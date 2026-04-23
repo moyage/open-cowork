@@ -15,6 +15,7 @@ HANDOFF_PACKAGE_SCHEMA = "handoff-package/v1"
 OWNER_TRANSFER_CONTINUITY_SCHEMA = "owner-transfer-continuity/v1"
 INCREMENT_PACKAGE_SCHEMA = "increment-package/v1"
 CLOSEOUT_PACKET_SCHEMA = "closeout-packet/v1"
+SYNC_PACKET_SCHEMA = "sync-packet/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -570,6 +571,120 @@ def materialize_closeout_packet(
     return str(target)
 
 
+def resolve_sync_packet(
+    root: str | Path,
+    *,
+    change_id: str,
+    source_kind: str,
+    sync_kind: str,
+    target_layer: str,
+    target_scope: str,
+    urgency: str,
+    headline: str,
+    delivered_scope: list[str],
+    pending_scope: list[str],
+    requested_attention: list[str],
+    requested_decisions: list[str],
+    next_owner_suggestion: str,
+    next_action_suggestion: str,
+) -> dict:
+    paths = GovernancePaths(Path(root))
+    if source_kind not in {"closeout", "increment"}:
+        raise ValueError("source_kind must be 'closeout' or 'increment'")
+    if sync_kind not in {"routine-sync", "escalation"}:
+        raise ValueError("sync_kind must be 'routine-sync' or 'escalation'")
+    if sync_kind == "escalation" and not (requested_attention or requested_decisions):
+        raise ValueError("escalation sync requires requested attention or requested decisions")
+
+    if source_kind == "closeout":
+        source_path = paths.closeout_packet_file(change_id)
+    else:
+        source_path = paths.increment_package_file(change_id)
+    if not source_path.exists():
+        raise ValueError(f"{source_kind} source for '{change_id}' does not exist")
+
+    source_payload = load_yaml(source_path)
+    refs = {f"{source_kind}_packet": str(source_path.relative_to(paths.root))}
+
+    runtime_timeline_ref = source_payload.get("refs", {}).get("runtime_timeline")
+    if runtime_timeline_ref:
+        refs["runtime_timeline"] = runtime_timeline_ref
+    owner_transfer_path = paths.owner_transfer_continuity_file(change_id)
+    if owner_transfer_path.exists():
+        refs["owner_transfer"] = str(owner_transfer_path.relative_to(paths.root))
+
+    source_status, source_summary = _sync_source_summary(source_kind, source_payload)
+
+    return {
+        "schema": SYNC_PACKET_SCHEMA,
+        "change_id": change_id,
+        "generated_at": _now_utc(),
+        "sync_kind": sync_kind,
+        "source_anchor": {
+            "source_kind": source_kind,
+            "source_ref": str(source_path.relative_to(paths.root)),
+            "source_status": source_status,
+            "source_summary": source_summary,
+        },
+        "target_context": {
+            "target_layer": target_layer,
+            "target_scope": target_scope,
+            "urgency": urgency,
+        },
+        "sync_summary": {
+            "headline": headline,
+            "delivered_scope": list(delivered_scope),
+            "pending_scope": list(pending_scope),
+            "requested_attention": list(requested_attention),
+            "requested_decisions": list(requested_decisions),
+        },
+        "continuity_bridge": {
+            "next_owner_suggestion": next_owner_suggestion,
+            "next_action_suggestion": next_action_suggestion,
+            "return_path_ref": str(source_path.relative_to(paths.root)),
+        },
+        "refs": refs,
+    }
+
+
+def materialize_sync_packet(
+    root: str | Path,
+    *,
+    change_id: str,
+    source_kind: str,
+    sync_kind: str,
+    target_layer: str,
+    target_scope: str,
+    urgency: str,
+    headline: str,
+    delivered_scope: list[str],
+    pending_scope: list[str],
+    requested_attention: list[str],
+    requested_decisions: list[str],
+    next_owner_suggestion: str,
+    next_action_suggestion: str,
+) -> str:
+    payload = resolve_sync_packet(
+        root,
+        change_id=change_id,
+        source_kind=source_kind,
+        sync_kind=sync_kind,
+        target_layer=target_layer,
+        target_scope=target_scope,
+        urgency=urgency,
+        headline=headline,
+        delivered_scope=delivered_scope,
+        pending_scope=pending_scope,
+        requested_attention=requested_attention,
+        requested_decisions=requested_decisions,
+        next_owner_suggestion=next_owner_suggestion,
+        next_action_suggestion=next_action_suggestion,
+    )
+    target = GovernancePaths(Path(root)).sync_packet_file(change_id, source_kind=source_kind)
+    write_yaml(target, payload)
+    return str(target)
+
+
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:
     return {
         "path": str(paths.change_file(change_id, name).relative_to(paths.root)),
@@ -655,6 +770,14 @@ def _carry_forward_section(paths: GovernancePaths, change_id: str, current_entry
 def _append_optional_closeout_ref(refs: dict, key: str, path: Path, root: Path) -> None:
     if path.exists():
         refs[key] = str(path.relative_to(root))
+
+
+def _sync_source_summary(source_kind: str, payload: dict) -> tuple[str | None, str | None]:
+    if source_kind == "closeout":
+        closure = payload.get("closure_summary", {})
+        return closure.get("final_status"), closure.get("closeout_statement")
+    anchor = payload.get("state_anchor", {})
+    return anchor.get("current_status"), anchor.get("next_decision")
 
 
 def _operator_start_pack(paths: GovernancePaths, change_id: str) -> list[str]:

@@ -76,6 +76,11 @@ class GovernancePaths:
     def closeout_packet_file(self, change_id: str) -> Path:
         return self.archived_change_dir(change_id) / "closeout-packet.yaml"
 
+    def sync_packet_file(self, change_id: str, *, source_kind: str) -> Path:
+        if source_kind == "closeout":
+            return self.archived_change_dir(change_id) / "sync-packet.yaml"
+        return self.change_dir(change_id) / "sync-packet.yaml"
+
     def status_snapshot_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "STATUS_SNAPSHOT.yaml"
 

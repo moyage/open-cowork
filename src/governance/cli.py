@@ -342,6 +342,29 @@ def cmd_continuity_closeout_packet(args):
     return 0
 
 
+def cmd_continuity_sync_packet(args):
+    from governance.continuity import materialize_sync_packet
+
+    output_path = materialize_sync_packet(
+        args.root,
+        change_id=args.change_id,
+        source_kind=args.source_kind,
+        sync_kind=args.sync_kind,
+        target_layer=args.target_layer,
+        target_scope=args.target_scope,
+        urgency=args.urgency,
+        headline=args.headline,
+        delivered_scope=list(args.delivered_scope or []),
+        pending_scope=list(args.pending_scope or []),
+        requested_attention=list(args.requested_attention or []),
+        requested_decisions=list(args.requested_decision or []),
+        next_owner_suggestion=args.next_owner_suggestion,
+        next_action_suggestion=args.next_action_suggestion,
+    )
+    print(f"Sync packet written: {output_path}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -521,6 +544,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_closeout.add_argument("--carry-forward-item", action="append", default=[], help="Carry forward item")
     p_continuity_closeout.add_argument("--operator-summary", required=True, help="Operator summary")
     p_continuity_closeout.add_argument("--sponsor-summary", required=True, help="Sponsor summary")
+    p_continuity_sync = p_continuity_sub.add_parser("sync-packet", help="Write sync or escalation packet yaml")
+    p_continuity_sync.add_argument("--change-id", required=True, help="Target change id")
+    p_continuity_sync.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
+    p_continuity_sync.add_argument("--sync-kind", choices=["routine-sync", "escalation"], required=True, help="Sync packet kind")
+    p_continuity_sync.add_argument("--target-layer", required=True, help="Target layer")
+    p_continuity_sync.add_argument("--target-scope", required=True, help="Target scope")
+    p_continuity_sync.add_argument("--urgency", required=True, help="Urgency signal")
+    p_continuity_sync.add_argument("--headline", required=True, help="Sync summary headline")
+    p_continuity_sync.add_argument("--delivered-scope", action="append", default=[], help="Delivered scope item")
+    p_continuity_sync.add_argument("--pending-scope", action="append", default=[], help="Pending scope item")
+    p_continuity_sync.add_argument("--requested-attention", action="append", default=[], help="Requested attention item")
+    p_continuity_sync.add_argument("--requested-decision", action="append", default=[], help="Requested decision item")
+    p_continuity_sync.add_argument("--next-owner-suggestion", required=True, help="Suggested next owner")
+    p_continuity_sync.add_argument("--next-action-suggestion", required=True, help="Suggested next action")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -575,6 +612,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_increment_package(args)
     elif args.command == "continuity" and args.subcmd == "closeout-packet":
         return cmd_continuity_closeout_packet(args)
+    elif args.command == "continuity" and args.subcmd == "sync-packet":
+        return cmd_continuity_sync_packet(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:

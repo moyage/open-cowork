@@ -758,6 +758,51 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["schema"], "closeout-packet/v1")
             self.assertIn("Closeout packet written", stdout.getvalue())
 
+
+
+    def test_continuity_sync_packet_command_materializes_output_from_closeout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-SYNC"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "closeout-packet.yaml", {
+                "schema": "closeout-packet/v1",
+                "change_id": change_id,
+                "closure_summary": {
+                    "final_status": "archived",
+                    "closeout_statement": "本轮已完成最小闭环并正式归档",
+                },
+                "refs": {
+                    "runtime_timeline": ".governance/runtime/timeline/events-202604.yaml",
+                },
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "sync-packet",
+                    "--change-id", change_id,
+                    "--source-kind", "closeout",
+                    "--sync-kind", "escalation",
+                    "--target-layer", "sponsor",
+                    "--target-scope", "project-level",
+                    "--urgency", "attention",
+                    "--headline", "建议进入更高层同步阶段",
+                    "--delivered-scope", "closeout-packet",
+                    "--pending-scope", "ecosystem-level sync",
+                    "--requested-attention", "确认上层同步边界",
+                    "--requested-decision", "是否以 sync-packet 作为默认上层输入",
+                    "--next-owner-suggestion", "sponsor-or-ecosystem-operator",
+                    "--next-action-suggestion", "review sync packet and decide next-level integration",
+                ])
+            self.assertEqual(exit_code, 0)
+            payload = load_yaml(archive_dir / "sync-packet.yaml")
+            self.assertEqual(payload["schema"], "sync-packet/v1")
+            self.assertIn("Sync packet written", stdout.getvalue())
+
     def test_continuity_owner_transfer_prepare_and_accept_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

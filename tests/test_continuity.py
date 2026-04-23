@@ -341,6 +341,129 @@ class ContinuityTests(unittest.TestCase):
                     sponsor_summary="n/a",
                 )
 
+
+
+    def test_materialize_sync_packet_from_closeout_anchor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-SYNC-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(archive_dir / "closeout-packet.yaml", {
+                "schema": "closeout-packet/v1",
+                "change_id": change_id,
+                "closure_summary": {
+                    "final_status": "archived",
+                    "closeout_statement": "本轮已完成最小闭环并正式归档",
+                },
+                "refs": {
+                    "runtime_timeline": ".governance/runtime/timeline/events-202604.yaml",
+                },
+            })
+
+            from governance.continuity import materialize_sync_packet
+
+            output_path = Path(materialize_sync_packet(
+                root,
+                change_id=change_id,
+                source_kind="closeout",
+                sync_kind="escalation",
+                target_layer="sponsor",
+                target_scope="project-level",
+                urgency="attention",
+                headline="建议进入更高层同步阶段",
+                delivered_scope=["closeout-packet"],
+                pending_scope=["ecosystem-level sync"],
+                requested_attention=["确认上层同步边界"],
+                requested_decisions=["是否以 sync-packet 作为默认上层输入"],
+                next_owner_suggestion="sponsor-or-ecosystem-operator",
+                next_action_suggestion="review sync packet and decide next-level integration",
+            ))
+            payload = load_yaml(output_path)
+
+            self.assertEqual(payload["schema"], "sync-packet/v1")
+            self.assertEqual(payload["source_anchor"]["source_kind"], "closeout")
+            self.assertEqual(output_path, archive_dir / "sync-packet.yaml")
+
+    def test_materialize_sync_packet_from_increment_anchor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-SYNC-2"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(change_dir / "increment-package.yaml", {
+                "schema": "increment-package/v1",
+                "change_id": change_id,
+                "state_anchor": {
+                    "current_status": "step7-verified",
+                    "next_decision": "Step 8 / Review and decide",
+                },
+                "refs": {
+                    "runtime_timeline": ".governance/runtime/timeline/events-202604.yaml",
+                },
+            })
+
+            from governance.continuity import materialize_sync_packet
+
+            output_path = Path(materialize_sync_packet(
+                root,
+                change_id=change_id,
+                source_kind="increment",
+                sync_kind="routine-sync",
+                target_layer="sponsor",
+                target_scope="project-level",
+                urgency="normal",
+                headline="阶段增量同步",
+                delivered_scope=["increment-package"],
+                pending_scope=[],
+                requested_attention=[],
+                requested_decisions=[],
+                next_owner_suggestion="reviewer",
+                next_action_suggestion="review increment result",
+            ))
+            payload = load_yaml(output_path)
+
+            self.assertEqual(payload["source_anchor"]["source_kind"], "increment")
+            self.assertEqual(output_path, change_dir / "sync-packet.yaml")
+
+    def test_sync_packet_requires_attention_or_decision_for_escalation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-SYNC-3"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "closeout-packet.yaml", {
+                "schema": "closeout-packet/v1",
+                "change_id": change_id,
+                "closure_summary": {"final_status": "archived", "closeout_statement": "done"},
+                "refs": {},
+            })
+
+            from governance.continuity import materialize_sync_packet
+
+            with self.assertRaises(ValueError):
+                materialize_sync_packet(
+                    root,
+                    change_id=change_id,
+                    source_kind="closeout",
+                    sync_kind="escalation",
+                    target_layer="sponsor",
+                    target_scope="project-level",
+                    urgency="attention",
+                    headline="需要升级",
+                    delivered_scope=["closeout-packet"],
+                    pending_scope=[],
+                    requested_attention=[],
+                    requested_decisions=[],
+                    next_owner_suggestion="sponsor",
+                    next_action_suggestion="decide next step",
+                )
+
     def test_prepare_owner_transfer_continuity_materializes_transfer_record(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
