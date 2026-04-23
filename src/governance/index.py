@@ -43,7 +43,14 @@ def read_current_change(root: str | Path) -> dict:
 
 def set_current_change(root: str | Path, change: dict) -> dict:
     paths = GovernancePaths(Path(root))
-    payload = {"current_change": change}
+    payload = {
+        "schema": "current-change/v1",
+        "status": change.get("status"),
+        "current_change_id": change.get("change_id") or change.get("current_change_id"),
+        "current_step": change.get("current_step"),
+        "formal_dispatch_status": change.get("formal_dispatch_status"),
+        "current_change": change,
+    }
     write_yaml(paths.current_change_file(), payload)
     return payload
 
@@ -64,3 +71,11 @@ def upsert_change_entry(root: str | Path, entry: dict) -> dict:
         changes.append(entry)
     write_yaml(paths.changes_index_file(), data)
     return data
+
+
+def set_maintenance_status(root: str | Path, **updates) -> dict:
+    paths = GovernancePaths(Path(root))
+    current = load_yaml(paths.maintenance_status_file())
+    merged = {**current, **updates}
+    write_yaml(paths.maintenance_status_file(), merged)
+    return merged

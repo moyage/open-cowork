@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .contract import load_contract
 from .paths import GovernancePaths
-from .simple_yaml import load_yaml
+from .simple_yaml import load_yaml, write_yaml
 from .state_consistency import evaluate_state_consistency
 
 STEP_MATRIX_TOTAL_STEPS = 9
@@ -42,6 +42,12 @@ ACTION_PURPOSES = {
     9: "Archive approved outputs and refresh maintenance state.",
 }
 DEFAULT_HUMAN_INTERVENTION_STEPS = {1, 2, 3, 5, 8, 9}
+PHASE_LABELS = {
+    1: "Phase 1 / 定义与对齐",
+    2: "Phase 2 / 方案与准备",
+    3: "Phase 3 / 执行与验证",
+    4: "Phase 4 / 审查与收束",
+}
 
 
 def render_step_matrix(root: str | Path, change_id: str | None = None) -> dict:
@@ -88,6 +94,62 @@ def render_step_matrix(root: str | Path, change_id: str | None = None) -> dict:
         "action_guide": _action_guide(bindings, manifest, current_status),
         "step_labels": STEP_LABELS,
     }
+
+
+def render_status_snapshot(root: str | Path, change_id: str | None = None) -> dict:
+    matrix = render_step_matrix(root, change_id)
+    current_step = matrix["current_step"]
+    current_phase_index = _phase_index_for_step(current_step)
+    next_decision_step = _next_human_decision_step(current_step)
+    blockers = matrix["blockers"]
+    return {
+        "schema": "status-snapshot/v1",
+        "change_id": matrix["change_id"],
+        "current_phase": PHASE_LABELS[current_phase_index],
+        "current_step": current_step,
+        "completed_steps": [step for step in range(1, STEP_MATRIX_TOTAL_STEPS + 1) if step < current_step],
+        "remaining_steps": [step for step in range(1, STEP_MATRIX_TOTAL_STEPS + 1) if step > current_step],
+        "current_owner": matrix["current_owner_or_stage_actor"],
+        "waiting_on": _resolve_waiting_on(current_step, blockers),
+        "next_decision": _resolve_next_decision(next_decision_step),
+        "human_intervention_required": bool(blockers) or _current_step_requires_human(current_step, matrix["human_intervention_points"]),
+        "project_summary": matrix["goal_summary"],
+        "current_status": matrix["current_status"],
+        "blockers": blockers,
+    }
+
+
+def format_status_snapshot_view(snapshot: dict) -> str:
+    lines = [
+        "# open-cowork status",
+        "",
+        "## Human status snapshot",
+        f"- current_phase: {snapshot['current_phase']}",
+        f"- current_step: {snapshot['current_step']}",
+        f"- current_owner: {snapshot['current_owner']}",
+        f"- waiting_on: {snapshot['waiting_on']}",
+        f"- next_decision: {snapshot['next_decision']}",
+        f"- human_intervention_required: {str(snapshot['human_intervention_required']).lower()}",
+        f"- project_summary: {snapshot['project_summary']}",
+    ]
+    lines.extend(["", "## Progress"])
+    lines.append(f"- completed_steps: {', '.join(str(step) for step in snapshot['completed_steps']) or 'none'}")
+    lines.append(f"- remaining_steps: {', '.join(str(step) for step in snapshot['remaining_steps']) or 'none'}")
+    lines.extend(["", "## Blockers"])
+    if snapshot["blockers"]:
+        for blocker in snapshot["blockers"]:
+            lines.append(f"- {blocker}")
+    else:
+        lines.append("- none")
+    return "\n".join(lines) + "\n"
+
+
+def write_status_snapshot(root: str | Path, change_id: str | None = None, output_path: str | Path | None = None) -> str:
+    snapshot = render_status_snapshot(root, change_id)
+    paths = GovernancePaths(Path(root))
+    target = Path(output_path) if output_path else paths.status_snapshot_file(snapshot["change_id"])
+    write_yaml(target, snapshot)
+    return str(target)
 
 
 def format_step_matrix_view(matrix: dict) -> str:
@@ -255,3 +317,52 @@ def _default_gate(step: int) -> str:
     if step == 6:
         return "auto-pass"
     return "guided"
+
+
+def _phase_index_for_step(current_step: int | str) -> int:
+    if not isinstance(current_step, int):
+        return 1
+    if current_step <= 2:
+        return 1
+    if current_step <= 5:
+        return 2
+    if current_step <= 7:
+        return 3
+    return 4
+
+
+def _next_human_decision_step(current_step: int | str) -> int | None:
+    if not isinstance(current_step, int):
+        return None
+    for step in range(current_step + 1, STEP_MATRIX_TOTAL_STEPS + 1):
+        if step in DEFAULT_HUMAN_INTERVENTION_STEPS:
+            return step
+    return None
+
+
+def _resolve_waiting_on(current_step: int | str, blockers: list[str]) -> str:
+    if blockers:
+        return blockers[0]
+    if current_step == 5:
+        return "Step 6 entry readiness and dispatch confirmation"
+    if current_step == 6:
+        return "Step 7 verify outputs and review-ready decision"
+    if current_step == 7:
+        return "Verification closure and review entry readiness"
+    if current_step == 8:
+        return "Review decision closure and archive entry readiness"
+    if current_step == 9:
+        return "Archive receipt and maintenance baseline refresh"
+    return "Current phase completion and next-step readiness"
+
+
+def _resolve_next_decision(step: int | None) -> str:
+    if not step:
+        return "none"
+    return f"Step {step} / {STEP_LABELS[step]}"
+
+
+def _current_step_requires_human(current_step: int | str, points: list[dict]) -> bool:
+    if not isinstance(current_step, int):
+        return False
+    return any(point["step"] == current_step for point in points)

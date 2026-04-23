@@ -17,6 +17,11 @@ def write_yaml(path: str | Path, data) -> None:
 
 def loads_yaml(text: str):
     lines = text.splitlines()
+    cleaned = [line.strip() for line in lines if line.strip()]
+    if cleaned == ["{}"]:
+        return {}
+    if cleaned == ["[]"]:
+        return []
     value, index = _parse_block(lines, 0, 0)
     while index < len(lines) and not _clean(lines[index]):
         index += 1
