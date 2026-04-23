@@ -464,6 +464,93 @@ class ContinuityTests(unittest.TestCase):
                     next_action_suggestion="decide next step",
                 )
 
+
+
+    def test_append_sync_history_from_closeout_sync_packet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-HIST-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "sync-packet.yaml", {
+                "schema": "sync-packet/v1",
+                "change_id": change_id,
+                "generated_at": "2026-04-24T12:00:00Z",
+                "sync_kind": "escalation",
+                "source_anchor": {"source_kind": "closeout"},
+                "target_context": {"target_layer": "sponsor", "target_scope": "project-level"},
+                "sync_summary": {"headline": "需要更高层同步"},
+            })
+
+            from governance.continuity import append_sync_history
+
+            output_path = Path(append_sync_history(root, change_id=change_id, source_kind="closeout"))
+            payload = load_yaml(output_path)
+            self.assertEqual(payload["schema"], "sync-history/v1")
+            self.assertEqual(len(payload["events"]), 1)
+            self.assertEqual(payload["events"][0]["packet_ref"], f".governance/archive/{change_id}/sync-packet.yaml")
+
+    def test_append_sync_history_deduplicates_same_packet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-HIST-2"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "sync-packet.yaml", {
+                "schema": "sync-packet/v1",
+                "change_id": change_id,
+                "generated_at": "2026-04-24T12:00:00Z",
+                "sync_kind": "routine-sync",
+                "source_anchor": {"source_kind": "closeout"},
+                "target_context": {"target_layer": "sponsor", "target_scope": "project-level"},
+                "sync_summary": {"headline": "阶段同步"},
+            })
+
+            from governance.continuity import append_sync_history
+
+            output_path = Path(append_sync_history(root, change_id=change_id, source_kind="closeout"))
+            append_sync_history(root, change_id=change_id, source_kind="closeout")
+            payload = load_yaml(output_path)
+            self.assertEqual(len(payload["events"]), 1)
+
+    def test_export_sync_packet_writes_minimum_external_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            export_root = root / "exports"
+            ensure_governance_index(root)
+            change_id = "CHG-EXP-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "sync-packet.yaml", {
+                "schema": "sync-packet/v1",
+                "change_id": change_id,
+                "generated_at": "2026-04-24T12:00:00Z",
+                "sync_kind": "escalation",
+                "source_anchor": {"source_kind": "closeout"},
+                "target_context": {"target_layer": "sponsor", "target_scope": "project-level"},
+                "sync_summary": {"headline": "需要更高层同步"},
+            })
+
+            from governance.continuity import export_sync_packet
+
+            export_dir = Path(export_sync_packet(root, change_id=change_id, source_kind="closeout", output_dir=export_root))
+            self.assertTrue((export_dir / "README.md").exists())
+            self.assertTrue((export_dir / "export-manifest.yaml").exists())
+            self.assertTrue((export_dir / "sync-packet.yaml").exists())
+
+    def test_export_sync_packet_fails_when_source_packet_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            export_root = root / "exports"
+            ensure_governance_index(root)
+
+            from governance.continuity import export_sync_packet
+
+            with self.assertRaises(ValueError):
+                export_sync_packet(root, change_id="CHG-EXP-2", source_kind="closeout", output_dir=export_root)
+
     def test_prepare_owner_transfer_continuity_materializes_transfer_record(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -37,6 +37,10 @@ class GovernancePaths:
     def runtime_timeline_dir(self) -> Path:
         return self.runtime_dir / "timeline"
 
+    @property
+    def sync_history_dir(self) -> Path:
+        return self.runtime_dir / "sync-history"
+
     def current_change_file(self) -> Path:
         return self.index_dir / "current-change.yaml"
 
@@ -96,6 +100,10 @@ class GovernancePaths:
     def runtime_timeline_month_file(self, month_key: str | None = None) -> Path:
         resolved_month = month_key or datetime.now(timezone.utc).strftime("%Y%m")
         return self.runtime_timeline_dir / f"events-{resolved_month}.yaml"
+
+    def sync_history_month_file(self, month_key: str | None = None) -> Path:
+        resolved_month = month_key or datetime.now(timezone.utc).strftime("%Y%m")
+        return self.sync_history_dir / f"events-{resolved_month}.yaml"
 
     def archived_change_dir(self, change_id: str) -> Path:
         return self.archive_dir / change_id

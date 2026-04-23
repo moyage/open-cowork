@@ -365,6 +365,27 @@ def cmd_continuity_sync_packet(args):
     return 0
 
 
+def cmd_continuity_sync_history(args):
+    from governance.continuity import append_sync_history
+
+    output_path = append_sync_history(args.root, change_id=args.change_id, source_kind=args.source_kind)
+    print(f"Sync history written: {output_path}")
+    return 0
+
+
+def cmd_continuity_export_sync_packet(args):
+    from governance.continuity import export_sync_packet
+
+    output_path = export_sync_packet(
+        args.root,
+        change_id=args.change_id,
+        source_kind=args.source_kind,
+        output_dir=args.output_dir,
+    )
+    print(f"Sync packet exported: {output_path}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -558,6 +579,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_sync.add_argument("--requested-decision", action="append", default=[], help="Requested decision item")
     p_continuity_sync.add_argument("--next-owner-suggestion", required=True, help="Suggested next owner")
     p_continuity_sync.add_argument("--next-action-suggestion", required=True, help="Suggested next action")
+    p_continuity_sync_history = p_continuity_sub.add_parser("sync-history", help="Append sync packet to project history")
+    p_continuity_sync_history.add_argument("--change-id", required=True, help="Target change id")
+    p_continuity_sync_history.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
+    p_continuity_export = p_continuity_sub.add_parser("export-sync-packet", help="Export sync packet to external directory")
+    p_continuity_export.add_argument("--change-id", required=True, help="Target change id")
+    p_continuity_export.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
+    p_continuity_export.add_argument("--output-dir", required=True, help="External export root directory")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -614,6 +642,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_closeout_packet(args)
     elif args.command == "continuity" and args.subcmd == "sync-packet":
         return cmd_continuity_sync_packet(args)
+    elif args.command == "continuity" and args.subcmd == "sync-history":
+        return cmd_continuity_sync_history(args)
+    elif args.command == "continuity" and args.subcmd == "export-sync-packet":
+        return cmd_continuity_export_sync_packet(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:

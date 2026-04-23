@@ -803,6 +803,67 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["schema"], "sync-packet/v1")
             self.assertIn("Sync packet written", stdout.getvalue())
 
+
+
+    def test_continuity_sync_history_command_appends_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-HIST"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "sync-packet.yaml", {
+                "schema": "sync-packet/v1",
+                "change_id": change_id,
+                "generated_at": "2026-04-24T12:00:00Z",
+                "sync_kind": "escalation",
+                "source_anchor": {"source_kind": "closeout"},
+                "target_context": {"target_layer": "sponsor", "target_scope": "project-level"},
+                "sync_summary": {"headline": "需要更高层同步"},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "sync-history",
+                    "--change-id", change_id,
+                    "--source-kind", "closeout",
+                ])
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Sync history written", stdout.getvalue())
+
+    def test_continuity_export_sync_packet_command_materializes_external_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            export_root = root / "exports"
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-EXP"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "sync-packet.yaml", {
+                "schema": "sync-packet/v1",
+                "change_id": change_id,
+                "generated_at": "2026-04-24T12:00:00Z",
+                "sync_kind": "escalation",
+                "source_anchor": {"source_kind": "closeout"},
+                "target_context": {"target_layer": "sponsor", "target_scope": "project-level"},
+                "sync_summary": {"headline": "需要更高层同步"},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "export-sync-packet",
+                    "--change-id", change_id,
+                    "--source-kind", "closeout",
+                    "--output-dir", str(export_root),
+                ])
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((export_root / change_id / "sync-packet.yaml").exists())
+            self.assertIn("Sync packet exported", stdout.getvalue())
+
     def test_continuity_owner_transfer_prepare_and_accept_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

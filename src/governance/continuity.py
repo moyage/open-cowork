@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import shutil
 from pathlib import Path
 
 from .index import read_changes_index, read_current_change
@@ -16,6 +17,8 @@ OWNER_TRANSFER_CONTINUITY_SCHEMA = "owner-transfer-continuity/v1"
 INCREMENT_PACKAGE_SCHEMA = "increment-package/v1"
 CLOSEOUT_PACKET_SCHEMA = "closeout-packet/v1"
 SYNC_PACKET_SCHEMA = "sync-packet/v1"
+SYNC_HISTORY_SCHEMA = "sync-history/v1"
+SYNC_EXPORT_MANIFEST_SCHEMA = "sync-export-manifest/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -685,6 +688,64 @@ def materialize_sync_packet(
     return str(target)
 
 
+def append_sync_history(root: str | Path, *, change_id: str, source_kind: str) -> str:
+    paths = GovernancePaths(Path(root))
+    packet_path = paths.sync_packet_file(change_id, source_kind=source_kind)
+    if not packet_path.exists():
+        raise ValueError(f"sync packet for '{change_id}' does not exist")
+    packet = load_yaml(packet_path)
+    recorded_at = packet.get("generated_at") or _now_utc()
+    month_key = recorded_at[:7].replace("-", "")
+    target = paths.sync_history_month_file(month_key)
+    current = load_yaml(target) if target.exists() else {
+        "schema": SYNC_HISTORY_SCHEMA,
+        "month": month_key,
+        "events": [],
+    }
+    event = {
+        "event_id": f"{change_id}-sync-{recorded_at.replace('-', '').replace(':', '')}",
+        "change_id": change_id,
+        "recorded_at": recorded_at,
+        "sync_kind": packet.get("sync_kind"),
+        "source_kind": source_kind,
+        "target_layer": packet.get("target_context", {}).get("target_layer"),
+        "target_scope": packet.get("target_context", {}).get("target_scope"),
+        "packet_ref": str(packet_path.relative_to(paths.root)),
+        "headline": packet.get("sync_summary", {}).get("headline"),
+    }
+    current["events"] = _merge_sync_history_events(current.get("events", []), event)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    write_yaml(target, current)
+    return str(target)
+
+
+def export_sync_packet(root: str | Path, *, change_id: str, source_kind: str, output_dir: str | Path) -> str:
+    paths = GovernancePaths(Path(root))
+    packet_path = paths.sync_packet_file(change_id, source_kind=source_kind)
+    if not packet_path.exists():
+        raise ValueError(f"sync packet for '{change_id}' does not exist")
+    packet = load_yaml(packet_path)
+    export_root = Path(output_dir)
+    export_target = export_root / change_id
+    export_target.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(packet_path, export_target / "sync-packet.yaml")
+    manifest = {
+        "schema": SYNC_EXPORT_MANIFEST_SCHEMA,
+        "change_id": change_id,
+        "exported_at": _now_utc(),
+        "source_sync_packet": str(packet_path.relative_to(paths.root)),
+        "export_dir": str(export_target),
+        "files": ["README.md", "export-manifest.yaml", "sync-packet.yaml"],
+    }
+    write_yaml(export_target / "export-manifest.yaml", manifest)
+    (export_target / "README.md").write_text(
+        _render_sync_export_readme(change_id, packet, manifest),
+        encoding="utf-8",
+    )
+    return str(export_target)
+
+
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:
     return {
         "path": str(paths.change_file(change_id, name).relative_to(paths.root)),
@@ -770,6 +831,28 @@ def _carry_forward_section(paths: GovernancePaths, change_id: str, current_entry
 def _append_optional_closeout_ref(refs: dict, key: str, path: Path, root: Path) -> None:
     if path.exists():
         refs[key] = str(path.relative_to(root))
+
+
+def _merge_sync_history_events(existing: list[dict], new_event: dict) -> list[dict]:
+    for item in existing:
+        if item.get("packet_ref") == new_event.get("packet_ref"):
+            return existing
+    return list(existing) + [new_event]
+
+
+def _render_sync_export_readme(change_id: str, packet: dict, manifest: dict) -> str:
+    return "\n".join([
+        "# Sync Packet Export",
+        "",
+        f"- change_id: {change_id}",
+        f"- sync_kind: {packet.get('sync_kind')}",
+        f"- source_kind: {packet.get('source_anchor', {}).get('source_kind')}",
+        f"- headline: {packet.get('sync_summary', {}).get('headline')}",
+        f"- exported_at: {manifest.get('exported_at')}",
+        "",
+        "本目录是显式导出的上层消费包，不是项目内 authoritative truth-source。",
+        "",
+    ])
 
 
 def _sync_source_summary(source_kind: str, payload: dict) -> tuple[str | None, str | None]:
