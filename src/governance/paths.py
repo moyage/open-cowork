@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -23,6 +24,18 @@ class GovernancePaths:
     @property
     def archive_dir(self) -> Path:
         return self.governance_dir / "archive"
+
+    @property
+    def runtime_dir(self) -> Path:
+        return self.governance_dir / "runtime"
+
+    @property
+    def runtime_status_dir(self) -> Path:
+        return self.runtime_dir / "status"
+
+    @property
+    def runtime_timeline_dir(self) -> Path:
+        return self.runtime_dir / "timeline"
 
     def current_change_file(self) -> Path:
         return self.index_dir / "current-change.yaml"
@@ -53,6 +66,19 @@ class GovernancePaths:
 
     def status_snapshot_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "STATUS_SNAPSHOT.yaml"
+
+    def runtime_change_status_file(self) -> Path:
+        return self.runtime_status_dir / "change-status.yaml"
+
+    def runtime_steps_status_file(self) -> Path:
+        return self.runtime_status_dir / "steps-status.yaml"
+
+    def runtime_participants_status_file(self) -> Path:
+        return self.runtime_status_dir / "participants-status.yaml"
+
+    def runtime_timeline_month_file(self, month_key: str | None = None) -> Path:
+        resolved_month = month_key or datetime.now(timezone.utc).strftime("%Y%m")
+        return self.runtime_timeline_dir / f"events-{resolved_month}.yaml"
 
     def archived_change_dir(self, change_id: str) -> Path:
         return self.archive_dir / change_id

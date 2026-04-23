@@ -184,6 +184,30 @@ def cmd_continuity_round_entry_summary(args):
     return 0
 
 
+def cmd_runtime_status(args):
+    from governance.runtime_status import materialize_runtime_status
+
+    try:
+        result = materialize_runtime_status(args.root, args.change_id)
+        print(f"Runtime status written: {result['change_status_path']}")
+        return 0
+    except Exception as exc:
+        print(f"Runtime status failed: {exc}")
+        return 1
+
+
+def cmd_timeline(args):
+    from governance.runtime_status import materialize_timeline
+
+    try:
+        result = materialize_timeline(args.root, args.change_id)
+        print(f"Timeline written: {result['path']}")
+        return 0
+    except Exception as exc:
+        print(f"Timeline failed: {exc}")
+        return 1
+
+
 def cmd_diagnose_session(args):
     from governance.hermes_recovery import diagnose_hermes_execution_stall
 
@@ -274,6 +298,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")
     subparsers.add_parser("status", help="Show current step, gate status, and blockers")
+    p_runtime_status = subparsers.add_parser("runtime-status", help="Write machine-readable runtime status snapshot")
+    p_runtime_status.add_argument("--change-id", required=True, help="Target change id")
+    p_timeline = subparsers.add_parser("timeline", help="Write machine-readable runtime timeline")
+    p_timeline.add_argument("--change-id", required=True, help="Target change id")
     p_continuity = subparsers.add_parser("continuity", help="Materialize minimum continuity outputs")
     p_continuity_sub = p_continuity.add_subparsers(dest="subcmd")
     p_continuity_launch = p_continuity_sub.add_parser("launch-input", help="Write continuity launch input yaml")
@@ -316,6 +344,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_review(args)
     elif args.command == "archive":
         return cmd_archive(args)
+    elif args.command == "runtime-status":
+        return cmd_runtime_status(args)
+    elif args.command == "timeline":
+        return cmd_timeline(args)
     elif args.command == "continuity" and args.subcmd == "launch-input":
         return cmd_continuity_launch_input(args)
     elif args.command == "continuity" and args.subcmd == "round-entry-summary":
