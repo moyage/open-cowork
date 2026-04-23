@@ -93,6 +93,8 @@ def upsert_change_entry(root: str | Path, entry: dict) -> dict:
 def set_maintenance_status(root: str | Path, **updates) -> dict:
     paths = GovernancePaths(Path(root))
     current = load_yaml(paths.maintenance_status_file())
+    _ensure_non_regressive_maintenance_status(current, updates)
+    _ensure_sticky_archive_baseline(current, updates)
     merged = {**current, **updates}
     write_yaml(paths.maintenance_status_file(), merged)
     return merged
@@ -152,3 +154,61 @@ def _normalize_step(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _ensure_non_regressive_maintenance_status(current: dict, updates: dict) -> None:
+    existing_change_id = current.get("current_change_id")
+    incoming_change_id = updates.get("current_change_id", existing_change_id)
+
+    if existing_change_id and incoming_change_id and str(existing_change_id) == str(incoming_change_id):
+        existing_status = current.get("status")
+        incoming_status = updates.get("status", existing_status)
+        _ensure_non_regressive_status_pair(
+            change_id=incoming_change_id,
+            existing_status=existing_status,
+            incoming_status=incoming_status,
+        )
+
+        existing_active = current.get("current_change_active")
+        incoming_active = updates.get("current_change_active", existing_active)
+        _ensure_non_regressive_status_pair(
+            change_id=incoming_change_id,
+            existing_status=existing_active,
+            incoming_status=incoming_active,
+        )
+
+    if (
+        updates.get("current_change_id") is None
+        and updates.get("status") == "idle"
+        and updates.get("current_change_active") == "none"
+    ):
+        return
+
+
+def _ensure_non_regressive_status_pair(*, change_id, existing_status, incoming_status) -> None:
+    existing_rank = _status_rank(existing_status)
+    incoming_rank = _status_rank(incoming_status)
+    if existing_rank is None or incoming_rank is None:
+        return
+    if incoming_rank < existing_rank:
+        raise ValueError(
+            f"maintenance-status for change '{change_id}' cannot regress from '{existing_status}' to '{incoming_status}'"
+        )
+
+
+def _ensure_sticky_archive_baseline(current: dict, updates: dict) -> None:
+    if current.get("last_archived_change") is not None and "last_archived_change" in updates and updates.get("last_archived_change") is None:
+        raise ValueError("maintenance-status cannot clear last_archived_change once established")
+    if current.get("last_archive_at") is not None and "last_archive_at" in updates and updates.get("last_archive_at") is None:
+        raise ValueError("maintenance-status cannot clear last_archive_at once established")
+
+
+def _status_rank(value):
+    if value in (None, ""):
+        return None
+    normalized = str(value)
+    if normalized == "draft":
+        normalized = "drafting"
+    if normalized == "none":
+        normalized = "idle"
+    return _STATUS_RANKS.get(normalized, 0 if normalized == "idle" else None)

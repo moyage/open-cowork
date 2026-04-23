@@ -59,6 +59,8 @@
 - `plans/19-milestone2-sync-history-and-external-export-implementation-plan.md`
 - `plans/20-milestone2-boundary-hardening-design.md`
 - `plans/21-milestone2-boundary-hardening-implementation-plan.md`
+- `plans/22-milestone2-maintenance-status-hardening-design.md`
+- `plans/23-milestone2-maintenance-status-hardening-implementation-plan.md`
 
 ## 报告与实践材料
 
