@@ -72,6 +72,16 @@ class CliTests(unittest.TestCase):
                 event["change_id"] == "CHG-CLI-CONTRACT" and event["event_type"] == "contract_validate_fail"
                 for event in payload["events"]
             ))
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "contract", "validate", "--change-id", "CHG-CLI-CONTRACT"])
+            self.assertEqual(exit_code, 1)
+
+            payload = load_yaml(month_file)
+            fail_events = [
+                event for event in payload["events"]
+                if event["change_id"] == "CHG-CLI-CONTRACT" and event["event_type"] == "contract_validate_fail"
+            ]
+            self.assertEqual(len(fail_events), 2)
 
     def test_change_create_sets_active_change_and_index_entry(self):
         with tempfile.TemporaryDirectory() as tmp:

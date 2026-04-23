@@ -96,11 +96,16 @@ def _build_steps_status(paths: GovernancePaths, change_id: str) -> dict:
             "gate": binding.get("gate") or _default_gate(step),
             "human_intervention_required": _gate_requires_human(binding.get("gate") or _default_gate(step)),
         })
+    completed_steps = [item["step"] for item in steps if item["status"] == "completed"]
+    blocked_steps = [item["step"] for item in steps if item["status"] == "blocked"]
     return {
         "schema": "runtime-steps-status/v1",
         "change_id": change_id,
         "phase": PHASE_LABELS[_phase_index(current_step)],
         "current_step": current_step,
+        "next_step": _next_step(current_step),
+        "completed_steps": completed_steps,
+        "blocked_steps": blocked_steps,
         "steps": steps,
         "generated_at": _now_utc(),
     }
@@ -327,6 +332,14 @@ def _phase_index(current_step: int | str) -> int:
     if current_step <= 7:
         return 3
     return 4
+
+
+def _next_step(current_step: int | str) -> int | None:
+    if not isinstance(current_step, int):
+        return None
+    if current_step >= 9:
+        return None
+    return current_step + 1
 
 
 def _load_optional_yaml(path: Path) -> dict:

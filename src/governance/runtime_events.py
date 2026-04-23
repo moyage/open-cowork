@@ -30,9 +30,15 @@ def append_runtime_event(
         "events": [],
         "generated_at": _now_utc(),
     }
+    event_id = _next_instance_event_id(
+        payload.get("events", []),
+        change_id=change_id,
+        event_type=event_type,
+        event_suffix=event_suffix,
+    )
     event = {
         "schema": "runtime-event/v1",
-        "event_id": _event_id(change_id, event_type, event_suffix),
+        "event_id": event_id,
         "change_id": change_id,
         "entity_type": "change",
         "event_type": event_type,
@@ -77,6 +83,22 @@ def _event_id(change_id: str, event_type: str, suffix: str | None) -> str:
     if suffix:
         return f"{change_id}-{event_type}-{suffix}"
     return f"{change_id}-{event_type}"
+
+
+def _next_instance_event_id(
+    existing_events: list[dict],
+    *,
+    change_id: str,
+    event_type: str,
+    event_suffix: str | None,
+) -> str:
+    base_id = _event_id(change_id, event_type, event_suffix)
+    matching = [
+        item.get("event_id", "")
+        for item in existing_events
+        if str(item.get("event_id", "")).startswith(base_id)
+    ]
+    return f"{base_id}-{len(matching) + 1:04d}"
 
 
 def _event_timestamp(source_path: Path) -> str:
