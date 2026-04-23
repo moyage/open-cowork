@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .change_package import update_manifest
 from .index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
+from .lifecycle import require_transition_state
 from .paths import GovernancePaths
 from .simple_yaml import load_yaml, write_yaml
 from .state_consistency import write_state_consistency_result
@@ -12,6 +13,13 @@ from .step_matrix import write_step_matrix_view
 
 def write_verify_result(root: str | Path, change_id: str) -> dict:
     paths = GovernancePaths(Path(root))
+    require_transition_state(
+        root,
+        change_id,
+        expected_step=6,
+        allowed_statuses=["step6-executed-pre-step7"],
+        action_label="verify",
+    )
     evidence_summary_path = paths.evidence_dir(change_id) / "execution-summary.yaml"
     if not evidence_summary_path.exists():
         raise ValueError(f"change '{change_id}' has no execution evidence; run step 6 before verify")

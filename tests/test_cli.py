@@ -211,6 +211,90 @@ class CliTests(unittest.TestCase):
             self.assertIn("Review failed", stdout.getvalue())
             self.assertEqual(load_yaml(change_dir / "review.yaml"), {})
 
+    def test_verify_requires_step6_execution_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-CLI-VERIFY",
+                    "--title",
+                    "Verify gate",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-CLI-VERIFY"
+            (change_dir / "evidence").mkdir(exist_ok=True)
+            write_yaml(change_dir / "evidence/execution-summary.yaml", {
+                "status": "success",
+                "artifacts": {"created": [], "modified": []},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                verify_exit = main([
+                    "--root",
+                    str(root),
+                    "verify",
+                    "--change-id",
+                    "CHG-CLI-VERIFY",
+                ])
+
+            self.assertEqual(verify_exit, 1)
+            self.assertIn("Verify failed", stdout.getvalue())
+
+    def test_review_requires_step7_verified_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-CLI-REVIEW-STATE",
+                    "--title",
+                    "Review state gate",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-CLI-REVIEW-STATE"
+            manifest = load_yaml(change_dir / "manifest.yaml")
+            manifest["status"] = "step6-executed-pre-step7"
+            manifest["current_step"] = 6
+            write_yaml(change_dir / "manifest.yaml", manifest)
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": "CHG-CLI-REVIEW-STATE",
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                review_exit = main([
+                    "--root",
+                    str(root),
+                    "review",
+                    "--change-id",
+                    "CHG-CLI-REVIEW-STATE",
+                    "--decision",
+                    "approve",
+                    "--reviewer",
+                    "reviewer-agent",
+                    "--rationale",
+                    "Should fail before step7 state is recorded",
+                ])
+
+            self.assertEqual(review_exit, 1)
+            self.assertIn("Review failed", stdout.getvalue())
+
     def test_archive_requires_approved_review(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -247,6 +331,43 @@ class CliTests(unittest.TestCase):
             self.assertEqual(archive_exit, 1)
             self.assertIn("Archive failed", stdout.getvalue())
             self.assertFalse((root / ".governance/archive/CHG-CLI-ARCHIVE").exists())
+
+    def test_archive_requires_step8_review_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-CLI-ARCHIVE-STATE",
+                    "--title",
+                    "Archive state gate",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-CLI-ARCHIVE-STATE"
+            write_yaml(change_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": "CHG-CLI-ARCHIVE-STATE",
+                "decision": {"status": "approve", "rationale": "looks good"},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                archive_exit = main([
+                    "--root",
+                    str(root),
+                    "archive",
+                    "--change-id",
+                    "CHG-CLI-ARCHIVE-STATE",
+                ])
+
+            self.assertEqual(archive_exit, 1)
+            self.assertIn("Archive failed", stdout.getvalue())
+            self.assertFalse((root / ".governance/archive/CHG-CLI-ARCHIVE-STATE").exists())
 
     def test_status_outputs_human_facing_phase_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:

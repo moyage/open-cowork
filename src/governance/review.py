@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .change_package import update_manifest
 from .index import read_current_change, set_current_change, upsert_change_entry
+from .lifecycle import require_transition_state
 from .paths import GovernancePaths
 from .simple_yaml import load_yaml, write_yaml
 
@@ -17,6 +18,13 @@ def write_review_decision(
     rationale: str = "",
 ) -> dict:
     paths = GovernancePaths(Path(root))
+    require_transition_state(
+        root,
+        change_id,
+        expected_step=7,
+        allowed_statuses=["step7-verified"],
+        action_label="review",
+    )
     verify_path = paths.change_file(change_id, "verify.yaml")
     verify_payload = load_yaml(verify_path) if verify_path.exists() else {}
     if verify_payload.get("summary", {}).get("status") != "pass":
