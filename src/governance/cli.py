@@ -302,6 +302,25 @@ def cmd_continuity_owner_transfer_accept(args):
     return 0
 
 
+def cmd_continuity_increment_package(args):
+    from governance.continuity import materialize_increment_package
+
+    output_path = materialize_increment_package(
+        args.root,
+        change_id=args.change_id,
+        reason=args.reason,
+        segment_owner=args.segment_owner,
+        segment_label=args.segment_label,
+        new_findings=list(args.new_finding or []),
+        invalidated_assumptions=list(args.invalidated_assumption or []),
+        new_risks=list(args.new_risk or []),
+        blockers=list(args.blocker or []),
+        next_followups=list(args.next_followup or []),
+    )
+    print(f"Increment package written: {output_path}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -459,6 +478,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_owner_transfer_accept.add_argument("--change-id", required=True, help="Target change id")
     p_owner_transfer_accept.add_argument("--accepted-by", required=True, help="Receiver accepting transfer")
     p_owner_transfer_accept.add_argument("--note", default="", help="Optional acceptance note")
+    p_continuity_increment = p_continuity_sub.add_parser("increment-package", help="Write increment package yaml")
+    p_continuity_increment.add_argument("--change-id", required=True, help="Target change id")
+    p_continuity_increment.add_argument("--reason", required=True, help="Increment reason")
+    p_continuity_increment.add_argument("--segment-owner", required=True, help="Segment owner id")
+    p_continuity_increment.add_argument("--segment-label", required=True, help="Segment label")
+    p_continuity_increment.add_argument("--new-finding", action="append", default=[], help="New finding")
+    p_continuity_increment.add_argument("--invalidated-assumption", action="append", default=[], help="Invalidated assumption")
+    p_continuity_increment.add_argument("--new-risk", action="append", default=[], help="New risk")
+    p_continuity_increment.add_argument("--blocker", action="append", default=[], help="Blocker")
+    p_continuity_increment.add_argument("--next-followup", action="append", default=[], help="Next followup")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -509,6 +538,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_owner_transfer_prepare(args)
     elif args.command == "continuity" and args.subcmd == "owner-transfer" and args.owner_transfer_subcmd == "accept":
         return cmd_continuity_owner_transfer_accept(args)
+    elif args.command == "continuity" and args.subcmd == "increment-package":
+        return cmd_continuity_increment_package(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:

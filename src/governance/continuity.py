@@ -13,6 +13,7 @@ CONTINUITY_LAUNCH_INPUT_SCHEMA = "continuity-launch-input/v1"
 ROUND_ENTRY_INPUT_SUMMARY_SCHEMA = "round-entry-input-summary/v1"
 HANDOFF_PACKAGE_SCHEMA = "handoff-package/v1"
 OWNER_TRANSFER_CONTINUITY_SCHEMA = "owner-transfer-continuity/v1"
+INCREMENT_PACKAGE_SCHEMA = "increment-package/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -337,6 +338,95 @@ def accept_owner_transfer_continuity(
     })
     write_yaml(target, payload)
     return payload
+
+
+def resolve_increment_package(
+    root: str | Path,
+    *,
+    change_id: str,
+    reason: str,
+    segment_owner: str,
+    segment_label: str,
+    new_findings: list[str],
+    invalidated_assumptions: list[str],
+    new_risks: list[str],
+    blockers: list[str],
+    next_followups: list[str],
+) -> dict:
+    if not any([new_findings, invalidated_assumptions, new_risks, blockers, next_followups]):
+        raise ValueError("increment package requires at least one delta item")
+    paths = GovernancePaths(Path(root))
+    handoff_path = paths.handoff_package_file(change_id)
+    if not handoff_path.exists():
+        materialize_handoff_package(root, change_id)
+    handoff_payload = load_yaml(handoff_path)
+    runtime_payload = _ensure_runtime_status_payload(paths, change_id)
+    refs = {
+        "handoff_package": str(handoff_path.relative_to(paths.root)),
+        "runtime_change_status": str(paths.runtime_change_status_file().relative_to(paths.root)),
+        "runtime_timeline": str(paths.runtime_timeline_month_file().relative_to(paths.root)),
+    }
+    verify_path = paths.change_file(change_id, "verify.yaml")
+    if verify_path.exists():
+        refs["verify"] = str(verify_path.relative_to(paths.root))
+    owner_transfer_path = paths.owner_transfer_continuity_file(change_id)
+    if owner_transfer_path.exists():
+        refs["owner_transfer"] = str(owner_transfer_path.relative_to(paths.root))
+    return {
+        "schema": INCREMENT_PACKAGE_SCHEMA,
+        "change_id": change_id,
+        "generated_at": _now_utc(),
+        "increment_context": {
+            "increment_reason": reason,
+            "segment_owner": segment_owner,
+            "segment_label": segment_label,
+        },
+        "state_anchor": {
+            "current_status": handoff_payload.get("summary", {}).get("current_status"),
+            "current_step": handoff_payload.get("summary", {}).get("current_step"),
+            "current_phase": handoff_payload.get("summary", {}).get("current_phase"),
+            "next_decision": handoff_payload.get("summary", {}).get("next_decision")
+            or runtime_payload["change_status"].get("gate_posture", {}).get("next_decision"),
+        },
+        "delta": {
+            "new_findings": list(new_findings),
+            "invalidated_assumptions": list(invalidated_assumptions),
+            "new_risks": list(new_risks),
+            "blockers": list(blockers),
+            "next_followups": list(next_followups),
+        },
+        "refs": refs,
+    }
+
+
+def materialize_increment_package(
+    root: str | Path,
+    *,
+    change_id: str,
+    reason: str,
+    segment_owner: str,
+    segment_label: str,
+    new_findings: list[str],
+    invalidated_assumptions: list[str],
+    new_risks: list[str],
+    blockers: list[str],
+    next_followups: list[str],
+) -> str:
+    payload = resolve_increment_package(
+        root,
+        change_id=change_id,
+        reason=reason,
+        segment_owner=segment_owner,
+        segment_label=segment_label,
+        new_findings=new_findings,
+        invalidated_assumptions=invalidated_assumptions,
+        new_risks=new_risks,
+        blockers=blockers,
+        next_followups=next_followups,
+    )
+    target = GovernancePaths(Path(root)).increment_package_file(change_id)
+    write_yaml(target, payload)
+    return str(target)
 
 
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:

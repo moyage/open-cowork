@@ -70,6 +70,9 @@ class GovernancePaths:
     def owner_transfer_continuity_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "owner-transfer-continuity.yaml"
 
+    def increment_package_file(self, change_id: str) -> Path:
+        return self.change_dir(change_id) / "increment-package.yaml"
+
     def status_snapshot_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "STATUS_SNAPSHOT.yaml"
 

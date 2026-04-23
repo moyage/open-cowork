@@ -800,6 +800,104 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["acceptance"]["status"], "accepted")
             self.assertEqual(payload["acceptance"]["accepted_by"], "reviewer-agent-b")
 
+    def test_continuity_increment_package_command_materializes_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-INCR"
+
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "CLI increment package",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit increment package from CLI",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["IncrementPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nEmit increment package from CLI.\n", encoding="utf-8")
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step7-verified",
+                "current_change_id": change_id,
+                "current_step": 7,
+                "current_change": {
+                    "change_id": change_id,
+                    "status": "step7-verified",
+                    "current_step": 7,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-verified",
+                "current_change_active": "step7-verified",
+                "current_change_id": change_id,
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "increment-package",
+                    "--change-id", change_id,
+                    "--reason", "post-verify update",
+                    "--segment-owner", "verifier-agent",
+                    "--segment-label", "verify-to-review",
+                    "--new-finding", "runtime status schema 已稳定",
+                    "--invalidated-assumption", "timeline 可以只靠生成式补写",
+                    "--new-risk", "owner transfer 尚未进入 review trace",
+                    "--blocker", "review gate still pending",
+                    "--next-followup", "prepare review decision",
+                ])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Increment package written:", stdout.getvalue())
+            payload = load_yaml(root / f".governance/changes/{change_id}/increment-package.yaml")
+            self.assertEqual(payload["increment_context"]["segment_label"], "verify-to-review")
+            self.assertEqual(payload["delta"]["blockers"], ["review gate still pending"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,10 +8,12 @@ import test_support  # noqa: F401
 
 from governance.continuity import (
     accept_owner_transfer_continuity,
+    materialize_increment_package,
     materialize_continuity_launch_input,
     materialize_handoff_package,
     materialize_round_entry_input_summary,
     prepare_owner_transfer_continuity,
+    resolve_increment_package,
     resolve_continuity_launch_input,
     resolve_handoff_package,
     resolve_round_entry_input_summary,
@@ -21,6 +23,226 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class ContinuityTests(unittest.TestCase):
+    def test_materialize_increment_package_records_delta_and_handoff_ref(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-INCR-1"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "increment package materialization",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "materialize increment package",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["IncrementPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nMaterialize increment package.\n", encoding="utf-8")
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+
+            output_path = Path(materialize_increment_package(
+                root,
+                change_id=change_id,
+                reason="post-verify update",
+                segment_owner="verifier-agent",
+                segment_label="verify-to-review",
+                new_findings=["runtime status schema 已稳定"],
+                invalidated_assumptions=["timeline 可以只靠生成式补写"],
+                new_risks=["owner transfer 尚未进入 review trace"],
+                blockers=["review gate still pending"],
+                next_followups=["prepare review decision"],
+            ))
+            payload = load_yaml(output_path)
+
+            self.assertEqual(payload["schema"], "increment-package/v1")
+            self.assertEqual(payload["increment_context"]["segment_owner"], "verifier-agent")
+            self.assertIn("handoff_package", payload["refs"])
+            self.assertTrue((root / f".governance/changes/{change_id}/handoff-package.yaml").exists())
+
+    def test_increment_package_omits_owner_transfer_ref_when_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-INCR-2"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "increment without owner transfer",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "increment package without owner transfer",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["IncrementPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nIncrement without owner transfer.\n", encoding="utf-8")
+
+            payload = resolve_increment_package(
+                root,
+                change_id=change_id,
+                reason="post-verify update",
+                segment_owner="verifier-agent",
+                segment_label="verify-to-review",
+                new_findings=["runtime status schema 已稳定"],
+                invalidated_assumptions=[],
+                new_risks=[],
+                blockers=[],
+                next_followups=[],
+            )
+
+            self.assertNotIn("owner_transfer", payload["refs"])
+
+    def test_increment_package_requires_non_empty_delta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-INCR-3"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "increment empty delta",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "increment empty delta",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["IncrementPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nIncrement empty delta.\n", encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                materialize_increment_package(
+                    root,
+                    change_id=change_id,
+                    reason="empty delta",
+                    segment_owner="verifier-agent",
+                    segment_label="verify-to-review",
+                    new_findings=[],
+                    invalidated_assumptions=[],
+                    new_risks=[],
+                    blockers=[],
+                    next_followups=[],
+                )
+
     def test_prepare_owner_transfer_continuity_materializes_transfer_record(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
