@@ -387,6 +387,140 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(payload["source_anchor"]["source_kind"], "closeout")
             self.assertEqual(output_path, archive_dir / "sync-packet.yaml")
 
+    def test_closeout_packet_omits_runtime_change_status_when_active_snapshot_belongs_to_other_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-REF-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "closeout refs consistency",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+            runtime_status_dir = root / ".governance/runtime/status"
+            runtime_status_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(runtime_status_dir / "change-status.yaml", {
+                "schema": "runtime-change-status/v1",
+                "change_id": "CHG-OTHER",
+                "current_status": "step7-verified",
+                "current_step": 7,
+                "phase": "执行与验证",
+            })
+            write_yaml(runtime_status_dir / "steps-status.yaml", {
+                "schema": "runtime-steps-status/v1",
+                "change_id": "CHG-OTHER",
+                "current_step": 7,
+                "steps": [],
+            })
+            write_yaml(runtime_status_dir / "participants-status.yaml", {
+                "schema": "runtime-participants-status/v1",
+                "change_id": "CHG-OTHER",
+                "participants": [],
+            })
+
+            from governance.continuity import resolve_closeout_packet
+
+            payload = resolve_closeout_packet(
+                root,
+                change_id=change_id,
+                closeout_statement="closeout",
+                delivered_scope=["continuity"],
+                deferred_scope=[],
+                key_outcomes=["done"],
+                unresolved_items=[],
+                next_direction="sync",
+                attention_points=[],
+                carry_forward_items=[],
+                operator_summary="ok",
+                sponsor_summary="ok",
+            )
+
+            self.assertNotIn("runtime_change_status", payload["refs"])
+
+    def test_closeout_packet_omits_runtime_timeline_ref_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-REF-2"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "closeout refs consistency",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+
+            from governance.continuity import resolve_closeout_packet
+
+            payload = resolve_closeout_packet(
+                root,
+                change_id=change_id,
+                closeout_statement="closeout",
+                delivered_scope=["continuity"],
+                deferred_scope=[],
+                key_outcomes=["done"],
+                unresolved_items=[],
+                next_direction="sync",
+                attention_points=[],
+                carry_forward_items=[],
+                operator_summary="ok",
+                sponsor_summary="ok",
+            )
+
+            self.assertNotIn("runtime_timeline", payload["refs"])
+
     def test_materialize_sync_packet_from_increment_anchor(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -429,6 +563,118 @@ class ContinuityTests(unittest.TestCase):
 
             self.assertEqual(payload["source_anchor"]["source_kind"], "increment")
             self.assertEqual(output_path, change_dir / "sync-packet.yaml")
+
+    def test_sync_packet_omits_runtime_timeline_when_source_ref_target_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-SYNC-REF-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "closeout-packet.yaml", {
+                "schema": "closeout-packet/v1",
+                "change_id": change_id,
+                "closure_summary": {
+                    "final_status": "archived",
+                    "closeout_statement": "done",
+                },
+                "refs": {
+                    "runtime_timeline": ".governance/runtime/timeline/events-202604.yaml",
+                },
+            })
+
+            from governance.continuity import resolve_sync_packet
+
+            payload = resolve_sync_packet(
+                root,
+                change_id=change_id,
+                source_kind="closeout",
+                sync_kind="routine-sync",
+                target_layer="sponsor",
+                target_scope="project-level",
+                urgency="normal",
+                headline="sync",
+                delivered_scope=["closeout-packet"],
+                pending_scope=[],
+                requested_attention=[],
+                requested_decisions=[],
+                next_owner_suggestion="owner",
+                next_action_suggestion="review",
+            )
+
+            self.assertNotIn("runtime_timeline", payload["refs"])
+
+    def test_increment_package_omits_runtime_timeline_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-INC-REF-1"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "increment refs consistency",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "increment refs consistency",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["IncrementPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nIncrement refs.\n", encoding="utf-8")
+
+            from governance.continuity import resolve_increment_package
+
+            payload = resolve_increment_package(
+                root,
+                change_id=change_id,
+                reason="ref consistency",
+                segment_owner="verifier-agent",
+                segment_label="verify",
+                new_findings=["timeline omitted when missing"],
+                invalidated_assumptions=[],
+                new_risks=[],
+                blockers=[],
+                next_followups=["review refs"],
+            )
+
+            self.assertNotIn("runtime_timeline", payload["refs"])
 
     def test_sync_packet_requires_attention_or_decision_for_escalation(self):
         with tempfile.TemporaryDirectory() as tmp:

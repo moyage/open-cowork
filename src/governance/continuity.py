@@ -369,8 +369,8 @@ def resolve_increment_package(
     refs = {
         "handoff_package": str(handoff_path.relative_to(paths.root)),
         "runtime_change_status": str(paths.runtime_change_status_file().relative_to(paths.root)),
-        "runtime_timeline": str(paths.runtime_timeline_month_file().relative_to(paths.root)),
     }
+    _append_existing_ref(refs, "runtime_timeline", paths.runtime_timeline_month_file(), paths.root)
     verify_path = paths.change_file(change_id, "verify.yaml")
     if verify_path.exists():
         refs["verify"] = str(verify_path.relative_to(paths.root))
@@ -481,11 +481,13 @@ def resolve_closeout_packet(
         "archived_contract": str(contract_path.relative_to(paths.root)) if contract_path.exists() else None,
         "archived_verify": str(verify_path.relative_to(paths.root)),
         "archived_review": str(review_path.relative_to(paths.root)),
-        "maintenance_status": str(paths.maintenance_status_file().relative_to(paths.root)),
-        "runtime_change_status": str(paths.runtime_change_status_file().relative_to(paths.root)),
-        "runtime_timeline": str(paths.runtime_timeline_month_file().relative_to(paths.root)),
     }
     refs = {key: value for key, value in refs.items() if value is not None}
+    _append_existing_ref(refs, "maintenance_status", paths.maintenance_status_file(), paths.root)
+    _append_existing_ref(refs, "runtime_timeline", paths.runtime_timeline_month_file(), paths.root)
+    runtime_change_status_ref = _runtime_change_status_ref_if_matching(paths, change_id)
+    if runtime_change_status_ref:
+        refs["runtime_change_status"] = runtime_change_status_ref
     _append_optional_closeout_ref(refs, "handoff_package", paths.handoff_package_file(change_id), paths.root)
     _append_optional_closeout_ref(refs, "owner_transfer", paths.owner_transfer_continuity_file(change_id), paths.root)
     _append_optional_closeout_ref(refs, "increment_package", paths.increment_package_file(change_id), paths.root)
@@ -610,8 +612,7 @@ def resolve_sync_packet(
     refs = {f"{source_kind}_packet": str(source_path.relative_to(paths.root))}
 
     runtime_timeline_ref = source_payload.get("refs", {}).get("runtime_timeline")
-    if runtime_timeline_ref:
-        refs["runtime_timeline"] = runtime_timeline_ref
+    _append_resolved_payload_ref(refs, "runtime_timeline", runtime_timeline_ref, paths.root)
     owner_transfer_path = paths.owner_transfer_continuity_file(change_id)
     if owner_transfer_path.exists():
         refs["owner_transfer"] = str(owner_transfer_path.relative_to(paths.root))
@@ -831,6 +832,38 @@ def _carry_forward_section(paths: GovernancePaths, change_id: str, current_entry
 def _append_optional_closeout_ref(refs: dict, key: str, path: Path, root: Path) -> None:
     if path.exists():
         refs[key] = str(path.relative_to(root))
+
+
+def _append_existing_ref(refs: dict, key: str, path: Path, root: Path) -> None:
+    if path.exists():
+        refs[key] = str(path.relative_to(root))
+
+
+def _append_resolved_payload_ref(refs: dict, key: str, ref: str | None, root: Path) -> None:
+    resolved = _ref_path_if_exists(root, ref)
+    if resolved:
+        refs[key] = resolved
+
+
+def _ref_path_if_exists(root: Path, ref: str | None) -> str | None:
+    if not ref or not isinstance(ref, str):
+        return None
+    candidate = (root / ref).resolve()
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError:
+        return None
+    return ref if candidate.exists() else None
+
+
+def _runtime_change_status_ref_if_matching(paths: GovernancePaths, change_id: str) -> str | None:
+    status_path = paths.runtime_change_status_file()
+    if not status_path.exists():
+        return None
+    payload = load_yaml(status_path)
+    if payload.get("change_id") != change_id:
+        return None
+    return str(status_path.relative_to(paths.root))
 
 
 def _merge_sync_history_events(existing: list[dict], new_event: dict) -> list[dict]:

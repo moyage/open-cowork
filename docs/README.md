@@ -65,6 +65,8 @@
 - `plans/25-milestone2-truth-source-artifact-boundary-implementation-plan.md`
 - `plans/26-milestone2-archive-maintenance-consistency-design.md`
 - `plans/27-milestone2-archive-maintenance-consistency-implementation-plan.md`
+- `plans/28-milestone2-continuity-refs-consistency-design.md`
+- `plans/29-milestone2-continuity-refs-consistency-implementation-plan.md`
 
 ## 报告与实践材料
 
