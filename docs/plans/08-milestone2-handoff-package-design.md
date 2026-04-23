@@ -128,16 +128,42 @@ handoff package 不新增事实权威层，而是从已有结构派生：
 5. `runtime/status/change-status.yaml`
 6. `runtime/status/steps-status.yaml`
 7. `runtime/status/participants-status.yaml`
-8. `continuity-launch-input.yaml`
-9. `ROUND_ENTRY_INPUT_SUMMARY.yaml`
-10. `review.yaml / verify.yaml`（存在时）
+8. `review.yaml / verify.yaml`（存在时）
 
-### 7.2 生成原则
+### 7.2 可选增强来源
+
+以下来源不属于 handoff package 的最小成立条件，但在存在时应被复用：
+
+1. `continuity-launch-input.yaml`
+2. `ROUND_ENTRY_INPUT_SUMMARY.yaml`
+3. `runtime/timeline/events-YYYYMM.yaml`
+
+### 7.3 生成原则
 
 1. handoff package 必须是派生摘要层。
 2. 所有结论必须能回指到明确 refs。
 3. 如果同类信息已存在于 `runtime/status`，不得再造一套平行字段语义。
 4. 如果 `continuity launch-input` 已提供 carry-forward 视角，handoff package 只做面向接手的压缩表达。
+
+### 7.4 最小成立条件
+
+handoff package 的最小成立条件应尽量低，避免它变成“只有流程跑到较后阶段才能使用”的能力。
+
+本轮明确约定：
+
+1. 只要目标 change 存在，且能读取其最小 authoritative facts，handoff package 就应可生成。
+2. handoff package 的最小成立不依赖：
+   - `predecessor_change`
+   - `continuity-launch-input.yaml`
+   - `ROUND_ENTRY_INPUT_SUMMARY.yaml`
+   - `verify.yaml`
+   - `review.yaml`
+3. `carry_forward` 视角属于可选增强层，而不是强制字段。
+4. 如果当前 active change 尚未显式 materialize `runtime/status/*.yaml`，命令可以先按当前 authoritative state 派生并落盘 runtime status，再继续生成 handoff package。
+5. 只有在以下情况才应失败：
+   - 未提供 `change_id` 且不存在 current change
+   - 指定 change 不存在
+   - 最小 authoritative inputs 缺失到无法识别当前 change 的基础状态
 
 ## 8. 最小 schema
 
@@ -192,6 +218,18 @@ refs:
   verify: .governance/changes/CHG-20260424-001/verify.yaml
   review: .governance/changes/CHG-20260424-001/review.yaml
 ```
+
+说明：
+
+1. `summary.current_phase/current_step/current_status/current_owner/waiting_on/next_decision` 是受控镜像字段，不是新的权威状态层。
+2. 这些字段的唯一权威来源应分别来自：
+   - `runtime/status/change-status.yaml`
+   - `runtime/status/steps-status.yaml`
+   - `runtime/status/participants-status.yaml`
+3. `execution_context.active_roles/current_gate` 也是面向接手方的压缩表达，其底层来源同样应回指到 `runtime/status` 与 change 内已有 contract/bindings。
+4. `carry_forward` 整段为可选字段：
+   - 当存在 predecessor baseline 与 continuity 文件时写入；
+   - 当不存在时应整体省略，而不是生成空占位结构。
 
 ## 9. 核心语义
 
@@ -253,6 +291,24 @@ ocw continuity handoff-package --change-id CHG-20260424-001
 
 本轮建议先只落最小生成能力，不急着一开始就做更复杂的格式选项。
 
+### 10.1 依赖缺失时的行为
+
+为了让 handoff package 真正服务“进行中的接手”，命令行为需要明确：
+
+1. 如果 `runtime/status/*.yaml` 尚未生成：
+   - 命令应先从当前 authoritative state materialize 最小 runtime status；
+   - 然后再生成 handoff package。
+2. 如果 `verify.yaml` 或 `review.yaml` 不存在：
+   - 不应失败；
+   - 只是不写入对应 refs。
+3. 如果 `continuity-launch-input.yaml` / `ROUND_ENTRY_INPUT_SUMMARY.yaml` 不存在，或 change 没有 predecessor baseline：
+   - 不应失败；
+   - 只是不写入 `carry_forward`。
+4. 如果当前 change 仍处在较早阶段：
+   - handoff package 仍应生成；
+   - 其 `waiting_on / next_decision / current_gate` 由当前 runtime status 派生。
+5. 只有最小 authoritative state 无法识别时，命令才应失败并返回明确错误。
+
 ## 11. 与后续能力的关系
 
 ### 11.1 与 owner transfer continuity
@@ -297,7 +353,9 @@ ocw continuity handoff-package --change-id CHG-20260424-001
    - `next_decision`
 4. 能带出最小 `operator_start_pack`
 5. 存在 continuity 输入时，能带出 `carry_forward_refs`
-6. active change 不存在时应失败
+6. 不存在 predecessor baseline 时，仍能生成不含 `carry_forward` 的 handoff package
+7. `runtime/status` 未预生成时，命令可先 materialize 再生成
+8. active change 不存在时应失败
 
 ## 13. 一句话结论
 
