@@ -14,6 +14,65 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class CliTests(unittest.TestCase):
+    def test_contract_validate_writes_pass_and_fail_timeline_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-CLI-CONTRACT",
+                    "--title",
+                    "Contract events",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-CLI-CONTRACT"
+            contract_path = change_dir / "contract.yaml"
+            write_yaml(contract_path, {
+                "objective": "contract-pass",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["ContractSchema"],
+                "verification": {"commands": ["python3 -m unittest"], "checks": ["contract-valid"]},
+                "evidence_expectations": {"required": ["contract.yaml"]},
+            })
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "contract", "validate", "--change-id", "CHG-CLI-CONTRACT"])
+            self.assertEqual(exit_code, 0)
+
+            month_file = root / ".governance/runtime/timeline" / f"events-{__import__('datetime').datetime.utcnow().strftime('%Y%m')}.yaml"
+            payload = load_yaml(month_file)
+            self.assertTrue(any(
+                event["change_id"] == "CHG-CLI-CONTRACT" and event["event_type"] == "contract_validate_pass"
+                for event in payload["events"]
+            ))
+
+            write_yaml(contract_path, {
+                "objective": "",
+                "scope_in": [".governance/**"],
+            })
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "contract", "validate", "--change-id", "CHG-CLI-CONTRACT"])
+            self.assertEqual(exit_code, 1)
+
+            payload = load_yaml(month_file)
+            self.assertTrue(any(
+                event["change_id"] == "CHG-CLI-CONTRACT" and event["event_type"] == "contract_validate_fail"
+                for event in payload["events"]
+            ))
+
     def test_change_create_sets_active_change_and_index_entry(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -166,6 +225,13 @@ class CliTests(unittest.TestCase):
             self.assertEqual(changes_index["changes"][0]["status"], "archived")
             self.assertEqual(maintenance["last_archived_change"], "CHG-CLI-2")
 
+            month_file = root / ".governance/runtime/timeline" / f"events-{__import__('datetime').datetime.utcnow().strftime('%Y%m')}.yaml"
+            payload = load_yaml(month_file)
+            self.assertTrue(any(
+                event["change_id"] == "CHG-CLI-2" and event["event_type"] == "run_completed"
+                for event in payload["events"]
+            ))
+
     def test_review_requires_verify_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -210,6 +276,14 @@ class CliTests(unittest.TestCase):
             self.assertEqual(review_exit, 1)
             self.assertIn("Review failed", stdout.getvalue())
             self.assertEqual(load_yaml(change_dir / "review.yaml"), {})
+            month_file = root / ".governance/runtime/timeline" / f"events-{__import__('datetime').datetime.utcnow().strftime('%Y%m')}.yaml"
+            payload = load_yaml(month_file)
+            self.assertTrue(any(
+                event["change_id"] == "CHG-CLI-REVIEW"
+                and event["event_type"] == "gate_blocked"
+                and event["step"] == 8
+                for event in payload["events"]
+            ))
 
     def test_verify_requires_step6_execution_state(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -32,13 +32,43 @@ def cmd_change_create(args):
 def cmd_contract_validate(args):
     from governance.change_package import read_change_package
     from governance.contract import ContractValidationError, load_contract
+    from governance.runtime_events import append_runtime_event
 
     try:
         contract_path = Path(args.path) if args.path else read_change_package(args.root, args.change_id).path / "contract.yaml"
         load_contract(contract_path)
+        change_id = args.change_id or contract_path.parent.name
+        append_runtime_event(
+            args.root,
+            change_id=change_id,
+            event_type="contract_validate_pass",
+            step=5,
+            from_status="contract-present",
+            to_status="contract-valid",
+            actor_id="governance",
+            refs=[str(contract_path.relative_to(Path(args.root)))],
+            source_path=contract_path,
+        )
         print(f"Contract valid: {contract_path}")
         return 0
     except (ValueError, ContractValidationError) as exc:
+        contract_path = Path(args.path) if args.path else (
+            Path(args.root) / ".governance" / "changes" / str(args.change_id) / "contract.yaml"
+            if args.change_id else None
+        )
+        change_id = args.change_id or (contract_path.parent.name if contract_path else None)
+        if change_id:
+            append_runtime_event(
+                args.root,
+                change_id=change_id,
+                event_type="contract_validate_fail",
+                step=5,
+                from_status="contract-present",
+                to_status="contract-invalid",
+                actor_id="governance",
+                refs=[str(contract_path.relative_to(Path(args.root)))] if contract_path else [],
+                source_path=contract_path,
+            )
         print(f"Contract invalid: {exc}")
         return 1
 
@@ -47,8 +77,10 @@ def cmd_run(args):
     from governance.change_package import read_change_package, update_manifest
     from governance.index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
     from governance.run import AdapterRequest, run_change
+    from governance.runtime_events import append_runtime_event
 
     package = read_change_package(args.root, args.change_id)
+    previous_status = package.manifest.get("status")
     contract_path = package.path / "contract.yaml"
     request = AdapterRequest(
         change_id=package.change_id,
@@ -83,24 +115,49 @@ def cmd_run(args):
         current_change_active=manifest.get("status"),
         current_change_id=package.change_id,
     )
+    execution_summary_path = package.path / "evidence" / "execution-summary.yaml"
+    append_runtime_event(
+        args.root,
+        change_id=package.change_id,
+        event_type="run_completed",
+        step=6,
+        from_status=previous_status,
+        to_status=manifest.get("status"),
+        actor_id=package.manifest.get("roles", {}).get("executor") or "executor",
+        refs=[str(execution_summary_path.relative_to(Path(args.root)))] if execution_summary_path.exists() else [],
+        source_path=execution_summary_path if execution_summary_path.exists() else package.path / "manifest.yaml",
+    )
     print(f"Run completed: {package.change_id} ({response.run_id})")
     return 0
 
 
 def cmd_verify(args):
     from governance.verify import write_verify_result
+    from governance.runtime_events import append_runtime_event
 
     try:
         payload = write_verify_result(args.root, args.change_id)
         print(f"Verify recorded: {payload['change_id']} -> {payload['summary']['status']}")
         return 0
     except Exception as exc:
+        append_runtime_event(
+            args.root,
+            change_id=args.change_id,
+            event_type="gate_blocked",
+            step=7,
+            from_status=None,
+            to_status="blocked",
+            actor_id="governance",
+            event_suffix="step7",
+            extra={"reason": str(exc)},
+        )
         print(f"Verify failed: {exc}")
         return 1
 
 
 def cmd_review(args):
     from governance.review import write_review_decision
+    from governance.runtime_events import append_runtime_event
 
     try:
         payload = write_review_decision(
@@ -113,18 +170,41 @@ def cmd_review(args):
         print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
         return 0
     except Exception as exc:
+        append_runtime_event(
+            args.root,
+            change_id=args.change_id,
+            event_type="gate_blocked",
+            step=8,
+            from_status=None,
+            to_status="blocked",
+            actor_id=args.reviewer or "governance",
+            event_suffix="step8",
+            extra={"reason": str(exc)},
+        )
         print(f"Review failed: {exc}")
         return 1
 
 
 def cmd_archive(args):
     from governance.archive import archive_change
+    from governance.runtime_events import append_runtime_event
 
     try:
         receipt = archive_change(args.root, args.change_id)
         print(f"Archived change {receipt['change_id']} at {receipt['archived_at']}")
         return 0
     except Exception as exc:
+        append_runtime_event(
+            args.root,
+            change_id=args.change_id,
+            event_type="gate_blocked",
+            step=9,
+            from_status=None,
+            to_status="blocked",
+            actor_id="governance",
+            event_suffix="step9",
+            extra={"reason": str(exc)},
+        )
         print(f"Archive failed: {exc}")
         return 1
 

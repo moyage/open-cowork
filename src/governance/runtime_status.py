@@ -6,6 +6,7 @@ from pathlib import Path
 from .change_package import read_change_package
 from .index import read_changes_index, read_current_change
 from .paths import GovernancePaths
+from .runtime_events import merge_runtime_timeline_payload
 from .simple_yaml import load_yaml, write_yaml
 from .step_matrix import PHASE_LABELS, STEP_LABELS, render_status_snapshot, render_step_matrix
 
@@ -338,20 +339,7 @@ def _merge_timeline_payload(target: Path, new_payload: dict) -> dict:
     if not target.exists():
         return new_payload
     existing = load_yaml(target)
-    merged_events = list(existing.get("events", []))
-    seen = {item.get("event_id") for item in merged_events}
-    for event in new_payload.get("events", []):
-        if event.get("event_id") in seen:
-            continue
-        merged_events.append(event)
-        seen.add(event.get("event_id"))
-    merged_events.sort(key=lambda item: (str(item.get("timestamp")), str(item.get("event_id"))))
-    return {
-        "schema": "runtime-timeline/v1",
-        "month": new_payload.get("month") or existing.get("month"),
-        "events": merged_events,
-        "generated_at": _now_utc(),
-    }
+    return merge_runtime_timeline_payload(existing, new_payload)
 
 
 def _require_active_change(paths: GovernancePaths, change_id: str) -> None:
