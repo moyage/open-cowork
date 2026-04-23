@@ -61,6 +61,8 @@
 - `plans/21-milestone2-boundary-hardening-implementation-plan.md`
 - `plans/22-milestone2-maintenance-status-hardening-design.md`
 - `plans/23-milestone2-maintenance-status-hardening-implementation-plan.md`
+- `plans/24-milestone2-truth-source-artifact-boundary-design.md`
+- `plans/25-milestone2-truth-source-artifact-boundary-implementation-plan.md`
 
 ## 报告与实践材料
 

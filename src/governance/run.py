@@ -106,7 +106,7 @@ def _is_reserved_governance_artifact(path: str) -> bool:
         return True
     if path.startswith(".governance/archive/"):
         return True
-    if path.startswith(".governance/changes/") and path.endswith(".yaml"):
+    if path.startswith(".governance/changes/"):
         return True
     return False
 

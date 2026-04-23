@@ -367,6 +367,58 @@ class RunTests(unittest.TestCase):
                     artifacts={"created": [".governance/changes/CHG-9/manifest.yaml"], "modified": []},
                 ))
 
+    def test_run_blocks_when_artifacts_touch_change_package_markdown_or_text_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            create_change_package(root, "CHG-10")
+            contract_path = root / ".governance/changes/CHG-10/contract.yaml"
+            write_yaml(contract_path, {
+                "objective": "enforce-change-package-boundary",
+                "scope_in": [".governance/**", "src/**", "tests/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["create_code"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["StateConsistencyCheck"],
+                "verification": {"commands": [], "checks": ["evidence persisted"]},
+                "evidence_expectations": {"required": ["changed_files_manifest", "command_output", "test_output", "file_diff"]},
+            })
+            manifest_path = root / ".governance/changes/CHG-10/manifest.yaml"
+            manifest = load_yaml(manifest_path)
+            manifest.setdefault("readiness", {})["step6_entry_ready"] = True
+            write_yaml(manifest_path, manifest)
+            write_yaml(root / ".governance/changes/CHG-10/bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+
+            reserved_targets = [
+                ".governance/changes/CHG-10/tasks.md",
+                ".governance/changes/CHG-10/requirements.md",
+                ".governance/changes/CHG-10/evidence/manual-note.txt",
+            ]
+            for target in reserved_targets:
+                with self.assertRaisesRegex(ValueError, "reserved governance boundary"):
+                    run_change(root, AdapterRequest(
+                        change_id="CHG-10",
+                        contract_path=str(contract_path),
+                        working_directory=str(root),
+                        allowed_write_scope=[".governance/**", "src/**", "tests/**"],
+                        timeout_seconds=60,
+                        command="python -m unittest",
+                        command_output="ok",
+                        test_output="tests passed",
+                        artifacts={"created": [target], "modified": []},
+                    ))
+
 
 if __name__ == "__main__":
     unittest.main()
