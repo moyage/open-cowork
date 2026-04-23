@@ -11,6 +11,10 @@ __pycache__/
 .venv/
 venv/
 
+# Local workspaces and exports
+.worktrees/
+.baseline_exports/
+
 # Runtime governance outputs (generated)
 .governance/index/
 .governance/changes/
