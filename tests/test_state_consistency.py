@@ -53,6 +53,7 @@ class StateConsistencyTests(unittest.TestCase):
             write_yaml(change_dir / "bindings.yaml", {
                 "steps": {
                     "6": {"owner": "OOSO/OpenCode", "gate": "auto-pass"},
+                    "7": {"owner": "VerifierAgent", "gate": "review-required"},
                     "8": {"owner": "Hermes", "gate": "approval-required"},
                 },
             })
@@ -118,6 +119,7 @@ class StateConsistencyTests(unittest.TestCase):
             write_yaml(change_dir / "bindings.yaml", {
                 "steps": {
                     "6": {"owner": "OOSO/OpenCode", "gate": "auto-pass"},
+                    "7": {"owner": "VerifierAgent", "gate": "review-required"},
                     "8": {"owner": "Hermes", "gate": "approval-required"},
                 },
             })
@@ -175,6 +177,7 @@ class StateConsistencyTests(unittest.TestCase):
             write_yaml(change_dir / "bindings.yaml", {
                 "steps": {
                     "6": {"owner": "SharedActor", "gate": "auto-pass"},
+                    "7": {"owner": "SharedActor", "gate": "review-required"},
                     "8": {"owner": "SharedActor", "gate": "approval-required"},
                 },
             })
@@ -196,7 +199,7 @@ class StateConsistencyTests(unittest.TestCase):
             result = evaluate_state_consistency(root, "CHG-1")
 
             self.assertEqual(result["status"], "blocker")
-            self.assertTrue(any(check["name"] == "execution_review_owner_separation" and check["status"] == "blocker" for check in result["checks"]))
+            self.assertTrue(any(check["name"] == "execution_verify_review_owner_separation" and check["status"] == "blocker" for check in result["checks"]))
 
 
 if __name__ == "__main__":

@@ -47,7 +47,6 @@ def cmd_run(args):
     from governance.change_package import read_change_package, update_manifest
     from governance.index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
     from governance.run import AdapterRequest, run_change
-    from governance.simple_yaml import write_yaml
 
     package = read_change_package(args.root, args.change_id)
     contract_path = package.path / "contract.yaml"
@@ -63,14 +62,6 @@ def cmd_run(args):
         artifacts={"created": list(args.created or []), "modified": list(args.modified or [])},
     )
     response = run_change(args.root, request)
-    verify_path = package.path / "verify.yaml"
-    write_yaml(verify_path, {
-        "schema": "verify-result/v1",
-        "change_id": package.change_id,
-        "summary": {"status": "pass" if response.completed else "blocker", "blocker_count": 0 if response.completed else 1},
-        "checks": [{"name": "adapter-response", "status": response.status}],
-        "issues": [],
-    })
     manifest = update_manifest(args.root, package.change_id, status="step6-executed-pre-step7", current_step=6)
     current = read_current_change(args.root).get("current_change") or {}
     set_current_change(args.root, {
@@ -96,26 +87,46 @@ def cmd_run(args):
     return 0
 
 
+def cmd_verify(args):
+    from governance.verify import write_verify_result
+
+    try:
+        payload = write_verify_result(args.root, args.change_id)
+        print(f"Verify recorded: {payload['change_id']} -> {payload['summary']['status']}")
+        return 0
+    except Exception as exc:
+        print(f"Verify failed: {exc}")
+        return 1
+
+
 def cmd_review(args):
     from governance.review import write_review_decision
 
-    payload = write_review_decision(
-        args.root,
-        args.change_id,
-        decision=args.decision,
-        reviewer=args.reviewer,
-        rationale=args.rationale or "",
-    )
-    print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
-    return 0
+    try:
+        payload = write_review_decision(
+            args.root,
+            args.change_id,
+            decision=args.decision,
+            reviewer=args.reviewer,
+            rationale=args.rationale or "",
+        )
+        print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
+        return 0
+    except Exception as exc:
+        print(f"Review failed: {exc}")
+        return 1
 
 
 def cmd_archive(args):
     from governance.archive import archive_change
 
-    receipt = archive_change(args.root, args.change_id)
-    print(f"Archived change {receipt['change_id']} at {receipt['archived_at']}")
-    return 0
+    try:
+        receipt = archive_change(args.root, args.change_id)
+        print(f"Archived change {receipt['change_id']} at {receipt['archived_at']}")
+        return 0
+    except Exception as exc:
+        print(f"Archive failed: {exc}")
+        return 1
 
 
 def cmd_init(args):
@@ -251,7 +262,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--created", action="append", default=[], help="Created artifact path")
     p_run.add_argument("--modified", action="append", default=[], help="Modified artifact path")
 
-    subparsers.add_parser("verify", help="Verify execution results")
+    p_verify = subparsers.add_parser("verify", help="Verify execution results")
+    p_verify.add_argument("--change-id", required=True, help="Target change id")
 
     p_review = subparsers.add_parser("review", help="Review and decide on change")
     p_review.add_argument("--change-id", required=True, help="Target change id")
@@ -298,6 +310,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_contract_validate(args)
     elif args.command == "run":
         return cmd_run(args)
+    elif args.command == "verify":
+        return cmd_verify(args)
     elif args.command == "review":
         return cmd_review(args)
     elif args.command == "archive":

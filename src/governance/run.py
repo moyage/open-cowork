@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from fnmatch import fnmatch
 
 from adapters.generic_file_command import run_generic_file_command
 
@@ -44,13 +45,16 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
         readiness = manifest.get("readiness", {})
         if not readiness.get("step6_entry_ready"):
             raise ValueError(f"change '{request.change_id}' is not ready for Step 6 execution (step6_entry_ready is not True)")
-        
+
         bindings_path = paths.change_file(request.change_id, "bindings.yaml")
         if bindings_path.exists():
             bindings = load_yaml(bindings_path)
             from .state_consistency import _step_owner
             execution_owner = _step_owner(bindings, manifest, 6)
-            review_owner = _step_owner(bindings, manifest, 8) or _step_owner(bindings, manifest, 7)
+            verification_owner = _step_owner(bindings, manifest, 7)
+            review_owner = _step_owner(bindings, manifest, 8)
+            if execution_owner and verification_owner and execution_owner == verification_owner:
+                raise ValueError(f"execution owner cannot be the same as verification owner for change '{request.change_id}'")
             if execution_owner and review_owner and execution_owner == review_owner:
                 raise ValueError(f"execution owner cannot be the same as review owner for change '{request.change_id}'")
 
@@ -60,6 +64,7 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
         for scope in request.allowed_write_scope:
             if ".governance/index" in scope or "current/" in scope:
                 raise ValueError(f"executor does not have stable write authority for truth-source '{scope}'")
+    _ensure_artifacts_within_write_boundary(request.artifacts, request.allowed_write_scope, contract.get("scope_out", []))
 
     response = run_generic_file_command(request.__dict__)
     evidence_dir = GovernancePaths(Path(root)).evidence_dir(request.change_id)
@@ -73,3 +78,23 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
         evidence_refs=evidence_refs,
         completed=response["status"] == "success",
     )
+
+
+def _ensure_artifacts_within_write_boundary(artifacts: dict, allowed_scopes: list[str], scope_out: list[str]) -> None:
+    touched_paths = list(artifacts.get("created", [])) + list(artifacts.get("modified", []))
+    for path in touched_paths:
+        normalized = _normalize_artifact_path(path)
+        if not any(fnmatch(normalized, pattern) for pattern in allowed_scopes):
+            raise ValueError(f"artifact '{normalized}' is outside the allowed write boundary")
+        if any(fnmatch(normalized, pattern) for pattern in scope_out):
+            raise ValueError(f"artifact '{normalized}' is outside the allowed write boundary")
+
+
+def _normalize_artifact_path(path: str) -> str:
+    normalized = str(Path(path)).replace("\\", "/")
+    if normalized.startswith("/"):
+        raise ValueError(f"artifact path '{path}' must be relative to the working directory")
+    parts = [part for part in normalized.split("/") if part not in {"", "."}]
+    if any(part == ".." for part in parts):
+        raise ValueError(f"artifact path '{path}' must remain within the working directory")
+    return "/".join(parts)

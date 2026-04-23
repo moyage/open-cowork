@@ -78,11 +78,13 @@ class CliTests(unittest.TestCase):
             write_yaml(change_dir / "bindings.yaml", {
                 "steps": {
                     "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
                     "8": {"owner": "reviewer-agent", "gate": "approval-required"},
                 },
             })
             manifest = load_yaml(change_dir / "manifest.yaml")
             manifest.setdefault("readiness", {})["step6_entry_ready"] = True
+            manifest["target_validation_objects"] = ["StateConsistencyCheck"]
             write_yaml(change_dir / "manifest.yaml", manifest)
 
             stdout = io.StringIO()
@@ -112,6 +114,19 @@ class CliTests(unittest.TestCase):
                 ])
             self.assertEqual(run_exit, 0)
             self.assertTrue((change_dir / "evidence/execution-summary.yaml").exists())
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                verify_exit = main([
+                    "--root",
+                    str(root),
+                    "verify",
+                    "--change-id",
+                    "CHG-CLI-2",
+                ])
+            self.assertEqual(verify_exit, 0)
+            verify_payload = load_yaml(change_dir / "verify.yaml")
+            self.assertEqual(verify_payload["summary"]["status"], "pass")
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -151,6 +166,88 @@ class CliTests(unittest.TestCase):
             self.assertEqual(changes_index["changes"][0]["status"], "archived")
             self.assertEqual(maintenance["last_archived_change"], "CHG-CLI-2")
 
+    def test_review_requires_verify_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-CLI-REVIEW",
+                    "--title",
+                    "Review gate",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-CLI-REVIEW"
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                review_exit = main([
+                    "--root",
+                    str(root),
+                    "review",
+                    "--change-id",
+                    "CHG-CLI-REVIEW",
+                    "--decision",
+                    "approve",
+                    "--reviewer",
+                    "reviewer-agent",
+                    "--rationale",
+                    "Should fail before verify",
+                ])
+
+            self.assertEqual(review_exit, 1)
+            self.assertIn("Review failed", stdout.getvalue())
+            self.assertEqual(load_yaml(change_dir / "review.yaml"), {})
+
+    def test_archive_requires_approved_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-CLI-ARCHIVE",
+                    "--title",
+                    "Archive gate",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-CLI-ARCHIVE"
+            write_yaml(change_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": "CHG-CLI-ARCHIVE",
+                "decision": {"status": "revise", "rationale": "not ready"},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                archive_exit = main([
+                    "--root",
+                    str(root),
+                    "archive",
+                    "--change-id",
+                    "CHG-CLI-ARCHIVE",
+                ])
+
+            self.assertEqual(archive_exit, 1)
+            self.assertIn("Archive failed", stdout.getvalue())
+            self.assertFalse((root / ".governance/archive/CHG-CLI-ARCHIVE").exists())
+
     def test_status_outputs_human_facing_phase_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -187,6 +284,7 @@ class CliTests(unittest.TestCase):
             write_yaml(change_dir / "bindings.yaml", {
                 "steps": {
                     "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
                     "8": {"owner": "reviewer-agent", "gate": "approval-required"},
                 },
             })
@@ -297,6 +395,10 @@ class CliTests(unittest.TestCase):
                 launch_exit = main(["--root", str(root), "continuity", "launch-input", "--change-id", current_change])
             self.assertEqual(launch_exit, 0)
             self.assertIn("continuity-launch-input.yaml", stdout.getvalue())
+            launch_payload = load_yaml(root / f".governance/changes/{current_change}/continuity-launch-input.yaml")
+            self.assertEqual(launch_payload["decision_summary"]["current_phase"], "Phase 2 / 方案与准备")
+            self.assertEqual(launch_payload["decision_summary"]["next_decision"], "Step 5 / Approve the start")
+            self.assertTrue(launch_payload["decision_summary"]["next_input_suggestion"])
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):

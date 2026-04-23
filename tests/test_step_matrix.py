@@ -52,6 +52,7 @@ class StepMatrixTests(unittest.TestCase):
                 "steps": {
                     "5": {"owner": "Marvis", "gate": "approval-required"},
                     "6": {"owner": "OOSO/OpenCode", "gate": "auto-pass"},
+                    "7": {"owner": "VerifierAgent", "gate": "review-required"},
                     "8": {"owner": "Hermes", "gate": "approval-required"},
                 },
             })

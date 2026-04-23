@@ -131,17 +131,28 @@ def evaluate_state_consistency(root: str | Path, change_id: str | None = None) -
     )
 
     execution_owner = _step_owner(bindings, manifest, 6)
-    review_owner = _step_owner(bindings, manifest, 8) or _step_owner(bindings, manifest, 7)
-    owner_separation_passed = bool(execution_owner and review_owner and execution_owner != review_owner)
+    verification_owner = _step_owner(bindings, manifest, 7)
+    review_owner = _step_owner(bindings, manifest, 8)
+    owner_separation_passed = bool(
+        execution_owner
+        and verification_owner
+        and review_owner
+        and execution_owner != verification_owner
+        and execution_owner != review_owner
+    )
     _append_check(
         checks,
         check_id="C8",
-        name="execution_review_owner_separation",
-        expected="step6 owner must differ from step7/8 reviewer owner",
-        actual={"step6_owner": execution_owner, "review_owner": review_owner},
+        name="execution_verify_review_owner_separation",
+        expected="step6 owner must differ from both step7 verifier owner and step8 reviewer owner",
+        actual={
+            "step6_owner": execution_owner,
+            "step7_owner": verification_owner,
+            "step8_owner": review_owner,
+        },
         passed=owner_separation_passed,
         failure_severity="blocker",
-        detail="Execution and review ownership must remain separated for the active change.",
+        detail="Execution, verification, and review ownership must remain separated for the active change.",
     )
 
     blocker_count = sum(1 for check in checks if check["status"] == "blocker")

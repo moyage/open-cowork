@@ -50,6 +50,24 @@ def resolve_continuity_launch_input(root: str | Path, change_id: str | None = No
     if not review_decision:
         raise ValueError(f"predecessor review for '{predecessor_change}' is missing decision status")
 
+    current_step = current_entry.get("current_step") or current_manifest.get("current_step")
+    decision_summary = {
+        "current_phase": _phase_label_for_step(current_step),
+        "current_summary": {
+            "change_id": str(resolved_change_id),
+            "status": current_entry.get("status") or current_manifest.get("status"),
+            "validation_focus": current_entry.get("validation_focus") or current_manifest.get("validation_focus"),
+            "predecessor_change": predecessor_change,
+        },
+        "current_blockers": [],
+        "next_decision": _decision_point_for_step(current_step),
+        "next_input_suggestion": [
+            str(paths.change_file(str(resolved_change_id), "manifest.yaml").relative_to(paths.root)),
+            str(paths.change_file(str(resolved_change_id), "contract.yaml").relative_to(paths.root)),
+            str(paths.change_file(str(resolved_change_id), "bindings.yaml").relative_to(paths.root)),
+        ],
+    }
+
     return {
         "schema": CONTINUITY_LAUNCH_INPUT_SCHEMA,
         "change_id": str(resolved_change_id),
@@ -99,6 +117,7 @@ def resolve_continuity_launch_input(root: str | Path, change_id: str | None = No
             "archived_predecessor_available": True,
             "review_to_archive_to_launch_chain_explicit": True,
         },
+        "decision_summary": decision_summary,
         "not_step7_8_9": {
             "step7_verify": False,
             "step8_review": False,
@@ -206,3 +225,46 @@ def _find_archive_entry(archive_map: dict, change_id: str) -> dict:
         if entry.get("change_id") == change_id:
             return entry
     raise ValueError(f"archived change '{change_id}' not found in archive map")
+
+
+def _phase_label_for_step(step) -> str:
+    if isinstance(step, str) and step.isdigit():
+        step = int(step)
+    if not isinstance(step, int):
+        return "Phase 1 / 定义与对齐"
+    if step <= 2:
+        return "Phase 1 / 定义与对齐"
+    if step <= 5:
+        return "Phase 2 / 方案与准备"
+    if step <= 7:
+        return "Phase 3 / 执行与验证"
+    return "Phase 4 / 审查与收束"
+
+
+def _decision_point_for_step(step) -> str:
+    if isinstance(step, str) and step.isdigit():
+        step = int(step)
+    if not isinstance(step, int):
+        return "Step 1 / Clarify the goal"
+    if step in {1, 2, 3, 5, 8, 9}:
+        return f"Step {step} / {_step_label(step)}"
+    if step < 5:
+        return f"Step {step + 1} / {_step_label(step + 1)}"
+    if step in {6, 7}:
+        return "Step 8 / Review and decide"
+    return "none"
+
+
+def _step_label(step: int) -> str:
+    labels = {
+        1: "Clarify the goal",
+        2: "Lock the scope",
+        3: "Shape the approach",
+        4: "Assemble the change",
+        5: "Approve the start",
+        6: "Execute the change",
+        7: "Verify the result",
+        8: "Review and decide",
+        9: "Archive and carry forward",
+    }
+    return labels.get(step, str(step))

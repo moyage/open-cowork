@@ -80,6 +80,10 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(payload["predecessor_review_baseline"]["decision_status"], "approve_with_conditions")
             self.assertTrue(payload["predecessor_archive_baseline"]["archive_executed"])
             self.assertTrue(payload["launch_readiness"]["review_to_archive_to_launch_chain_explicit"])
+            self.assertEqual(payload["decision_summary"]["current_phase"], "Phase 2 / 方案与准备")
+            self.assertEqual(payload["decision_summary"]["next_decision"], "Step 5 / Approve the start")
+            self.assertIn("validation_focus", payload["decision_summary"]["current_summary"])
+            self.assertTrue(any("manifest.yaml" in item for item in payload["decision_summary"]["next_input_suggestion"]))
 
     def test_materialize_round_entry_input_summary(self):
         with tempfile.TemporaryDirectory() as tmp:

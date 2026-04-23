@@ -17,6 +17,11 @@ def write_review_decision(
     rationale: str = "",
 ) -> dict:
     paths = GovernancePaths(Path(root))
+    verify_path = paths.change_file(change_id, "verify.yaml")
+    verify_payload = load_yaml(verify_path) if verify_path.exists() else {}
+    if verify_payload.get("summary", {}).get("status") != "pass":
+        raise ValueError(f"change '{change_id}' must have a passing verify result before review")
+
     review_path = paths.change_file(change_id, "review.yaml")
     existing = load_yaml(review_path) if review_path.exists() else {}
     payload = {

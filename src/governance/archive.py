@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .change_package import update_manifest
-from .index import read_changes_index, set_current_change, set_maintenance_status, upsert_change_entry
+from .index import set_current_change, set_maintenance_status, upsert_change_entry
 from .paths import GovernancePaths
 from .simple_yaml import load_yaml, write_yaml
 
@@ -14,6 +14,9 @@ def archive_change(root: str | Path, change_id: str) -> dict:
     paths = GovernancePaths(Path(root))
     source_dir = paths.change_dir(change_id)
     archive_dir = paths.archived_change_dir(change_id)
+    review_payload = load_yaml(paths.change_file(change_id, "review.yaml"))
+    if review_payload.get("decision", {}).get("status") != "approve":
+        raise ValueError(f"change '{change_id}' must have an approved review before archive")
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = update_manifest(root, change_id, status="archived", current_step=9)
