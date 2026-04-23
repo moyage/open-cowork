@@ -57,6 +57,8 @@
 - `plans/17-milestone2-sync-escalation-packet-implementation-plan.md`
 - `plans/18-milestone2-sync-history-and-external-export-design.md`
 - `plans/19-milestone2-sync-history-and-external-export-implementation-plan.md`
+- `plans/20-milestone2-boundary-hardening-design.md`
+- `plans/21-milestone2-boundary-hardening-implementation-plan.md`
 
 ## 报告与实践材料
 

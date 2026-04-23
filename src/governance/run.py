@@ -65,6 +65,7 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
             if ".governance/index" in scope or "current/" in scope:
                 raise ValueError(f"executor does not have stable write authority for truth-source '{scope}'")
     _ensure_artifacts_within_write_boundary(request.artifacts, request.allowed_write_scope, contract.get("scope_out", []))
+    _ensure_governance_reserved_boundaries(request.change_id, request.artifacts)
 
     response = run_generic_file_command(request.__dict__)
     evidence_dir = GovernancePaths(Path(root)).evidence_dir(request.change_id)
@@ -88,6 +89,26 @@ def _ensure_artifacts_within_write_boundary(artifacts: dict, allowed_scopes: lis
             raise ValueError(f"artifact '{normalized}' is outside the allowed write boundary")
         if any(fnmatch(normalized, pattern) for pattern in scope_out):
             raise ValueError(f"artifact '{normalized}' is outside the allowed write boundary")
+
+
+def _ensure_governance_reserved_boundaries(change_id: str, artifacts: dict) -> None:
+    touched_paths = list(artifacts.get("created", [])) + list(artifacts.get("modified", []))
+    for path in touched_paths:
+        normalized = _normalize_artifact_path(path)
+        if _is_reserved_governance_artifact(normalized):
+            raise ValueError(f"artifact '{normalized}' touches a reserved governance boundary")
+
+
+def _is_reserved_governance_artifact(path: str) -> bool:
+    if path.startswith(".governance/index/"):
+        return True
+    if path.startswith(".governance/runtime/"):
+        return True
+    if path.startswith(".governance/archive/"):
+        return True
+    if path.startswith(".governance/changes/") and path.endswith(".yaml"):
+        return True
+    return False
 
 
 def _normalize_artifact_path(path: str) -> str:
