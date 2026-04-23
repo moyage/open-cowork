@@ -14,6 +14,7 @@ from governance.index import (
     set_maintenance_status,
     upsert_change_entry,
 )
+from governance.simple_yaml import write_yaml
 
 
 class GovernanceIndexTests(unittest.TestCase):
@@ -143,6 +144,15 @@ class GovernanceIndexTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             ensure_governance_index(root)
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": "CHG-1",
+                    "archive_path": ".governance/archive/CHG-1/",
+                    "receipt": ".governance/archive/CHG-1/archive-receipt.yaml",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                }],
+            })
             set_maintenance_status(
                 root,
                 status="review-approved",
@@ -165,6 +175,15 @@ class GovernanceIndexTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             ensure_governance_index(root)
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": "CHG-1",
+                    "archive_path": ".governance/archive/CHG-1/",
+                    "receipt": ".governance/archive/CHG-1/archive-receipt.yaml",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                }],
+            })
             set_maintenance_status(
                 root,
                 status="idle",
@@ -181,6 +200,15 @@ class GovernanceIndexTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             ensure_governance_index(root)
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": "CHG-1",
+                    "archive_path": ".governance/archive/CHG-1/",
+                    "receipt": ".governance/archive/CHG-1/archive-receipt.yaml",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                }],
+            })
             set_maintenance_status(
                 root,
                 status="idle",
@@ -197,6 +225,23 @@ class GovernanceIndexTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             ensure_governance_index(root)
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [
+                    {
+                        "change_id": "CHG-1",
+                        "archive_path": ".governance/archive/CHG-1/",
+                        "receipt": ".governance/archive/CHG-1/archive-receipt.yaml",
+                        "archived_at": "2026-04-24T12:00:00+00:00",
+                    },
+                    {
+                        "change_id": "CHG-2",
+                        "archive_path": ".governance/archive/CHG-2/",
+                        "receipt": ".governance/archive/CHG-2/archive-receipt.yaml",
+                        "archived_at": "2026-04-25T12:00:00+00:00",
+                    },
+                ],
+            })
             set_maintenance_status(
                 root,
                 status="idle",
@@ -212,6 +257,82 @@ class GovernanceIndexTests(unittest.TestCase):
                 last_archive_at="2026-04-25T12:00:00+00:00",
             )
             self.assertEqual(payload["last_archived_change"], "CHG-2")
+
+    def test_set_maintenance_status_blocks_last_archived_change_missing_from_archive_map(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with self.assertRaisesRegex(ValueError, "missing from archive-map"):
+                set_maintenance_status(
+                    root,
+                    status="idle",
+                    current_change_active="none",
+                    current_change_id=None,
+                    last_archived_change="CHG-404",
+                    last_archive_at="2026-04-24T12:00:00+00:00",
+                )
+
+    def test_set_maintenance_status_blocks_last_archive_at_mismatch_with_archive_map(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": "CHG-1",
+                    "archive_path": ".governance/archive/CHG-1/",
+                    "receipt": ".governance/archive/CHG-1/archive-receipt.yaml",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                }],
+            })
+
+            with self.assertRaisesRegex(ValueError, "does not match archive-map"):
+                set_maintenance_status(
+                    root,
+                    status="idle",
+                    current_change_active="none",
+                    current_change_id=None,
+                    last_archived_change="CHG-1",
+                    last_archive_at="2026-04-24T12:05:00+00:00",
+                )
+
+    def test_set_maintenance_status_allows_matching_archive_baseline_from_archive_map(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": "CHG-1",
+                    "archive_path": ".governance/archive/CHG-1/",
+                    "receipt": ".governance/archive/CHG-1/archive-receipt.yaml",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                }],
+            })
+
+            payload = set_maintenance_status(
+                root,
+                status="idle",
+                current_change_active="none",
+                current_change_id=None,
+                last_archived_change="CHG-1",
+                last_archive_at="2026-04-24T12:00:00+00:00",
+            )
+            self.assertEqual(payload["last_archived_change"], "CHG-1")
+
+    def test_set_maintenance_status_allows_non_archive_updates_without_archive_map_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            payload = set_maintenance_status(
+                root,
+                status="drafting",
+                current_change_active="draft",
+                current_change_id="CHG-1",
+            )
+            self.assertEqual(payload["current_change_id"], "CHG-1")
 
 
 if __name__ == "__main__":

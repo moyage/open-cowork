@@ -95,6 +95,7 @@ def set_maintenance_status(root: str | Path, **updates) -> dict:
     current = load_yaml(paths.maintenance_status_file())
     _ensure_non_regressive_maintenance_status(current, updates)
     _ensure_sticky_archive_baseline(current, updates)
+    _ensure_archive_baseline_resolves_in_archive_map(paths, current, updates)
     merged = {**current, **updates}
     write_yaml(paths.maintenance_status_file(), merged)
     return merged
@@ -203,6 +204,27 @@ def _ensure_sticky_archive_baseline(current: dict, updates: dict) -> None:
         raise ValueError("maintenance-status cannot clear last_archive_at once established")
 
 
+def _ensure_archive_baseline_resolves_in_archive_map(paths: GovernancePaths, current: dict, updates: dict) -> None:
+    if "last_archived_change" not in updates and "last_archive_at" not in updates:
+        return
+
+    target_change_id = updates.get("last_archived_change", current.get("last_archived_change"))
+    target_archived_at = updates.get("last_archive_at", current.get("last_archive_at"))
+    if not target_change_id:
+        return
+
+    archive_map = load_yaml(paths.archive_map_file())
+    archive_entry = _find_archive_entry_by_change_id(archive_map, str(target_change_id))
+    if not archive_entry:
+        raise ValueError(f"maintenance-status last_archived_change '{target_change_id}' is missing from archive-map")
+
+    mapped_archived_at = archive_entry.get("archived_at")
+    if target_archived_at and mapped_archived_at and str(target_archived_at) != str(mapped_archived_at):
+        raise ValueError(
+            f"maintenance-status last_archive_at '{target_archived_at}' does not match archive-map '{mapped_archived_at}'"
+        )
+
+
 def _status_rank(value):
     if value in (None, ""):
         return None
@@ -212,3 +234,10 @@ def _status_rank(value):
     if normalized == "none":
         normalized = "idle"
     return _STATUS_RANKS.get(normalized, 0 if normalized == "idle" else None)
+
+
+def _find_archive_entry_by_change_id(archive_map: dict, change_id: str) -> dict:
+    for entry in archive_map.get("archives", []):
+        if str(entry.get("change_id")) == str(change_id):
+            return entry
+    return {}
