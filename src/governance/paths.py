@@ -64,6 +64,9 @@ class GovernancePaths:
     def round_entry_input_summary_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "ROUND_ENTRY_INPUT_SUMMARY.yaml"
 
+    def handoff_package_file(self, change_id: str) -> Path:
+        return self.change_dir(change_id) / "handoff-package.yaml"
+
     def status_snapshot_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "STATUS_SNAPSHOT.yaml"
 

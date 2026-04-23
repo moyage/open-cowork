@@ -8,8 +8,10 @@ import test_support  # noqa: F401
 
 from governance.continuity import (
     materialize_continuity_launch_input,
+    materialize_handoff_package,
     materialize_round_entry_input_summary,
     resolve_continuity_launch_input,
+    resolve_handoff_package,
     resolve_round_entry_input_summary,
 )
 from governance.index import ensure_governance_index, set_current_change, upsert_change_entry
@@ -17,6 +19,221 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class ContinuityTests(unittest.TestCase):
+    def test_materialize_handoff_package_without_predecessor_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-HO-1"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "handoff package test",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "handoff package generation",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["HandoffPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nGenerate handoff package.\n", encoding="utf-8")
+
+            output_path = Path(materialize_handoff_package(root, change_id))
+            payload = load_yaml(output_path)
+
+            self.assertEqual(payload["schema"], "handoff-package/v1")
+            self.assertEqual(payload["change_id"], change_id)
+            self.assertEqual(payload["summary"]["current_status"], "step6-executed-pre-step7")
+            self.assertNotIn("carry_forward", payload)
+
+    def test_handoff_package_materializes_runtime_status_when_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-HO-2"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "handoff package runtime materialization",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "materialize runtime status before handoff",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["RuntimeStatusSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nGenerate handoff package.\n", encoding="utf-8")
+
+            output_path = Path(materialize_handoff_package(root, change_id))
+            payload = load_yaml(output_path)
+
+            self.assertTrue((root / ".governance/runtime/status/change-status.yaml").exists())
+            self.assertEqual(payload["refs"]["runtime_change_status"], ".governance/runtime/status/change-status.yaml")
+
+    def test_handoff_package_uses_optional_refs_when_available(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-HO-3"
+            predecessor_change = "CHG-HO-2"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+                "predecessor_change": predecessor_change,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "handoff optional refs",
+                "status": "step7-verified",
+                "current_step": 7,
+                "predecessor_change": predecessor_change,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "handoff optional refs",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["HandoffPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nGenerate optional handoff refs.\n", encoding="utf-8")
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+            write_yaml(change_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "reviewers": [{"role": "reviewer", "id": "reviewer-agent"}],
+                "decision": {"status": "approve", "rationale": "handoff ready"},
+                "conditions": {"must_before_next_step": [], "followups": []},
+                "trace": {"evidence_refs": [], "verify_refs": ["verify.yaml"]},
+            })
+            write_yaml(change_dir / "continuity-launch-input.yaml", {"schema": "continuity-launch-input/v1"})
+            write_yaml(change_dir / "ROUND_ENTRY_INPUT_SUMMARY.yaml", {"schema": "round-entry-input-summary/v1"})
+
+            payload = resolve_handoff_package(root, change_id)
+
+            self.assertIn("carry_forward", payload)
+            self.assertEqual(payload["carry_forward"]["predecessor_change"], predecessor_change)
+            self.assertIn(".governance/changes/CHG-HO-3/continuity-launch-input.yaml", payload["carry_forward"]["carry_forward_refs"])
+            self.assertIn("verify", payload["refs"])
+            self.assertIn("review", payload["refs"])
+
+    def test_handoff_package_fails_without_active_change_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with self.assertRaises(ValueError):
+                resolve_handoff_package(root)
+
     def test_materialize_continuity_launch_input_from_archived_predecessor(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

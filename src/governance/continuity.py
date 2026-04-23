@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .index import read_changes_index, read_current_change
 from .paths import GovernancePaths
+from .runtime_status import materialize_runtime_status
 from .simple_yaml import load_yaml, write_yaml
+from .step_matrix import render_status_snapshot
 
 CONTINUITY_LAUNCH_INPUT_SCHEMA = "continuity-launch-input/v1"
 ROUND_ENTRY_INPUT_SUMMARY_SCHEMA = "round-entry-input-summary/v1"
+HANDOFF_PACKAGE_SCHEMA = "handoff-package/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -189,6 +193,69 @@ def materialize_round_entry_input_summary(root: str | Path, change_id: str | Non
     return str(target)
 
 
+def resolve_handoff_package(root: str | Path, change_id: str | None = None) -> dict:
+    paths = GovernancePaths(Path(root))
+    current_change = read_current_change(root)
+    resolved_change_id = change_id or _extract_current_change_id(current_change)
+    if not resolved_change_id:
+        raise ValueError("no change_id provided and no current change set")
+
+    current_entry = _find_change_entry(read_changes_index(root), str(resolved_change_id))
+    manifest = _load_change_manifest(paths, str(resolved_change_id))
+    if not manifest:
+        raise ValueError(f"change '{resolved_change_id}' is missing manifest.yaml")
+
+    runtime_payload = _ensure_runtime_status_payload(paths, str(resolved_change_id))
+    snapshot = render_status_snapshot(root, str(resolved_change_id))
+    contract = _load_optional_yaml(paths.change_file(str(resolved_change_id), "contract.yaml"))
+    bindings = _load_optional_yaml(paths.change_file(str(resolved_change_id), "bindings.yaml"))
+    roles = manifest.get("roles", {})
+
+    payload = {
+        "schema": HANDOFF_PACKAGE_SCHEMA,
+        "change_id": str(resolved_change_id),
+        "handoff_kind": "active-change",
+        "generated_at": _now_utc(),
+        "summary": {
+            "project_summary": snapshot.get("project_summary"),
+            "current_phase": runtime_payload["change_status"].get("phase"),
+            "current_step": runtime_payload["change_status"].get("current_step"),
+            "current_status": runtime_payload["change_status"].get("current_status"),
+            "current_owner": runtime_payload["change_status"].get("current_owner"),
+            "waiting_on": runtime_payload["change_status"].get("gate_posture", {}).get("waiting_on"),
+            "next_decision": runtime_payload["change_status"].get("gate_posture", {}).get("next_decision"),
+        },
+        "handoff_need": {
+            "handoff_reason": "session-handoff",
+            "intended_receiver_type": "agent",
+            "intended_receiver_role": _intended_receiver_role(runtime_payload["steps_status"]),
+            "human_intervention_required": runtime_payload["change_status"].get("gate_posture", {}).get("human_intervention_required"),
+        },
+        "execution_context": {
+            "target_validation_objects": list(contract.get("validation_objects", [])) or list(manifest.get("target_validation_objects", [])),
+            "active_roles": {
+                "executor": roles.get("executor") or _step_binding(bindings, 6).get("owner"),
+                "verifier": roles.get("verifier") or _step_binding(bindings, 7).get("owner"),
+                "reviewer": roles.get("reviewer") or _step_binding(bindings, 8).get("owner"),
+            },
+            "current_gate": _current_gate(runtime_payload["steps_status"]),
+        },
+        "operator_start_pack": _operator_start_pack(paths, str(resolved_change_id)),
+        "refs": _handoff_refs(paths, str(resolved_change_id)),
+    }
+    carry_forward = _carry_forward_section(paths, str(resolved_change_id), current_entry, manifest)
+    if carry_forward:
+        payload["carry_forward"] = carry_forward
+    return payload
+
+
+def materialize_handoff_package(root: str | Path, change_id: str | None = None) -> str:
+    payload = resolve_handoff_package(root, change_id)
+    target = GovernancePaths(Path(root)).handoff_package_file(payload["change_id"])
+    write_yaml(target, payload)
+    return str(target)
+
+
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:
     return {
         "path": str(paths.change_file(change_id, name).relative_to(paths.root)),
@@ -201,6 +268,16 @@ def _find_change_entry(changes_index: dict, change_id: str) -> dict:
         if entry.get("change_id") == change_id or entry.get("id") == change_id:
             return entry
     raise ValueError(f"change '{change_id}' not found in changes index")
+
+
+def _ensure_runtime_status_payload(paths: GovernancePaths, change_id: str) -> dict:
+    if not paths.runtime_change_status_file().exists():
+        return materialize_runtime_status(paths.root, change_id)
+    return {
+        "change_status": load_yaml(paths.runtime_change_status_file()),
+        "steps_status": load_yaml(paths.runtime_steps_status_file()),
+        "participants_status": load_yaml(paths.runtime_participants_status_file()),
+    }
 
 
 def _extract_current_change_id(payload: dict) -> str | None:
@@ -218,6 +295,89 @@ def _load_change_manifest(paths: GovernancePaths, change_id: str) -> dict:
     if archived_manifest.exists():
         return load_yaml(archived_manifest)
     return {}
+
+
+def _load_optional_yaml(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return load_yaml(path)
+
+
+def _handoff_refs(paths: GovernancePaths, change_id: str) -> dict:
+    refs = {
+        "runtime_change_status": str(paths.runtime_change_status_file().relative_to(paths.root)),
+        "runtime_steps_status": str(paths.runtime_steps_status_file().relative_to(paths.root)),
+        "runtime_participants_status": str(paths.runtime_participants_status_file().relative_to(paths.root)),
+    }
+    verify_path = paths.change_file(change_id, "verify.yaml")
+    review_path = paths.change_file(change_id, "review.yaml")
+    if verify_path.exists():
+        refs["verify"] = str(verify_path.relative_to(paths.root))
+    if review_path.exists():
+        refs["review"] = str(review_path.relative_to(paths.root))
+    return refs
+
+
+def _carry_forward_section(paths: GovernancePaths, change_id: str, current_entry: dict, manifest: dict) -> dict | None:
+    predecessor_change = current_entry.get("predecessor_change") or manifest.get("predecessor_change")
+    launch_input = paths.continuity_launch_input_file(change_id)
+    round_entry = paths.round_entry_input_summary_file(change_id)
+    refs = []
+    if launch_input.exists():
+        refs.append(str(launch_input.relative_to(paths.root)))
+    if round_entry.exists():
+        refs.append(str(round_entry.relative_to(paths.root)))
+    if not predecessor_change and not refs:
+        return None
+    payload = {"carry_forward_refs": refs}
+    if predecessor_change:
+        payload["predecessor_change"] = predecessor_change
+    return payload
+
+
+def _operator_start_pack(paths: GovernancePaths, change_id: str) -> list[str]:
+    names = ["manifest.yaml", "contract.yaml", "tasks.md", "bindings.yaml"]
+    refs = []
+    for name in names:
+        path = paths.change_file(change_id, name)
+        if path.exists():
+            refs.append(str(path.relative_to(paths.root)))
+    return refs
+
+
+def _intended_receiver_role(steps_status: dict) -> str | None:
+    next_step = steps_status.get("next_step")
+    step_payload = next((item for item in steps_status.get("steps", []) if item.get("step") == next_step), None)
+    if not step_payload:
+        return None
+    if next_step == 7:
+        return "verifier"
+    if next_step == 8:
+        return "reviewer"
+    if next_step == 9:
+        return "archiver"
+    return step_payload.get("owner")
+
+
+def _current_gate(steps_status: dict) -> str | None:
+    next_step = steps_status.get("next_step")
+    step_payload = next((item for item in steps_status.get("steps", []) if item.get("step") == next_step), None)
+    if step_payload:
+        return step_payload.get("gate")
+    current_step = steps_status.get("current_step")
+    current_payload = next((item for item in steps_status.get("steps", []) if item.get("step") == current_step), None)
+    return current_payload.get("gate") if current_payload else None
+
+
+def _step_binding(bindings: dict, step: int) -> dict:
+    steps = bindings.get("steps", {})
+    if not isinstance(steps, dict):
+        return {}
+    return steps.get(str(step), {}) or steps.get(step, {}) or {}
+
+
+def _now_utc() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _find_archive_entry(archive_map: dict, change_id: str) -> dict:

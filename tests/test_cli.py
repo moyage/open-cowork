@@ -614,6 +614,87 @@ class CliTests(unittest.TestCase):
             self.assertTrue((root / f".governance/changes/{current_change}/continuity-launch-input.yaml").exists())
             self.assertTrue((root / f".governance/changes/{current_change}/ROUND_ENTRY_INPUT_SUMMARY.yaml").exists())
 
+    def test_continuity_handoff_package_command_materializes_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-HO"
+
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "CLI handoff package",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit handoff package from CLI",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["HandoffPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nEmit handoff package from CLI.\n", encoding="utf-8")
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step6-executed-pre-step7",
+                "current_change_id": change_id,
+                "current_step": 6,
+                "current_change": {
+                    "change_id": change_id,
+                    "status": "step6-executed-pre-step7",
+                    "current_step": 6,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step6-executed-pre-step7",
+                "current_change_active": "step6-executed-pre-step7",
+                "current_change_id": change_id,
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "handoff-package",
+                    "--change-id", change_id,
+                ])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Handoff package written:", stdout.getvalue())
+            self.assertTrue((root / f".governance/changes/{change_id}/handoff-package.yaml").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

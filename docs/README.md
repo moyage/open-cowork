@@ -47,6 +47,7 @@
 - `plans/06-milestone2-scope-and-splitting.md`
 - `plans/07-milestone2-runtime-status-and-timeline-design.md`
 - `plans/08-milestone2-handoff-package-design.md`
+- `plans/09-milestone2-handoff-package-implementation-plan.md`
 
 ## 报告与实践材料
 

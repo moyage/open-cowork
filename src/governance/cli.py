@@ -265,6 +265,14 @@ def cmd_continuity_round_entry_summary(args):
     return 0
 
 
+def cmd_continuity_handoff_package(args):
+    from governance.continuity import materialize_handoff_package
+
+    output_path = materialize_handoff_package(args.root, args.change_id)
+    print(f"Handoff package written: {output_path}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -407,6 +415,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_launch.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
     p_continuity_round = p_continuity_sub.add_parser("round-entry-summary", help="Write round entry summary yaml")
     p_continuity_round.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
+    p_continuity_handoff = p_continuity_sub.add_parser("handoff-package", help="Write handoff package yaml")
+    p_continuity_handoff.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -451,6 +461,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_launch_input(args)
     elif args.command == "continuity" and args.subcmd == "round-entry-summary":
         return cmd_continuity_round_entry_summary(args)
+    elif args.command == "continuity" and args.subcmd == "handoff-package":
+        return cmd_continuity_handoff_package(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:
