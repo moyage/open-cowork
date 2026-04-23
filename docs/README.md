@@ -45,6 +45,7 @@
 - `plans/04-milestone1-change-package.md`
 - `plans/05-milestone1-implementation-design-package.md`
 - `plans/06-milestone2-scope-and-splitting.md`
+- `plans/07-milestone2-runtime-status-and-timeline-design.md`
 
 ## 报告与实践材料
 
