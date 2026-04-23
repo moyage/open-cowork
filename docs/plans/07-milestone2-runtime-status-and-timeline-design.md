@@ -258,11 +258,19 @@ participants:
 2. 默认输出 `change-status.yaml` 的简要摘要
 3. 支持外部系统只读消费
 
-本轮最小参数建议：
+当前已落地的最小参数：
 
 ```bash
 ocw runtime-status --change-id CHG-20260424-001
+ocw runtime-status --change-id CHG-20260424-001 --format yaml
+ocw runtime-status --change-id CHG-20260424-001 --format json
 ```
+
+说明：
+
+1. `text` 为默认输出，保持人类可读摘要行为。
+2. `yaml/json` 直接输出当前 `change-status` payload，不另立新事实层。
+3. `runtime-status` 当前只允许对 active change 生成和查询。
 
 ### 8.2 `ocw timeline`
 
@@ -272,11 +280,19 @@ ocw runtime-status --change-id CHG-20260424-001
 2. 支持读取 active change 的关键事件列表
 3. 为后续 dashboard / TUI / 外部系统保留 append-only 事件来源
 
-本轮最小参数建议：
+当前已落地的最小参数：
 
 ```bash
 ocw timeline --change-id CHG-20260424-001
+ocw timeline --change-id CHG-20260424-001 --format yaml
+ocw timeline --change-id CHG-20260424-001 --format json
 ```
+
+说明：
+
+1. `text` 为默认输出，保持人类可读提示。
+2. `yaml/json` 直接输出当前 month timeline payload。
+3. `timeline` 文件为 append-only 合并，后续同类事件会保留为独立实例。
 
 ## 9. 设计约束
 
@@ -318,6 +334,43 @@ ocw timeline --change-id CHG-20260424-001
 
 1. 能生成 `change-status.yaml`
 2. 能生成 `steps-status.yaml`
+3. 能生成 `participants-status.yaml`
+4. `runtime-status` 只允许 active change
+5. `timeline` 不覆盖已有月度事件
+6. `timeline` 事件优先绑定真实源文件时间戳
+7. 同类事件多次发生时能够保留多次实例
+8. `runtime-status` 与 `timeline` 支持 `text / yaml / json` 查询输出
+
+## 12. 当前实现对齐状态
+
+截至当前 `Workstream B` 分支，这份设计已经形成以下已落地能力：
+
+1. `runtime/status/` 三份 machine-readable 快照
+   - `change-status.yaml`
+   - `steps-status.yaml`
+   - `participants-status.yaml`
+2. `steps-status.yaml` 已显式输出：
+   - `current_step`
+   - `next_step`
+   - `completed_steps`
+   - `blocked_steps`
+3. `runtime/timeline/` 已具备 append-only 月度事件流
+4. 当前已落地事件类型：
+   - `change_created`
+   - `contract_validate_pass`
+   - `contract_validate_fail`
+   - `run_completed`
+   - `verify_completed`
+   - `review_completed`
+   - `archive_completed`
+   - `gate_blocked`
+5. 同类事件已按实例级 `event_id` 保留，不再压成单条摘要
+6. 查询输出层已支持：
+   - `--format text`
+   - `--format yaml`
+   - `--format json`
+
+一句话说，这一段已不再是“设计草案”，而是“已落地的最小协议切片”。
 3. 能生成 `participants-status.yaml`
 4. 能生成/追加 `events-YYYYMM.yaml`
 5. 当前状态字段与现有 `manifest/current-change/index` 对齐

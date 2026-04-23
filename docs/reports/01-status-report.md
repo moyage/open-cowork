@@ -1,15 +1,16 @@
-# open-cowork 状态报告（Milestone 1 基线已成立）
+# open-cowork 状态报告（Milestone 1 基线已成立，Milestone 2 / Workstream B 已落地）
 
 ## 1. 当前状态
 
-`open-cowork` 当前已经完成 `Milestone 1` 的基线成立工作。
+`open-cowork` 当前已经完成 `Milestone 1` 的基线成立工作，并完成了 `Milestone 2 / Workstream B` 的第一段协议输出层落地。
 
-当前主线不是“只有文档定义的仓库基线”，而是已经具备最小可运行协作链路的实现基线：
+当前仓库不再只是“文档定义的框架基线”，而是已经具备：
 
 1. 顶层白皮书、PRD、执行计划与实现口径已对齐
 2. 主链最小闭环已经落地
 3. 最小 continuity 与最小人类状态面已经落地
 4. 关键边界与状态迁移已经具备最小真实约束
+5. machine-readable runtime status / timeline 协议层已经落地
 
 ## 2. 已完成能力
 
@@ -58,13 +59,38 @@
 2. `session-recovery-packet`
 3. Hermes 会话压缩 / 断连诊断与恢复包机制
 
+### 2.5 Milestone 2 / Workstream B 协议输出层
+
+已实现：
+
+1. `runtime-status`
+2. `timeline`
+3. `change-status.yaml`
+4. `steps-status.yaml`
+5. `participants-status.yaml`
+6. 月度 append-only `events-YYYYMM.yaml`
+7. 关键动作事件落盘：
+   - `contract_validate_pass/fail`
+   - `run_completed`
+   - `verify_completed`
+   - `review_completed`
+   - `archive_completed`
+   - `gate_blocked`
+8. 查询输出支持：
+   - `text`
+   - `yaml`
+   - `json`
+
 ## 3. 当前验证状态
 
 当前主线测试结果：
 
-- `31/31` 通过
+- `39/39` 通过
 
-这意味着当前基线已经不只是“方向正确”，而是“最小协议面真实成立”。
+这意味着当前基线已经不只是“方向正确”，而是：
+
+1. `Milestone 1` 最小协议面真实成立
+2. `Milestone 2 / Workstream B` 最小 machine-readable 协议切片真实成立
 
 ## 4. 当前限制
 
@@ -72,9 +98,9 @@
 
 1. write-boundary 仍是最小实现，尚未做到更强的真实写入拦截
 2. adapter 仍是单一最小 MVP，不代表完整适配层能力
-3. machine-readable runtime status / timeline 仍未正式落地
-4. handoff / owner transfer / increment package 仍需进一步标准化
-5. 人类体验层仍是最小成立，而非完整深化版本
+3. handoff / owner transfer / increment package 仍需进一步标准化
+4. 人类体验层仍是最小成立，而非完整深化版本
+5. Workstream B 已落地最小查询输出，但更完整的对外读取面仍可继续增强
 
 ## 5. 下一步方向
 
@@ -82,9 +108,9 @@
 
 1. 更强的边界与状态硬化
 2. continuity primitives 完整化
-3. 协议与适配层主体落地
-4. machine-readable status / timeline 输出
-5. 人类体验层进一步深化
+3. 协议与适配层继续深化
+4. 人类体验层进一步深化
+5. Workstream B 结果合回主线并作为后续消费基线
 
 对应收口文档：
 
