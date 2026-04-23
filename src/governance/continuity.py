@@ -469,6 +469,7 @@ def resolve_closeout_packet(
     receipt = load_yaml(receipt_path)
     if not receipt.get("archive_executed"):
         raise ValueError(f"change '{change_id}' is not archived")
+    _resolve_archived_change_anchor(paths, change_id, receipt)
 
     manifest = load_yaml(manifest_path)
     verify_payload = load_yaml(verify_path)
@@ -603,6 +604,13 @@ def resolve_sync_packet(
 
     if source_kind == "closeout":
         source_path = paths.closeout_packet_file(change_id)
+        receipt_path = paths.archived_change_file(change_id, "archive-receipt.yaml")
+        if not receipt_path.exists():
+            raise ValueError(f"archived change '{change_id}' is missing archive-receipt.yaml")
+        receipt = load_yaml(receipt_path)
+        if not receipt.get("archive_executed"):
+            raise ValueError(f"change '{change_id}' is not archived")
+        _resolve_archived_change_anchor(paths, change_id, receipt)
     else:
         source_path = paths.increment_package_file(change_id)
     if not source_path.exists():
@@ -939,6 +947,31 @@ def _step_binding(bindings: dict, step: int) -> dict:
 
 def _now_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _resolve_archived_change_anchor(paths: GovernancePaths, change_id: str, receipt: dict) -> dict:
+    archive_map = load_yaml(paths.archive_map_file())
+    try:
+        entry = _find_archive_entry(archive_map, change_id)
+    except ValueError as exc:
+        raise ValueError(f"archived change '{change_id}' is missing from archive-map") from exc
+    expected_archive_path = str(paths.archived_change_dir(change_id).relative_to(paths.root)) + "/"
+    expected_receipt = str(paths.archived_change_file(change_id, "archive-receipt.yaml").relative_to(paths.root))
+    if entry.get("archive_path") and str(entry.get("archive_path")) != expected_archive_path:
+        raise ValueError(
+            f"archived change '{change_id}' archive_path does not match archive-map"
+        )
+    if entry.get("receipt") and str(entry.get("receipt")) != expected_receipt:
+        raise ValueError(
+            f"archived change '{change_id}' receipt does not match archive-map"
+        )
+    mapped_archived_at = entry.get("archived_at")
+    receipt_archived_at = receipt.get("archived_at")
+    if mapped_archived_at and receipt_archived_at and str(mapped_archived_at) != str(receipt_archived_at):
+        raise ValueError(
+            f"archived change '{change_id}' archived_at does not match archive-map"
+        )
+    return entry
 
 
 def _find_archive_entry(archive_map: dict, change_id: str) -> dict:

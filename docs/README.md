@@ -67,6 +67,8 @@
 - `plans/27-milestone2-archive-maintenance-consistency-implementation-plan.md`
 - `plans/28-milestone2-continuity-refs-consistency-design.md`
 - `plans/29-milestone2-continuity-refs-consistency-implementation-plan.md`
+- `plans/30-milestone2-archive-receipt-and-archived-refs-consistency-design.md`
+- `plans/31-milestone2-archive-receipt-and-archived-refs-consistency-implementation-plan.md`
 
 ## 报告与实践材料
 

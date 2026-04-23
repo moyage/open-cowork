@@ -266,6 +266,15 @@ class ContinuityTests(unittest.TestCase):
                 "archive_executed": True,
                 "archived_at": "2026-04-24T12:00:00+00:00",
             })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
             write_yaml(archive_dir / "manifest.yaml", {
                 "change_id": change_id,
                 "title": "closeout packet materialization",
@@ -307,6 +316,192 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(payload["schema"], "closeout-packet/v1")
             self.assertEqual(payload["closure_summary"]["final_status"], "archived")
             self.assertEqual(payload["refs"]["archive_receipt"], f".governance/archive/{change_id}/archive-receipt.yaml")
+
+    def test_closeout_packet_rejects_when_archive_map_entry_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-AM-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "missing archive map entry",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+
+            from governance.continuity import materialize_closeout_packet
+
+            with self.assertRaisesRegex(ValueError, "missing from archive-map"):
+                materialize_closeout_packet(
+                    root,
+                    change_id=change_id,
+                    closeout_statement="should fail",
+                    delivered_scope=["continuity primitives"],
+                    deferred_scope=[],
+                    key_outcomes=["n/a"],
+                    unresolved_items=[],
+                    next_direction="n/a",
+                    attention_points=[],
+                    carry_forward_items=[],
+                    operator_summary="n/a",
+                    sponsor_summary="n/a",
+                )
+
+    def test_closeout_packet_rejects_when_archive_map_receipt_mismatches_archived_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-AM-2"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                    "receipt": ".governance/archive/CHG-OTHER/archive-receipt.yaml",
+                }],
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "receipt mismatch",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+
+            from governance.continuity import materialize_closeout_packet
+
+            with self.assertRaisesRegex(ValueError, "receipt does not match"):
+                materialize_closeout_packet(
+                    root,
+                    change_id=change_id,
+                    closeout_statement="should fail",
+                    delivered_scope=["continuity primitives"],
+                    deferred_scope=[],
+                    key_outcomes=["n/a"],
+                    unresolved_items=[],
+                    next_direction="n/a",
+                    attention_points=[],
+                    carry_forward_items=[],
+                    operator_summary="n/a",
+                    sponsor_summary="n/a",
+                )
+
+    def test_closeout_packet_rejects_when_archive_map_archived_at_mismatches_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-AM-3"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-25T12:00:00+00:00",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "archived_at mismatch",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+
+            from governance.continuity import materialize_closeout_packet
+
+            with self.assertRaisesRegex(ValueError, "archived_at does not match"):
+                materialize_closeout_packet(
+                    root,
+                    change_id=change_id,
+                    closeout_statement="should fail",
+                    delivered_scope=["continuity primitives"],
+                    deferred_scope=[],
+                    key_outcomes=["n/a"],
+                    unresolved_items=[],
+                    next_direction="n/a",
+                    attention_points=[],
+                    carry_forward_items=[],
+                    operator_summary="n/a",
+                    sponsor_summary="n/a",
+                )
 
     def test_closeout_packet_rejects_non_archived_change(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -350,6 +545,21 @@ class ContinuityTests(unittest.TestCase):
             change_id = "CHG-SYNC-1"
             archive_dir = root / f".governance/archive/{change_id}"
             archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00Z",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00Z",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
 
             write_yaml(archive_dir / "closeout-packet.yaml", {
                 "schema": "closeout-packet/v1",
@@ -387,6 +597,58 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(payload["source_anchor"]["source_kind"], "closeout")
             self.assertEqual(output_path, archive_dir / "sync-packet.yaml")
 
+    def test_sync_packet_from_closeout_rejects_when_archive_anchor_is_inconsistent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-SYNC-AM-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00Z",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00Z",
+                    "receipt": ".governance/archive/CHG-OTHER/archive-receipt.yaml",
+                }],
+            })
+            write_yaml(archive_dir / "closeout-packet.yaml", {
+                "schema": "closeout-packet/v1",
+                "change_id": change_id,
+                "closure_summary": {
+                    "final_status": "archived",
+                    "closeout_statement": "done",
+                },
+                "refs": {},
+            })
+
+            from governance.continuity import materialize_sync_packet
+
+            with self.assertRaisesRegex(ValueError, "receipt does not match"):
+                materialize_sync_packet(
+                    root,
+                    change_id=change_id,
+                    source_kind="closeout",
+                    sync_kind="routine-sync",
+                    target_layer="sponsor",
+                    target_scope="project-level",
+                    urgency="normal",
+                    headline="sync",
+                    delivered_scope=["closeout-packet"],
+                    pending_scope=[],
+                    requested_attention=[],
+                    requested_decisions=[],
+                    next_owner_suggestion="owner",
+                    next_action_suggestion="review",
+                )
+
     def test_closeout_packet_omits_runtime_change_status_when_active_snapshot_belongs_to_other_change(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -407,6 +669,15 @@ class ContinuityTests(unittest.TestCase):
                 "change_id": change_id,
                 "archive_executed": True,
                 "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
             })
             write_yaml(archive_dir / "manifest.yaml", {
                 "change_id": change_id,
@@ -484,6 +755,15 @@ class ContinuityTests(unittest.TestCase):
                 "change_id": change_id,
                 "archive_executed": True,
                 "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
             })
             write_yaml(archive_dir / "manifest.yaml", {
                 "change_id": change_id,
@@ -571,6 +851,21 @@ class ContinuityTests(unittest.TestCase):
             change_id = "CHG-SYNC-REF-1"
             archive_dir = root / f".governance/archive/{change_id}"
             archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00Z",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00Z",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
             write_yaml(archive_dir / "closeout-packet.yaml", {
                 "schema": "closeout-packet/v1",
                 "change_id": change_id,

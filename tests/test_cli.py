@@ -718,6 +718,15 @@ class CliTests(unittest.TestCase):
                 "archive_executed": True,
                 "archived_at": "2026-04-24T12:00:00+00:00",
             })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00+00:00",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
             write_yaml(archive_dir / "manifest.yaml", {
                 "change_id": change_id,
                 "title": "CLI closeout",
@@ -767,6 +776,21 @@ class CliTests(unittest.TestCase):
             change_id = "CHG-CLI-SYNC"
             archive_dir = root / f".governance/archive/{change_id}"
             archive_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00Z",
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00Z",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
             write_yaml(archive_dir / "closeout-packet.yaml", {
                 "schema": "closeout-packet/v1",
                 "change_id": change_id,
