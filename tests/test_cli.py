@@ -695,6 +695,69 @@ class CliTests(unittest.TestCase):
             self.assertIn("Handoff package written:", stdout.getvalue())
             self.assertTrue((root / f".governance/changes/{change_id}/handoff-package.yaml").exists())
 
+
+
+    def test_continuity_closeout_packet_command_materializes_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-CLOSE"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "CLI closeout",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "contract.yaml", {"objective": "closeout packet"})
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "closeout-packet",
+                    "--change-id", change_id,
+                    "--closeout-statement", "本轮已完成最小闭环并正式归档",
+                    "--delivered-scope", "continuity primitives",
+                    "--deferred-scope", "sync / escalation packet",
+                    "--key-outcome", "continuity primitives 形成最小链",
+                    "--unresolved-item", "sync packet 尚未建立",
+                    "--next-direction", "build sync / escalation packet",
+                    "--attention-point", "不要把 closeout-packet 扩成新的 truth-source",
+                    "--carry-forward-item", "project-to-higher-layer sync",
+                    "--operator-summary", "本轮已完成 continuity primitives 基线",
+                    "--sponsor-summary", "本轮完成 continuity 主线基线",
+                ])
+            self.assertEqual(exit_code, 0)
+            payload = load_yaml(archive_dir / "closeout-packet.yaml")
+            self.assertEqual(payload["schema"], "closeout-packet/v1")
+            self.assertIn("Closeout packet written", stdout.getvalue())
+
     def test_continuity_owner_transfer_prepare_and_accept_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

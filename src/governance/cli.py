@@ -321,6 +321,27 @@ def cmd_continuity_increment_package(args):
     return 0
 
 
+def cmd_continuity_closeout_packet(args):
+    from governance.continuity import materialize_closeout_packet
+
+    output_path = materialize_closeout_packet(
+        args.root,
+        change_id=args.change_id,
+        closeout_statement=args.closeout_statement,
+        delivered_scope=list(args.delivered_scope or []),
+        deferred_scope=list(args.deferred_scope or []),
+        key_outcomes=list(args.key_outcome or []),
+        unresolved_items=list(args.unresolved_item or []),
+        next_direction=args.next_direction,
+        attention_points=list(args.attention_point or []),
+        carry_forward_items=list(args.carry_forward_item or []),
+        operator_summary=args.operator_summary,
+        sponsor_summary=args.sponsor_summary,
+    )
+    print(f"Closeout packet written: {output_path}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -488,6 +509,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_increment.add_argument("--new-risk", action="append", default=[], help="New risk")
     p_continuity_increment.add_argument("--blocker", action="append", default=[], help="Blocker")
     p_continuity_increment.add_argument("--next-followup", action="append", default=[], help="Next followup")
+    p_continuity_closeout = p_continuity_sub.add_parser("closeout-packet", help="Write closeout packet yaml")
+    p_continuity_closeout.add_argument("--change-id", required=True, help="Archived change id")
+    p_continuity_closeout.add_argument("--closeout-statement", required=True, help="Closeout statement")
+    p_continuity_closeout.add_argument("--delivered-scope", action="append", default=[], help="Delivered scope item")
+    p_continuity_closeout.add_argument("--deferred-scope", action="append", default=[], help="Deferred scope item")
+    p_continuity_closeout.add_argument("--key-outcome", action="append", default=[], help="Key outcome")
+    p_continuity_closeout.add_argument("--unresolved-item", action="append", default=[], help="Unresolved item")
+    p_continuity_closeout.add_argument("--next-direction", required=True, help="Next round default direction")
+    p_continuity_closeout.add_argument("--attention-point", action="append", default=[], help="Attention point")
+    p_continuity_closeout.add_argument("--carry-forward-item", action="append", default=[], help="Carry forward item")
+    p_continuity_closeout.add_argument("--operator-summary", required=True, help="Operator summary")
+    p_continuity_closeout.add_argument("--sponsor-summary", required=True, help="Sponsor summary")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -540,6 +573,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_owner_transfer_accept(args)
     elif args.command == "continuity" and args.subcmd == "increment-package":
         return cmd_continuity_increment_package(args)
+    elif args.command == "continuity" and args.subcmd == "closeout-packet":
+        return cmd_continuity_closeout_packet(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:

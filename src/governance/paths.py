@@ -73,6 +73,9 @@ class GovernancePaths:
     def increment_package_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "increment-package.yaml"
 
+    def closeout_packet_file(self, change_id: str) -> Path:
+        return self.archived_change_dir(change_id) / "closeout-packet.yaml"
+
     def status_snapshot_file(self, change_id: str) -> Path:
         return self.change_dir(change_id) / "STATUS_SNAPSHOT.yaml"
 

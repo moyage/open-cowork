@@ -14,6 +14,7 @@ ROUND_ENTRY_INPUT_SUMMARY_SCHEMA = "round-entry-input-summary/v1"
 HANDOFF_PACKAGE_SCHEMA = "handoff-package/v1"
 OWNER_TRANSFER_CONTINUITY_SCHEMA = "owner-transfer-continuity/v1"
 INCREMENT_PACKAGE_SCHEMA = "increment-package/v1"
+CLOSEOUT_PACKET_SCHEMA = "closeout-packet/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -429,6 +430,146 @@ def materialize_increment_package(
     return str(target)
 
 
+def resolve_closeout_packet(
+    root: str | Path,
+    *,
+    change_id: str,
+    closeout_statement: str,
+    delivered_scope: list[str],
+    deferred_scope: list[str],
+    key_outcomes: list[str],
+    unresolved_items: list[str],
+    next_direction: str,
+    attention_points: list[str],
+    carry_forward_items: list[str],
+    operator_summary: str,
+    sponsor_summary: str,
+) -> dict:
+    paths = GovernancePaths(Path(root))
+    archive_dir = paths.archived_change_dir(change_id)
+    receipt_path = archive_dir / "archive-receipt.yaml"
+    manifest_path = archive_dir / "manifest.yaml"
+    contract_path = archive_dir / "contract.yaml"
+    verify_path = archive_dir / "verify.yaml"
+    review_path = archive_dir / "review.yaml"
+
+    if not receipt_path.exists():
+        raise ValueError(f"archived change '{change_id}' is missing archive-receipt.yaml")
+    if not manifest_path.exists():
+        raise ValueError(f"archived change '{change_id}' is missing manifest.yaml")
+    if not verify_path.exists():
+        raise ValueError(f"archived change '{change_id}' is missing verify.yaml")
+    if not review_path.exists():
+        raise ValueError(f"archived change '{change_id}' is missing review.yaml")
+
+    receipt = load_yaml(receipt_path)
+    if not receipt.get("archive_executed"):
+        raise ValueError(f"change '{change_id}' is not archived")
+
+    manifest = load_yaml(manifest_path)
+    verify_payload = load_yaml(verify_path)
+    review_payload = load_yaml(review_path)
+    maintenance = _load_optional_yaml(paths.maintenance_status_file())
+
+    refs = {
+        "archive_receipt": str(receipt_path.relative_to(paths.root)),
+        "archived_manifest": str(manifest_path.relative_to(paths.root)),
+        "archived_contract": str(contract_path.relative_to(paths.root)) if contract_path.exists() else None,
+        "archived_verify": str(verify_path.relative_to(paths.root)),
+        "archived_review": str(review_path.relative_to(paths.root)),
+        "maintenance_status": str(paths.maintenance_status_file().relative_to(paths.root)),
+        "runtime_change_status": str(paths.runtime_change_status_file().relative_to(paths.root)),
+        "runtime_timeline": str(paths.runtime_timeline_month_file().relative_to(paths.root)),
+    }
+    refs = {key: value for key, value in refs.items() if value is not None}
+    _append_optional_closeout_ref(refs, "handoff_package", paths.handoff_package_file(change_id), paths.root)
+    _append_optional_closeout_ref(refs, "owner_transfer", paths.owner_transfer_continuity_file(change_id), paths.root)
+    _append_optional_closeout_ref(refs, "increment_package", paths.increment_package_file(change_id), paths.root)
+
+    archived_at = receipt.get("archived_at") or _now_utc()
+    final_step = manifest.get("current_step", 9)
+    final_status = manifest.get("status", "archived")
+    final_decision = review_payload.get("decision", {}).get("status")
+    if final_decision == "approve":
+        final_decision = "approve-and-close"
+
+    return {
+        "schema": CLOSEOUT_PACKET_SCHEMA,
+        "change_id": change_id,
+        "generated_at": _now_utc(),
+        "closeout_kind": "archived-change",
+        "closure_summary": {
+            "title": manifest.get("title"),
+            "final_status": final_status,
+            "final_phase": _phase_label_for_step(final_step),
+            "final_step": final_step,
+            "final_decision": final_decision,
+            "closeout_statement": closeout_statement,
+            "archived_at": archived_at,
+            "verify_status": verify_payload.get("summary", {}).get("status"),
+        },
+        "result_summary": {
+            "delivered_scope": list(delivered_scope),
+            "deferred_scope": list(deferred_scope),
+            "key_outcomes": list(key_outcomes),
+            "unresolved_items": list(unresolved_items),
+        },
+        "continuity_bridge": {
+            "next_round_default_direction": next_direction,
+            "next_round_attention_points": list(attention_points),
+            "carry_forward_items": list(carry_forward_items),
+        },
+        "human_reading_entry": {
+            "operator_summary": operator_summary,
+            "sponsor_summary": sponsor_summary,
+            "next_operator_start_pack": [
+                str(paths.closeout_packet_file(change_id).relative_to(paths.root)),
+                str(receipt_path.relative_to(paths.root)),
+                str(review_path.relative_to(paths.root)),
+            ],
+        },
+        "refs": refs,
+        "maintenance_anchor": {
+            "last_archived_change": maintenance.get("last_archived_change"),
+            "last_archive_at": maintenance.get("last_archive_at"),
+        },
+    }
+
+
+def materialize_closeout_packet(
+    root: str | Path,
+    *,
+    change_id: str,
+    closeout_statement: str,
+    delivered_scope: list[str],
+    deferred_scope: list[str],
+    key_outcomes: list[str],
+    unresolved_items: list[str],
+    next_direction: str,
+    attention_points: list[str],
+    carry_forward_items: list[str],
+    operator_summary: str,
+    sponsor_summary: str,
+) -> str:
+    payload = resolve_closeout_packet(
+        root,
+        change_id=change_id,
+        closeout_statement=closeout_statement,
+        delivered_scope=delivered_scope,
+        deferred_scope=deferred_scope,
+        key_outcomes=key_outcomes,
+        unresolved_items=unresolved_items,
+        next_direction=next_direction,
+        attention_points=attention_points,
+        carry_forward_items=carry_forward_items,
+        operator_summary=operator_summary,
+        sponsor_summary=sponsor_summary,
+    )
+    target = GovernancePaths(Path(root)).closeout_packet_file(change_id)
+    write_yaml(target, payload)
+    return str(target)
+
+
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:
     return {
         "path": str(paths.change_file(change_id, name).relative_to(paths.root)),
@@ -509,6 +650,11 @@ def _carry_forward_section(paths: GovernancePaths, change_id: str, current_entry
     if predecessor_change:
         payload["predecessor_change"] = predecessor_change
     return payload
+
+
+def _append_optional_closeout_ref(refs: dict, key: str, path: Path, root: Path) -> None:
+    if path.exists():
+        refs[key] = str(path.relative_to(root))
 
 
 def _operator_start_pack(paths: GovernancePaths, change_id: str) -> list[str]:

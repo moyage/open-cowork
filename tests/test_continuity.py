@@ -243,6 +243,104 @@ class ContinuityTests(unittest.TestCase):
                     next_followups=[],
                 )
 
+
+
+    def test_materialize_closeout_packet_for_archived_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-1"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00+00:00",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "closeout packet materialization",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "contract.yaml", {
+                "objective": "closeout packet",
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+
+            from governance.continuity import materialize_closeout_packet
+
+            output_path = Path(materialize_closeout_packet(
+                root,
+                change_id=change_id,
+                closeout_statement="本轮已完成最小闭环并正式归档",
+                delivered_scope=["continuity primitives"],
+                deferred_scope=["sync / escalation packet"],
+                key_outcomes=["continuity primitives 形成最小链"],
+                unresolved_items=["sync packet 尚未建立"],
+                next_direction="build sync / escalation packet",
+                attention_points=["不要把 closeout-packet 扩成新的 truth-source"],
+                carry_forward_items=["project-to-higher-layer sync"],
+                operator_summary="本轮已完成 continuity primitives 基线",
+                sponsor_summary="本轮完成 continuity 主线基线",
+            ))
+            payload = load_yaml(output_path)
+
+            self.assertEqual(payload["schema"], "closeout-packet/v1")
+            self.assertEqual(payload["closure_summary"]["final_status"], "archived")
+            self.assertEqual(payload["refs"]["archive_receipt"], f".governance/archive/{change_id}/archive-receipt.yaml")
+
+    def test_closeout_packet_rejects_non_archived_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLOSE-2"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "not archived yet",
+                "status": "step8-reviewed",
+                "current_step": 8,
+            })
+
+            from governance.continuity import materialize_closeout_packet
+
+            with self.assertRaises(ValueError):
+                materialize_closeout_packet(
+                    root,
+                    change_id=change_id,
+                    closeout_statement="should fail",
+                    delivered_scope=["continuity primitives"],
+                    deferred_scope=[],
+                    key_outcomes=["n/a"],
+                    unresolved_items=[],
+                    next_direction="n/a",
+                    attention_points=[],
+                    carry_forward_items=[],
+                    operator_summary="n/a",
+                    sponsor_summary="n/a",
+                )
+
     def test_prepare_owner_transfer_continuity_materializes_transfer_record(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
