@@ -1,32 +1,59 @@
-# Documentation Index
+# 文档索引
 
-This folder contains design specs, status reports, and practical onboarding guidance.
+本目录用于承载 `open-cowork` 的顶层定义、产品需求、执行计划、设计规范与实践说明。
 
-## Start Here
+建议优先阅读顶层文档，再进入细化规格与操作文档。
+
+## 建议阅读顺序
 
 1. `../README.md`
-   - project overview, install, and basic commands
-2. `QUICKSTART.md`
-   - low-friction setup for personal domains and team collaboration
+   - 项目入口、问题定义、适用场景与快速开始
+2. `specs/00-top-level-whitepaper.md`
+   - 顶层身份、时代背景、能力边界与长期方向
+3. `specs/01-prd.md`
+   - 产品定义、能力模型、目标用户与成功标准
+4. `plans/01-execution-plan.md`
+   - 能力包路线图与执行顺序
+5. `plans/02-boundary-and-product-shape-decision.md`
+   - 项目边界与产品形态决议
+6. `plans/03-human-team-experience-feedback-and-design-direction.md`
+   - 团队体验反馈与默认体验层方向
+7. `QUICKSTART.md`
+   - 低门槛上手说明
 
-## Core Specs
+## 顶层文档
 
+- `specs/00-top-level-whitepaper.md`
 - `specs/01-prd.md`
+- `plans/01-execution-plan.md`
+
+## 细化规格
+
 - `specs/03-fact-layer-directory-spec.md`
 - `specs/04-change-package-spec.md`
 - `specs/05-execution-contract-spec.md`
 - `specs/06-evidence-verify-review-schema.md`
 - `specs/07-standard-9-step-runtime-flow.md`
 - `specs/09-mvp-cli-entry-spec.md`
+- `specs/13-round-close-report-and-closeout-package-spec.md`
 
-## Operational Docs
+## 计划与方向
 
 - `plans/01-execution-plan.md`
+- `plans/02-boundary-and-product-shape-decision.md`
+- `plans/03-human-team-experience-feedback-and-design-direction.md`
+- `plans/04-milestone1-change-package.md`
+- `plans/05-milestone1-implementation-design-package.md`
+
+## 报告与实践材料
+
 - `reports/01-status-report.md`
 - `reports/02-session-recovery-playbook.md`
+- `QUICKSTART.md`
 
-## Notes
+## 说明
 
-- `docs/specs/` are framework-level design specs.
-- Runtime governance artifacts are generated under `.governance/` at project runtime.
-- Do not treat human-facing reports as authoritative runtime facts.
+- `docs/specs/` 用于承载框架级定义、结构规范与关键协作语义。
+- `docs/plans/` 用于承载阶段计划、边界决议与方向性设计文档。
+- 运行时生成的治理产物默认位于 `.governance/`，不应与顶层定义文档混淆。
+- 人类阅读文档不能直接充当机器事实真相源。
