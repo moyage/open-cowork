@@ -55,6 +55,8 @@
 - `plans/15-milestone2-closeout-packet-implementation-plan.md`
 - `plans/16-milestone2-sync-escalation-packet-design.md`
 - `plans/17-milestone2-sync-escalation-packet-implementation-plan.md`
+- `plans/18-milestone2-sync-history-and-external-export-design.md`
+- `plans/19-milestone2-sync-history-and-external-export-implementation-plan.md`
 
 ## 报告与实践材料
 
