@@ -53,6 +53,8 @@
 - `plans/13-milestone2-increment-package-implementation-plan.md`
 - `plans/14-milestone2-closeout-packet-design.md`
 - `plans/15-milestone2-closeout-packet-implementation-plan.md`
+- `plans/16-milestone2-sync-escalation-packet-design.md`
+- `plans/17-milestone2-sync-escalation-packet-implementation-plan.md`
 
 ## 报告与实践材料
 
