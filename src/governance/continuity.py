@@ -273,11 +273,14 @@ def _find_change_entry(changes_index: dict, change_id: str) -> dict:
 def _ensure_runtime_status_payload(paths: GovernancePaths, change_id: str) -> dict:
     if not paths.runtime_change_status_file().exists():
         return materialize_runtime_status(paths.root, change_id)
-    return {
+    payload = {
         "change_status": load_yaml(paths.runtime_change_status_file()),
         "steps_status": load_yaml(paths.runtime_steps_status_file()),
         "participants_status": load_yaml(paths.runtime_participants_status_file()),
     }
+    if payload["change_status"].get("change_id") != change_id:
+        return materialize_runtime_status(paths.root, change_id)
+    return payload
 
 
 def _extract_current_change_id(payload: dict) -> str | None:
@@ -327,7 +330,7 @@ def _carry_forward_section(paths: GovernancePaths, change_id: str, current_entry
         refs.append(str(launch_input.relative_to(paths.root)))
     if round_entry.exists():
         refs.append(str(round_entry.relative_to(paths.root)))
-    if not predecessor_change and not refs:
+    if not refs:
         return None
     payload = {"carry_forward_refs": refs}
     if predecessor_change:

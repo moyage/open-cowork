@@ -226,6 +226,169 @@ class ContinuityTests(unittest.TestCase):
             self.assertIn("verify", payload["refs"])
             self.assertIn("review", payload["refs"])
 
+    def test_handoff_package_omits_carry_forward_when_predecessor_exists_but_refs_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-HO-4"
+            predecessor_change = "CHG-HO-3"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+                "predecessor_change": predecessor_change,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "handoff missing carry-forward refs",
+                "status": "step7-verified",
+                "current_step": 7,
+                "predecessor_change": predecessor_change,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "omit carry forward without continuity refs",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["HandoffPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nDo not emit empty carry forward.\n", encoding="utf-8")
+
+            payload = resolve_handoff_package(root, change_id)
+
+            self.assertNotIn("carry_forward", payload)
+
+    def test_handoff_package_rebuilds_runtime_status_when_existing_snapshot_belongs_to_another_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            active_change = "CHG-ACTIVE"
+            target_change = "CHG-TARGET"
+            target_dir = root / f".governance/changes/{target_change}"
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": target_change,
+                "path": f".governance/changes/{target_change}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            upsert_change_entry(root, {
+                "change_id": target_change,
+                "path": f".governance/changes/{target_change}",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+            })
+            write_yaml(target_dir / "manifest.yaml", {
+                "change_id": target_change,
+                "title": "handoff runtime snapshot mismatch",
+                "status": "step6-executed-pre-step7",
+                "current_step": 6,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(target_dir / "contract.yaml", {
+                "objective": "refresh stale runtime snapshot",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["HandoffPackageSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(target_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (target_dir / "tasks.md").write_text("# Tasks\n\nRefresh stale runtime snapshot.\n", encoding="utf-8")
+
+            runtime_status_dir = root / ".governance/runtime/status"
+            runtime_status_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(runtime_status_dir / "change-status.yaml", {
+                "schema": "runtime-change-status/v1",
+                "change_id": active_change,
+                "phase": "Phase 3 / 执行与验证",
+                "current_step": 7,
+                "current_status": "step7-verified",
+                "overall_progress": {"completed_steps": [1, 2, 3, 4, 5, 6, 7], "remaining_steps": [8, 9]},
+                "gate_posture": {
+                    "waiting_on": "Step 8 / Review and decide",
+                    "next_decision": "Step 8 / Review and decide",
+                    "human_intervention_required": True,
+                },
+                "current_owner": "wrong-owner",
+                "maintenance_status": "step7-verified",
+                "refs": {},
+                "generated_at": "2026-04-24T00:00:00Z",
+                "active_change_matches_current": False,
+            })
+            write_yaml(runtime_status_dir / "steps-status.yaml", {
+                "schema": "runtime-steps-status/v1",
+                "change_id": active_change,
+                "phase": "Phase 3 / 执行与验证",
+                "current_step": 7,
+                "next_step": 8,
+                "completed_steps": [1, 2, 3, 4, 5, 6, 7],
+                "blocked_steps": [],
+                "steps": [],
+                "generated_at": "2026-04-24T00:00:00Z",
+            })
+            write_yaml(runtime_status_dir / "participants-status.yaml", {
+                "schema": "runtime-participants-status/v1",
+                "change_id": active_change,
+                "participants": [],
+                "generated_at": "2026-04-24T00:00:00Z",
+            })
+
+            payload = resolve_handoff_package(root, target_change)
+
+            self.assertEqual(payload["change_id"], target_change)
+            self.assertEqual(payload["summary"]["current_status"], "step6-executed-pre-step7")
+            refreshed_change_status = load_yaml(runtime_status_dir / "change-status.yaml")
+            self.assertEqual(refreshed_change_status["change_id"], target_change)
+
     def test_handoff_package_fails_without_active_change_context(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
