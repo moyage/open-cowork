@@ -273,6 +273,35 @@ def cmd_continuity_handoff_package(args):
     return 0
 
 
+def cmd_continuity_owner_transfer_prepare(args):
+    from governance.continuity import prepare_owner_transfer_continuity
+
+    output_path = prepare_owner_transfer_continuity(
+        args.root,
+        change_id=args.change_id,
+        target_role=args.target_role,
+        outgoing_owner=args.outgoing_owner,
+        incoming_owner=args.incoming_owner,
+        reason=args.reason,
+        initiated_by=args.initiated_by,
+    )
+    print(f"Owner transfer continuity written: {output_path}")
+    return 0
+
+
+def cmd_continuity_owner_transfer_accept(args):
+    from governance.continuity import accept_owner_transfer_continuity
+
+    payload = accept_owner_transfer_continuity(
+        args.root,
+        change_id=args.change_id,
+        accepted_by=args.accepted_by,
+        note=args.note or "",
+    )
+    print(f"Owner transfer accepted: {payload['change_id']} -> {payload['acceptance']['status']}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -417,6 +446,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_round.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
     p_continuity_handoff = p_continuity_sub.add_parser("handoff-package", help="Write handoff package yaml")
     p_continuity_handoff.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
+    p_continuity_owner_transfer = p_continuity_sub.add_parser("owner-transfer", help="Manage owner transfer continuity")
+    p_continuity_owner_transfer_sub = p_continuity_owner_transfer.add_subparsers(dest="owner_transfer_subcmd")
+    p_owner_transfer_prepare = p_continuity_owner_transfer_sub.add_parser("prepare", help="Write owner transfer continuity yaml")
+    p_owner_transfer_prepare.add_argument("--change-id", required=True, help="Target change id")
+    p_owner_transfer_prepare.add_argument("--target-role", required=True, help="Transferred role")
+    p_owner_transfer_prepare.add_argument("--outgoing-owner", required=True, help="Current owner id")
+    p_owner_transfer_prepare.add_argument("--incoming-owner", required=True, help="Incoming owner id")
+    p_owner_transfer_prepare.add_argument("--reason", required=True, help="Transfer reason")
+    p_owner_transfer_prepare.add_argument("--initiated-by", required=True, help="Transfer initiator id")
+    p_owner_transfer_accept = p_continuity_owner_transfer_sub.add_parser("accept", help="Accept pending owner transfer continuity")
+    p_owner_transfer_accept.add_argument("--change-id", required=True, help="Target change id")
+    p_owner_transfer_accept.add_argument("--accepted-by", required=True, help="Receiver accepting transfer")
+    p_owner_transfer_accept.add_argument("--note", default="", help="Optional acceptance note")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -463,6 +505,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_round_entry_summary(args)
     elif args.command == "continuity" and args.subcmd == "handoff-package":
         return cmd_continuity_handoff_package(args)
+    elif args.command == "continuity" and args.subcmd == "owner-transfer" and args.owner_transfer_subcmd == "prepare":
+        return cmd_continuity_owner_transfer_prepare(args)
+    elif args.command == "continuity" and args.subcmd == "owner-transfer" and args.owner_transfer_subcmd == "accept":
+        return cmd_continuity_owner_transfer_accept(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:

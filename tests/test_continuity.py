@@ -7,9 +7,11 @@ from pathlib import Path
 import test_support  # noqa: F401
 
 from governance.continuity import (
+    accept_owner_transfer_continuity,
     materialize_continuity_launch_input,
     materialize_handoff_package,
     materialize_round_entry_input_summary,
+    prepare_owner_transfer_continuity,
     resolve_continuity_launch_input,
     resolve_handoff_package,
     resolve_round_entry_input_summary,
@@ -19,6 +21,134 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class ContinuityTests(unittest.TestCase):
+    def test_prepare_owner_transfer_continuity_materializes_transfer_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-OT-1"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "owner transfer prepare",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent-a",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "prepare owner transfer continuity",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["OwnerTransferContinuitySchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent-a", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nPrepare owner transfer continuity.\n", encoding="utf-8")
+
+            output_path = Path(prepare_owner_transfer_continuity(
+                root,
+                change_id=change_id,
+                target_role="reviewer",
+                outgoing_owner="reviewer-agent-a",
+                incoming_owner="reviewer-agent-b",
+                reason="session handoff",
+                initiated_by="maintainer-agent",
+            ))
+            payload = load_yaml(output_path)
+
+            self.assertEqual(payload["schema"], "owner-transfer-continuity/v1")
+            self.assertEqual(payload["acceptance"]["status"], "pending")
+            self.assertEqual(payload["transfer_context"]["incoming_owner"], "reviewer-agent-b")
+            self.assertTrue((root / f".governance/changes/{change_id}/handoff-package.yaml").exists())
+
+    def test_accept_owner_transfer_continuity_updates_acceptance_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-OT-2"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "owner-transfer-continuity.yaml", {
+                "schema": "owner-transfer-continuity/v1",
+                "change_id": change_id,
+                "acceptance": {
+                    "status": "pending",
+                    "accepted_by": None,
+                    "accepted_at": None,
+                    "note": "",
+                },
+            })
+
+            payload = accept_owner_transfer_continuity(
+                root,
+                change_id=change_id,
+                accepted_by="reviewer-agent-b",
+                note="accept handoff",
+            )
+
+            self.assertEqual(payload["acceptance"]["status"], "accepted")
+            self.assertEqual(payload["acceptance"]["accepted_by"], "reviewer-agent-b")
+            self.assertEqual(payload["acceptance"]["note"], "accept handoff")
+            persisted = load_yaml(change_dir / "owner-transfer-continuity.yaml")
+            self.assertEqual(persisted["acceptance"]["status"], "accepted")
+
+    def test_accept_owner_transfer_continuity_rejects_non_pending_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-OT-3"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "owner-transfer-continuity.yaml", {
+                "schema": "owner-transfer-continuity/v1",
+                "change_id": change_id,
+                "acceptance": {
+                    "status": "accepted",
+                    "accepted_by": "reviewer-agent-b",
+                    "accepted_at": "2026-04-24T00:00:00Z",
+                    "note": "",
+                },
+            })
+
+            with self.assertRaises(ValueError):
+                accept_owner_transfer_continuity(
+                    root,
+                    change_id=change_id,
+                    accepted_by="reviewer-agent-b",
+                    note="duplicate accept",
+                )
+
     def test_materialize_handoff_package_without_predecessor_baseline(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -12,6 +12,7 @@ from .step_matrix import render_status_snapshot
 CONTINUITY_LAUNCH_INPUT_SCHEMA = "continuity-launch-input/v1"
 ROUND_ENTRY_INPUT_SUMMARY_SCHEMA = "round-entry-input-summary/v1"
 HANDOFF_PACKAGE_SCHEMA = "handoff-package/v1"
+OWNER_TRANSFER_CONTINUITY_SCHEMA = "owner-transfer-continuity/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -254,6 +255,88 @@ def materialize_handoff_package(root: str | Path, change_id: str | None = None) 
     target = GovernancePaths(Path(root)).handoff_package_file(payload["change_id"])
     write_yaml(target, payload)
     return str(target)
+
+
+def prepare_owner_transfer_continuity(
+    root: str | Path,
+    *,
+    change_id: str,
+    target_role: str,
+    outgoing_owner: str,
+    incoming_owner: str,
+    reason: str,
+    initiated_by: str,
+) -> str:
+    paths = GovernancePaths(Path(root))
+    handoff_path = paths.handoff_package_file(change_id)
+    if not handoff_path.exists():
+        materialize_handoff_package(root, change_id)
+    handoff_payload = load_yaml(handoff_path)
+    runtime_payload = _ensure_runtime_status_payload(paths, change_id)
+    payload = {
+        "schema": OWNER_TRANSFER_CONTINUITY_SCHEMA,
+        "change_id": change_id,
+        "generated_at": _now_utc(),
+        "transfer_context": {
+            "transfer_reason": reason,
+            "target_role": target_role,
+            "outgoing_owner": outgoing_owner,
+            "incoming_owner": incoming_owner,
+            "initiated_by": initiated_by,
+        },
+        "state_snapshot": {
+            "current_status": handoff_payload.get("summary", {}).get("current_status"),
+            "current_step": handoff_payload.get("summary", {}).get("current_step"),
+            "current_phase": handoff_payload.get("summary", {}).get("current_phase"),
+            "human_intervention_required": handoff_payload.get("handoff_need", {}).get("human_intervention_required"),
+        },
+        "acceptance": {
+            "status": "pending",
+            "accepted_by": None,
+            "accepted_at": None,
+            "note": "",
+        },
+        "effects": {
+            "current_change_pointer_update_required": False,
+            "bindings_update_required": True,
+            "contract_update_required": False,
+        },
+        "refs": {
+            "handoff_package": str(handoff_path.relative_to(paths.root)),
+            "runtime_change_status": str(paths.runtime_change_status_file().relative_to(paths.root)),
+            "runtime_participants_status": str(paths.runtime_participants_status_file().relative_to(paths.root)),
+            "current_change": str(paths.current_change_file().relative_to(paths.root)),
+            "bindings": str(paths.change_file(change_id, "bindings.yaml").relative_to(paths.root)),
+        },
+    }
+    target = paths.owner_transfer_continuity_file(change_id)
+    write_yaml(target, payload)
+    return str(target)
+
+
+def accept_owner_transfer_continuity(
+    root: str | Path,
+    *,
+    change_id: str,
+    accepted_by: str,
+    note: str = "",
+) -> dict:
+    paths = GovernancePaths(Path(root))
+    target = paths.owner_transfer_continuity_file(change_id)
+    if not target.exists():
+        raise ValueError(f"owner transfer continuity for '{change_id}' does not exist")
+    payload = load_yaml(target)
+    acceptance = payload.setdefault("acceptance", {})
+    if acceptance.get("status") != "pending":
+        raise ValueError("owner transfer continuity is not pending")
+    acceptance.update({
+        "status": "accepted",
+        "accepted_by": accepted_by,
+        "accepted_at": _now_utc(),
+        "note": note,
+    })
+    write_yaml(target, payload)
+    return payload
 
 
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:

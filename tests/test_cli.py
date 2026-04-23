@@ -695,6 +695,111 @@ class CliTests(unittest.TestCase):
             self.assertIn("Handoff package written:", stdout.getvalue())
             self.assertTrue((root / f".governance/changes/{change_id}/handoff-package.yaml").exists())
 
+    def test_continuity_owner_transfer_prepare_and_accept_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-OT"
+
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "CLI owner transfer continuity",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent-a",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit owner transfer continuity from CLI",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["OwnerTransferContinuitySchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent-a", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nEmit owner transfer continuity from CLI.\n", encoding="utf-8")
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step7-verified",
+                "current_change_id": change_id,
+                "current_step": 7,
+                "current_change": {
+                    "change_id": change_id,
+                    "status": "step7-verified",
+                    "current_step": 7,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-verified",
+                "current_change_active": "step7-verified",
+                "current_change_id": change_id,
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                prepare_exit = main([
+                    "--root", str(root),
+                    "continuity", "owner-transfer", "prepare",
+                    "--change-id", change_id,
+                    "--target-role", "reviewer",
+                    "--outgoing-owner", "reviewer-agent-a",
+                    "--incoming-owner", "reviewer-agent-b",
+                    "--reason", "session handoff",
+                    "--initiated-by", "maintainer-agent",
+                ])
+            self.assertEqual(prepare_exit, 0)
+            self.assertIn("Owner transfer continuity written:", stdout.getvalue())
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                accept_exit = main([
+                    "--root", str(root),
+                    "continuity", "owner-transfer", "accept",
+                    "--change-id", change_id,
+                    "--accepted-by", "reviewer-agent-b",
+                    "--note", "accept handoff",
+                ])
+            self.assertEqual(accept_exit, 0)
+            payload = load_yaml(root / f".governance/changes/{change_id}/owner-transfer-continuity.yaml")
+            self.assertEqual(payload["acceptance"]["status"], "accepted")
+            self.assertEqual(payload["acceptance"]["accepted_by"], "reviewer-agent-b")
+
 
 if __name__ == "__main__":
     unittest.main()
