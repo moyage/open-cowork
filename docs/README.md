@@ -49,6 +49,7 @@
 - `plans/08-milestone2-handoff-package-design.md`
 - `plans/09-milestone2-handoff-package-implementation-plan.md`
 - `plans/10-milestone2-owner-transfer-continuity-design.md`
+- `plans/12-milestone2-increment-package-design.md`
 
 ## 报告与实践材料
 
