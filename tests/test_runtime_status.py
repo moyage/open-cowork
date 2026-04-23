@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -11,10 +12,133 @@ import test_support  # noqa: F401
 
 from governance.cli import main
 from governance.index import ensure_governance_index, upsert_change_entry
-from governance.simple_yaml import load_yaml, write_yaml
+from governance.simple_yaml import load_yaml, loads_yaml, write_yaml
 
 
 class RuntimeStatusTests(unittest.TestCase):
+    def test_runtime_status_supports_json_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_dir = root / ".governance/changes/CHG-RT-FMT"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": "CHG-RT-FMT",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit-runtime-status-json",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["RuntimeStatusSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": "CHG-RT-FMT",
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step7-verified",
+                "current_change_id": "CHG-RT-FMT",
+                "current_step": 7,
+                "current_change": {
+                    "change_id": "CHG-RT-FMT",
+                    "status": "step7-verified",
+                    "current_step": 7,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": "CHG-RT-FMT",
+                "path": ".governance/changes/CHG-RT-FMT",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-verified",
+                "current_change_active": "step7-verified",
+                "current_change_id": "CHG-RT-FMT",
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-FMT", "--format", "json"])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["schema"], "runtime-change-status/v1")
+            self.assertEqual(payload["change_id"], "CHG-RT-FMT")
+            self.assertEqual(payload["current_status"], "step7-verified")
+
+    def test_timeline_supports_yaml_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_dir = root / ".governance/changes/CHG-RT-TL-FMT"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": "CHG-RT-TL-FMT",
+                "status": "review-approved",
+                "current_step": 8,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": "CHG-RT-TL-FMT",
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+            write_yaml(change_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": "CHG-RT-TL-FMT",
+                "reviewers": [{"role": "reviewer", "id": "reviewer-agent"}],
+                "decision": {"status": "approve", "rationale": "timeline ready"},
+                "conditions": {"must_before_next_step": [], "followups": []},
+                "trace": {"evidence_refs": [], "verify_refs": ["verify.yaml"]},
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "timeline", "--change-id", "CHG-RT-TL-FMT", "--format", "yaml"])
+
+            self.assertEqual(exit_code, 0)
+            payload = loads_yaml(stdout.getvalue())
+            self.assertEqual(payload["schema"], "runtime-timeline/v1")
+            self.assertTrue(any(event["event_type"] == "review_completed" for event in payload["events"]))
+
     def test_runtime_status_requires_active_change(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

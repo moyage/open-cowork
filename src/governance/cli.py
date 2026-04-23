@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 
@@ -269,6 +270,14 @@ def cmd_runtime_status(args):
 
     try:
         result = materialize_runtime_status(args.root, args.change_id)
+        if args.format == "json":
+            print(json.dumps(result["change_status"], ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(result["change_status"]), end="")
+            return 0
         print(f"Runtime status written: {result['change_status_path']}")
         return 0
     except Exception as exc:
@@ -281,6 +290,14 @@ def cmd_timeline(args):
 
     try:
         result = materialize_timeline(args.root, args.change_id)
+        if args.format == "json":
+            print(json.dumps(result["payload"], ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(result["payload"]), end="")
+            return 0
         print(f"Timeline written: {result['path']}")
         return 0
     except Exception as exc:
@@ -380,8 +397,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status", help="Show current step, gate status, and blockers")
     p_runtime_status = subparsers.add_parser("runtime-status", help="Write machine-readable runtime status snapshot")
     p_runtime_status.add_argument("--change-id", required=True, help="Target change id")
+    p_runtime_status.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_timeline = subparsers.add_parser("timeline", help="Write machine-readable runtime timeline")
     p_timeline.add_argument("--change-id", required=True, help="Target change id")
+    p_timeline.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_continuity = subparsers.add_parser("continuity", help="Materialize minimum continuity outputs")
     p_continuity_sub = p_continuity.add_subparsers(dest="subcmd")
     p_continuity_launch = p_continuity_sub.add_parser("launch-input", help="Write continuity launch input yaml")
