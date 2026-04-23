@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Local virtual envs
+.venv/
+venv/
+
+# Runtime governance outputs (generated)
+.governance/index/
+.governance/changes/
+.governance/archive/
+.governance/runtime/
+
+# Keep templates committed
+!.governance/templates/
+!.governance/templates/**
