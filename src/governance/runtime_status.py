@@ -12,6 +12,7 @@ from .step_matrix import PHASE_LABELS, STEP_LABELS, render_status_snapshot, rend
 
 def materialize_runtime_status(root: str | Path, change_id: str) -> dict:
     paths = GovernancePaths(Path(root))
+    _require_active_change(paths, change_id)
     paths.runtime_status_dir.mkdir(parents=True, exist_ok=True)
 
     change_status = _build_change_status(paths, change_id)
@@ -36,8 +37,9 @@ def materialize_timeline(root: str | Path, change_id: str) -> dict:
     paths.runtime_timeline_dir.mkdir(parents=True, exist_ok=True)
     payload = _build_timeline_payload(paths, change_id)
     target = paths.runtime_timeline_month_file(payload["month"])
-    write_yaml(target, payload)
-    return {"path": str(target), "payload": payload}
+    merged_payload = _merge_timeline_payload(target, payload)
+    write_yaml(target, merged_payload)
+    return {"path": str(target), "payload": merged_payload}
 
 
 def _build_change_status(paths: GovernancePaths, change_id: str) -> dict:
@@ -138,24 +140,55 @@ def _build_timeline_payload(paths: GovernancePaths, change_id: str) -> dict:
     entry = next((item for item in changes_index.get("changes", []) if item.get("change_id") == change_id), {})
     month = datetime.utcnow().strftime("%Y%m")
     events = []
-    events.append(_event(change_id, "change_created", 5, "drafting", entry.get("status") or manifest.get("status"), "orchestrator", [
-        str(paths.change_dir(change_id).relative_to(paths.root)) + "/",
-    ]))
+    change_created_source = _first_existing_path(paths.change_file(change_id, "manifest.yaml"), paths.change_dir(change_id))
+    events.append(_event(
+        change_id,
+        "change_created",
+        5,
+        None,
+        "drafting",
+        "orchestrator",
+        [str(paths.change_dir(change_id).relative_to(paths.root)) + "/"],
+        source_path=change_created_source,
+    ))
     if verify:
-        events.append(_event(change_id, "verify_completed", 7, "step6-executed-pre-step7", verify.get("summary", {}).get("status") == "pass" and "step7-verified" or "step7-blocked", _actor_for_verify(manifest), [
-            str(paths.change_file(change_id, "verify.yaml").relative_to(paths.root)),
-        ]))
+        verify_path = paths.change_file(change_id, "verify.yaml")
+        events.append(_event(
+            change_id,
+            "verify_completed",
+            7,
+            "step6-executed-pre-step7",
+            verify.get("summary", {}).get("status") == "pass" and "step7-verified" or "step7-blocked",
+            _actor_for_verify(manifest),
+            [str(verify_path.relative_to(paths.root))],
+            source_path=verify_path,
+        ))
     if review:
-        events.append(_event(change_id, "review_completed", 8, "step7-verified", _status_for_review(review), _actor_for_review(manifest, review), [
-            str(paths.change_file(change_id, "review.yaml").relative_to(paths.root)),
-        ]))
+        review_path = paths.change_file(change_id, "review.yaml")
+        events.append(_event(
+            change_id,
+            "review_completed",
+            8,
+            "step7-verified",
+            _status_for_review(review),
+            _actor_for_review(manifest, review),
+            [str(review_path.relative_to(paths.root))],
+            source_path=review_path,
+        ))
     if archive_receipt:
-        events.append(_event(change_id, "archive_completed", 9, "review-approved", "archived", _actor_for_review(manifest, review), [
-            str(paths.archived_change_file(change_id, "archive-receipt.yaml").relative_to(paths.root)),
-        ]))
+        archive_path = paths.archived_change_file(change_id, "archive-receipt.yaml")
+        events.append(_event(
+            change_id,
+            "archive_completed",
+            9,
+            "review-approved",
+            "archived",
+            _actor_for_review(manifest, review),
+            [str(archive_path.relative_to(paths.root))],
+            source_path=archive_path,
+        ))
     return {
         "schema": "runtime-timeline/v1",
-        "change_id": change_id,
         "month": month,
         "events": events,
         "generated_at": _now_utc(),
@@ -170,6 +203,8 @@ def _event(
     to_status: str | None,
     actor_id: str | None,
     refs: list[str],
+    *,
+    source_path: Path | None = None,
 ) -> dict:
     return {
         "schema": "runtime-event/v1",
@@ -181,7 +216,7 @@ def _event(
         "from_status": from_status,
         "to_status": to_status,
         "actor_id": actor_id or "governance",
-        "timestamp": _now_utc(),
+        "timestamp": _event_timestamp(source_path),
         "refs": {"files": refs},
     }
 
@@ -297,6 +332,49 @@ def _load_optional_yaml(path: Path) -> dict:
     if not path.exists():
         return {}
     return load_yaml(path)
+
+
+def _merge_timeline_payload(target: Path, new_payload: dict) -> dict:
+    if not target.exists():
+        return new_payload
+    existing = load_yaml(target)
+    merged_events = list(existing.get("events", []))
+    seen = {item.get("event_id") for item in merged_events}
+    for event in new_payload.get("events", []):
+        if event.get("event_id") in seen:
+            continue
+        merged_events.append(event)
+        seen.add(event.get("event_id"))
+    merged_events.sort(key=lambda item: (str(item.get("timestamp")), str(item.get("event_id"))))
+    return {
+        "schema": "runtime-timeline/v1",
+        "month": new_payload.get("month") or existing.get("month"),
+        "events": merged_events,
+        "generated_at": _now_utc(),
+    }
+
+
+def _require_active_change(paths: GovernancePaths, change_id: str) -> None:
+    current = read_current_change(paths.root)
+    current_change_id = current.get("current_change_id")
+    nested = current.get("current_change", {})
+    if not current_change_id and isinstance(nested, dict):
+        current_change_id = nested.get("change_id")
+    if current_change_id != change_id:
+        raise ValueError(f"runtime status only supports the active change; current active change is '{current_change_id}'")
+
+
+def _first_existing_path(*paths: Path) -> Path | None:
+    for path in paths:
+        if path.exists():
+            return path
+    return None
+
+
+def _event_timestamp(source_path: Path | None) -> str:
+    if source_path and source_path.exists():
+        return datetime.fromtimestamp(source_path.stat().st_mtime, tz=timezone.utc).isoformat()
+    return _now_utc()
 
 
 def _now_utc() -> str:
