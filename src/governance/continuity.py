@@ -947,6 +947,9 @@ def _resolve_active_continuity_digest(paths: GovernancePaths, change_id: str, se
     recent_sync_summary = _recent_sync_summary_for_change(paths.root, change_id)
     if recent_sync_summary:
         payload["recent_sync_summary"] = recent_sync_summary
+    recent_runtime_events = _recent_runtime_events_for_change(paths, change_id)
+    if recent_runtime_events:
+        payload["recent_runtime_events"] = recent_runtime_events
     return payload
 
 
@@ -1011,6 +1014,9 @@ def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, 
     recent_sync_summary = _recent_sync_summary_for_change(paths.root, change_id)
     if recent_sync_summary:
         payload["recent_sync_summary"] = recent_sync_summary
+    recent_runtime_events = _recent_runtime_events_for_change(paths, change_id)
+    if recent_runtime_events:
+        payload["recent_runtime_events"] = recent_runtime_events
     return payload
 
 
@@ -1147,6 +1153,25 @@ def _recent_sync_summary_for_change(root: Path, change_id: str) -> dict | None:
         "latest_target_layer": latest.get("target_layer"),
         "latest_headline": latest.get("headline"),
     }
+
+
+def _recent_runtime_events_for_change(paths: GovernancePaths, change_id: str, limit: int = 3) -> list[dict]:
+    timeline_path = paths.runtime_timeline_month_file()
+    if not timeline_path.exists():
+        return []
+    payload = load_yaml(timeline_path)
+    events = [
+        {
+            "event_type": event.get("event_type"),
+            "step": event.get("step"),
+            "to_status": event.get("to_status"),
+            "timestamp": event.get("timestamp"),
+        }
+        for event in payload.get("events", [])
+        if event.get("change_id") == change_id
+    ]
+    events.sort(key=lambda item: str(item.get("timestamp") or ""))
+    return events[-limit:]
 
 
 def _active_digest_projection_sources(paths: GovernancePaths, change_id: str) -> dict:

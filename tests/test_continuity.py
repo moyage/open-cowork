@@ -388,6 +388,103 @@ class ContinuityTests(unittest.TestCase):
                 f".governance/archive/{change_id}/manifest.yaml",
             )
 
+    def test_resolve_continuity_digest_includes_recent_runtime_events_when_timeline_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-DIGEST-RUNTIME-EVENTS"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "Digest Runtime Events",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "digest runtime events",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["DigestSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nDigest runtime events.\n", encoding="utf-8")
+            materialize_handoff_package(root, change_id)
+            timeline_dir = root / ".governance/runtime/timeline"
+            timeline_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(timeline_dir / "events-202604.yaml", {
+                "schema": "runtime-timeline/v1",
+                "month": "202604",
+                "events": [
+                    {
+                        "schema": "runtime-event/v1",
+                        "event_id": "evt-1",
+                        "change_id": change_id,
+                        "entity_type": "change",
+                        "event_type": "verify_completed",
+                        "step": 7,
+                        "from_status": "step6-executed-pre-step7",
+                        "to_status": "step7-verified",
+                        "actor_id": "verifier-agent",
+                        "timestamp": "2026-04-24T11:30:00Z",
+                        "refs": {"files": [f".governance/changes/{change_id}/verify.yaml"]},
+                    },
+                    {
+                        "schema": "runtime-event/v1",
+                        "event_id": "evt-2",
+                        "change_id": change_id,
+                        "entity_type": "change",
+                        "event_type": "review_completed",
+                        "step": 8,
+                        "from_status": "step7-verified",
+                        "to_status": "review-approved",
+                        "actor_id": "reviewer-agent",
+                        "timestamp": "2026-04-24T12:00:00Z",
+                        "refs": {"files": [f".governance/changes/{change_id}/review.yaml"]},
+                    },
+                ],
+                "generated_at": "2026-04-24T12:00:00Z",
+            })
+
+            payload = resolve_continuity_digest(root)
+
+            self.assertEqual(len(payload["recent_runtime_events"]), 2)
+            self.assertEqual(payload["recent_runtime_events"][-1]["event_type"], "review_completed")
+            self.assertEqual(payload["recent_runtime_events"][-1]["to_status"], "review-approved")
+
     def test_list_sync_history_months_returns_sorted_month_keys(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

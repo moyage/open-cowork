@@ -473,6 +473,11 @@ def cmd_continuity_digest(args):
             f"{recent_sync_summary.get('latest_target_layer')} / "
             f"{recent_sync_summary.get('latest_headline')}"
         )
+    recent_runtime_events = payload.get("recent_runtime_events", [])
+    if recent_runtime_events:
+        print("recent events:")
+        for event in recent_runtime_events:
+            print(f"- {event.get('event_type')} -> {event.get('to_status')}")
     for ref in payload["recommended_reading"].get("secondary_refs", []):
         print(f"- {ref}")
     return 0
