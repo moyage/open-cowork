@@ -11,33 +11,42 @@
 - 一个可写的本地项目目录
 - 任意一个能执行 shell、读写文件、遵守边界的 Agent 或 AI Coding 工具
 
-## 2. 安装 open-cowork
+## 2. 一键安装并初始化目标项目
+
+如果你只是想快速试用，推荐先用一条命令完成安装、初始化、状态查看和 session 诊断：
 
 ```bash
 git clone https://github.com/moyage/open-cowork.git
 cd open-cowork
-./scripts/bootstrap.sh
-source .venv/bin/activate
+./scripts/quickstart.sh /path/to/your-project
 ```
 
-`bootstrap.sh` 会创建本地虚拟环境并安装 `ocw` 命令。如果本地 `pip / setuptools` 版本较旧，它会自动生成本地 `ocw` shim，避免首次试用被 Python 打包细节卡住。
+`quickstart.sh` 会自动调用 `bootstrap.sh`，并在目标项目中执行：
 
-验证安装：
+- `ocw --root <project> init`
+- `ocw --root <project> status`
+- `ocw --root <project> diagnose-session`
 
-```bash
-ocw --help
-./scripts/smoke-test.sh
-```
+这一步会创建最小 `.governance/` 结构和索引文件，不会强迫你改造现有仓库结构、CI/CD 或 Agent 工具链。
 
 如果你不想在仓库根目录创建 `.venv`，可以指定虚拟环境目录：
 
 ```bash
-OCW_VENV_DIR=/tmp/open-cowork-venv ./scripts/bootstrap.sh
+OCW_VENV_DIR=/tmp/open-cowork-venv ./scripts/quickstart.sh /path/to/your-project
 ```
 
-## 3. 在你的项目中初始化
+## 3. 手动安装路径
 
-进入你要试用的目标项目根目录：
+如果你希望分步骤执行，可以使用手动路径：
+
+```bash
+./scripts/bootstrap.sh
+source .venv/bin/activate
+ocw --help
+./scripts/smoke-test.sh
+```
+
+然后进入你要试用的目标项目根目录：
 
 ```bash
 cd /path/to/your-project
@@ -45,8 +54,6 @@ ocw --root . init
 ocw --root . status
 ocw --root . diagnose-session
 ```
-
-这一步会创建最小 `.governance/` 结构和索引文件，不会强迫你改造现有仓库结构、CI/CD 或 Agent 工具链。
 
 ## 4. 个人域多 Agent 推荐用法
 

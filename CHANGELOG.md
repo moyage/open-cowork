@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Expanded `README.md` with positioning, background, goals, scenarios, 4-phase/9-step flow, roadmap, feature status, and document index
+- Added `scripts/quickstart.sh` for one-command install plus target-project initialization
+- Updated `docs/getting-started.md` to prefer the quickstart path while preserving manual setup
+
 ## 0.2.1
 
 - Consolidated onboarding docs into `docs/getting-started.md`
