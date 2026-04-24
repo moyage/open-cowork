@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -591,6 +592,75 @@ class CliTests(unittest.TestCase):
             self.assertIn("ocw --root . status", output)
             self.assertNotIn("Traceback", output)
             self.assertNotIn("missing required field", output)
+
+    def test_onboard_quickstart_initializes_target_and_runs_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target-project"
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["onboard", "--target", str(target), "--mode", "quickstart", "--yes"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / ".governance/index/current-change.yaml").exists())
+            self.assertIn("open-cowork onboard", output)
+            self.assertIn("mode: quickstart", output)
+            self.assertIn("Initialized open-cowork governance", output)
+            self.assertIn("# open-cowork status", output)
+            self.assertIn("# Session Execution Diagnosis", output)
+            self.assertIn("onboard complete", output)
+
+    def test_onboard_manual_mode_prints_plan_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "manual-project"
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["onboard", "--target", str(target), "--mode", "manual"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertFalse((target / ".governance").exists())
+            self.assertIn("Manual onboarding plan", output)
+            self.assertIn("ocw --root", output)
+
+    def test_setup_alias_runs_onboard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "setup-project"
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["setup", "--target", str(target), "--yes", "--no-diagnose"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / ".governance/index/current-change.yaml").exists())
+            self.assertIn("mode: quickstart", output)
+            self.assertNotIn("# Session Execution Diagnosis", output)
+
+    def test_onboard_yes_without_target_defaults_to_current_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(tmp)
+
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    exit_code = main(["onboard", "--yes", "--no-diagnose"])
+
+                output = stdout.getvalue()
+                self.assertEqual(exit_code, 0)
+                self.assertTrue((Path(tmp) / ".governance/index/current-change.yaml").exists())
+                self.assertIn(f"- target: {Path(tmp).resolve()}", output)
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_pyproject_exposes_open_cowork_console_alias(self):
+        pyproject_text = Path(__file__).resolve().parents[1].joinpath("pyproject.toml").read_text(encoding="utf-8")
+
+        self.assertIn('ocw = "governance.cli:main"', pyproject_text)
+        self.assertIn('open-cowork = "governance.cli:main"', pyproject_text)
 
     def test_continuity_commands_materialize_launch_input_and_round_entry_summary(self):
         with tempfile.TemporaryDirectory() as tmp:

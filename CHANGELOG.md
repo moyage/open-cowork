@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3
+
+- Added `ocw onboard` and `ocw setup` for interactive or scripted project onboarding
+- Added `open-cowork` console script alias for clearer first-use commands
+- Updated bootstrap shim fallback to expose both `ocw` and `open-cowork` commands
+- Reworked `scripts/quickstart.sh` to call the onboarding flow after bootstrap
+- Updated README and getting-started docs for onboarding/setup usage
+
 ## 0.2.2
 
 - Expanded `README.md` with positioning, background, goals, scenarios, 4-phase/9-step flow, roadmap, feature status, and document index

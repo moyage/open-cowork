@@ -103,7 +103,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 
 ## 当前版本完成度
 
-当前 `v0.2.2` 是“可试用的协议框架与 CLI 基线”，重点是让个人域和团队成员能低门槛开始实践。
+当前 `v0.2.3` 是“带 onboarding/setup 入口的可试用协议框架与 CLI 基线”，重点是让个人域和团队成员能低门槛开始实践。
 
 已经具备：
 
@@ -120,7 +120,9 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw continuity ...` 支持 handoff、owner transfer、increment、closeout、sync、history、export、digest。
 - `ocw diagnose-session` 和 `ocw session-recovery-packet` 支持 session/context 恢复诊断。
 - `scripts/bootstrap.sh` 支持本地安装。
-- `scripts/quickstart.sh` 支持一条命令安装并初始化目标项目。
+- `ocw onboard` / `ocw setup` 支持交互式或脚本式初始化。
+- `open-cowork onboard` 提供更直观的 console script alias。
+- `scripts/quickstart.sh` 保留为一键脚本入口，并调用 `ocw onboard`。
 - `scripts/smoke-test.sh` 支持最小健康检查。
 
 还没有覆盖：
@@ -141,7 +143,15 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 ./scripts/quickstart.sh /path/to/your-project
 ```
 
-这条命令会：
+或者安装后直接运行：
+
+```bash
+ocw onboard --target /path/to/your-project --mode quickstart --yes
+ocw setup --target /path/to/your-project --yes
+open-cowork onboard --target /path/to/your-project --yes
+```
+
+这些命令会：
 
 1. 自动安装 / 激活本地 `ocw` 命令。
 2. 在目标项目中执行 `ocw init`。

@@ -21,7 +21,7 @@ cd open-cowork
 ./scripts/quickstart.sh /path/to/your-project
 ```
 
-`quickstart.sh` 会自动调用 `bootstrap.sh`，并在目标项目中执行：
+`quickstart.sh` 会自动调用 `bootstrap.sh`，再调用 `ocw onboard --mode quickstart --yes`，并在目标项目中执行：
 
 - `ocw --root <project> init`
 - `ocw --root <project> status`
@@ -35,7 +35,24 @@ cd open-cowork
 OCW_VENV_DIR=/tmp/open-cowork-venv ./scripts/quickstart.sh /path/to/your-project
 ```
 
-## 3. 手动安装路径
+## 3. CLI onboarding 路径
+
+如果已经安装过 `ocw`，可以直接使用正式 onboarding 入口：
+
+```bash
+ocw onboard --target /path/to/your-project --mode quickstart --yes
+ocw setup --target /path/to/your-project --yes
+open-cowork onboard --target /path/to/your-project --yes
+```
+
+可选模式：
+
+- `quickstart`：默认推荐，初始化并输出最小下一步。
+- `personal`：个人域多 Agent 试用，额外提示角色分离建议。
+- `team`：团队试用准备，额外提示 evidence / review / closeout 约定。
+- `manual`：只打印命令，不写入目标项目。
+
+## 4. 手动安装路径
 
 如果你希望分步骤执行，可以使用手动路径：
 
@@ -55,7 +72,7 @@ ocw --root . status
 ocw --root . diagnose-session
 ```
 
-## 4. 个人域多 Agent 推荐用法
+## 5. 个人域多 Agent 推荐用法
 
 个人域中可以一人多角，但不建议让同一个执行会话自审自批。
 
@@ -79,7 +96,7 @@ ocw --root . diagnose-session
 - Review 尽量由另一个 Agent、另一个会话或人来做。
 - 人只在目标确认、风险确认、review 决策和 closeout 时介入。
 
-## 5. 常见个人域组合样例
+## 6. 常见个人域组合样例
 
 这些样例是匿名的工具组合模式，不代表团队成员身份。
 
@@ -159,7 +176,7 @@ ocw --root . status
 ocw --root . continuity digest
 ```
 
-## 6. 推荐首次试用流程
+## 7. 推荐首次试用流程
 
 ### Level 1：只验证接入
 
@@ -196,7 +213,7 @@ ocw --root . continuity digest --change-id personal-demo
 
 目标：确认从一个 Agent 切换到另一个 Agent 时，有一份可读、可接续、可审查的上下文输入。
 
-## 7. 团队试用最小约定
+## 8. 团队试用最小约定
 
 团队试用不要求统一本地工具链，但建议统一下面四件事：
 
@@ -207,7 +224,7 @@ ocw --root . continuity digest --change-id personal-demo
 
 首次团队试用建议仍从个人域开始，先让每个人在自己的本地项目上完成 `bootstrap + init + status`，再进入多人协作实践。
 
-## 8. 常见问题
+## 9. 常见问题
 
 ### 我只想先试，不想改现有流程？
 
@@ -226,7 +243,7 @@ ocw --root . session-recovery-packet
 
 先统一 change package、evidence schema、review gate 和 closeout 结构；暂时不要强制统一每个人的 Agent 或 IDE。
 
-## 9. 不推荐的首次试用方式
+## 10. 不推荐的首次试用方式
 
 - 一开始就要求所有 Agent 严格跑完整 `contract -> run -> verify -> review -> archive` 主链。
 - 让执行 Agent 自己完成最终 review 并直接 archive。
@@ -234,7 +251,7 @@ ocw --root . session-recovery-packet
 - 把 `open-cowork` 当成 AI Coding Runtime 或 IDE 插件替代品。
 - 每一步都产出大量长文档，而不是维护最小事实、证据和接续摘要。
 
-## 10. 判断试用是否成功
+## 11. 判断试用是否成功
 
 一次个人域试用成功，不要求项目真的进入团队协作，只要求满足：
 

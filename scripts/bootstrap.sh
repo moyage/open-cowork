@@ -52,9 +52,15 @@ export PYTHONPATH="$ROOT_DIR/src:\${PYTHONPATH:-}"
 exec "$VENV_DIR/bin/python" "$ROOT_DIR/bin/ocw" "\$@"
 SH
   chmod +x "$VENV_DIR/bin/ocw"
+  cat > "$VENV_DIR/bin/open-cowork" <<SH
+#!/usr/bin/env bash
+exec "$VENV_DIR/bin/ocw" "\$@"
+SH
+  chmod +x "$VENV_DIR/bin/open-cowork"
 fi
 
 "$VENV_DIR/bin/ocw" --help >/dev/null
+"$VENV_DIR/bin/open-cowork" --help >/dev/null
 
 echo
 echo "Bootstrap complete."
@@ -63,5 +69,6 @@ echo "  source \"$VENV_DIR/bin/activate\""
 echo
 echo "Verify with:"
 echo "  ocw --help"
+echo "  open-cowork --help"
 echo "  ocw --root . init"
 echo "  ocw --root . status"

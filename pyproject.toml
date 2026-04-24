@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "open-cowork"
-version = "0.2.2"
+version = "0.2.3"
 description = "Protocol-first framework for complex multi-person and multi-agent collaboration"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -22,6 +22,7 @@ classifiers = [
 
 [project.scripts]
 ocw = "governance.cli:main"
+open-cowork = "governance.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

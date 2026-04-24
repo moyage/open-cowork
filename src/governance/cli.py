@@ -217,6 +217,121 @@ def cmd_init(args):
     print(f"Initialized open-cowork governance in {args.root}/.governance")
 
 
+def cmd_onboard(args):
+    target = _resolve_onboard_target(args)
+    mode = args.mode or "quickstart"
+
+    if mode == "manual":
+        print(_format_manual_onboard_plan(target))
+        return 0
+
+    if not args.yes and not _confirm_onboard(target, mode):
+        print("Onboarding cancelled.")
+        return 1
+
+    target.mkdir(parents=True, exist_ok=True)
+    print("open-cowork onboard")
+    print("")
+    print("open-cowork 是一个本地优先的协作治理框架。")
+    print("它会初始化 .governance/，不会修改你的业务代码。")
+    print("")
+    print(f"- target: {target}")
+    print(f"- mode: {mode}")
+    print("")
+    cmd_init(argparse.Namespace(root=str(target)))
+    print("")
+    cmd_status(argparse.Namespace(root=str(target)))
+    if not args.no_diagnose:
+        print("")
+        cmd_diagnose_session(argparse.Namespace(
+            root=str(target),
+            change_id=None,
+            context_budget=args.context_budget,
+        ))
+    if args.create_demo_change:
+        demo_change_id = args.demo_change_id or "personal-demo"
+        print("")
+        cmd_change_create(argparse.Namespace(root=str(target), change_id=demo_change_id, title="Personal domain pilot"))
+    print("")
+    print(_format_onboard_next_steps(target, mode, args.create_demo_change, args.demo_change_id or "personal-demo"))
+    return 0
+
+
+def _resolve_onboard_target(args) -> Path:
+    if args.target:
+        return Path(args.target).expanduser().resolve()
+    if args.yes:
+        return Path(args.root).expanduser().resolve()
+    value = input("Target project path [.]: ").strip() or "."
+    return Path(value).expanduser().resolve()
+
+
+def _confirm_onboard(target: Path, mode: str) -> bool:
+    print("open-cowork onboard")
+    print("")
+    print("This will initialize .governance/ in the target project.")
+    print("It will not modify application source files.")
+    print("")
+    print(f"- target: {target}")
+    print(f"- mode: {mode}")
+    answer = input("Continue? [y/N] ").strip().lower()
+    return answer in {"y", "yes"}
+
+
+def _format_manual_onboard_plan(target: Path) -> str:
+    return "\n".join([
+        "# open-cowork onboard",
+        "",
+        "## Manual onboarding plan",
+        f"- target: {target}",
+        "",
+        "Commands to run:",
+        f"- ocw --root \"{target}\" init",
+        f"- ocw --root \"{target}\" status",
+        f"- ocw --root \"{target}\" diagnose-session",
+        "",
+        "Optional next step:",
+        f"- ocw --root \"{target}\" change create personal-demo --title \"Personal domain pilot\"",
+    ]) + "\n"
+
+
+def _format_onboard_next_steps(target: Path, mode: str, created_demo_change: bool, demo_change_id: str) -> str:
+    lines = [
+        "open-cowork onboard complete.",
+        "",
+        "Next commands you can run:",
+    ]
+    if not created_demo_change:
+        lines.append(f"- ocw --root \"{target}\" change create personal-demo --title \"Personal domain pilot\"")
+        lines.append(f"- ocw --root \"{target}\" status")
+        lines.append(f"- ocw --root \"{target}\" continuity digest --change-id personal-demo")
+    else:
+        lines.append(f"- ocw --root \"{target}\" status")
+        lines.append(f"- ocw --root \"{target}\" continuity digest --change-id {demo_change_id}")
+    if mode == "personal":
+        lines.extend([
+            "",
+            "Personal mode reminder:",
+            "- Keep executor and final reviewer separated when possible.",
+            "- Use a second Agent, another session, or a human for independent review.",
+        ])
+    elif mode == "team":
+        lines.extend([
+            "",
+            "Team mode minimum agreement:",
+            "- Bind every collaboration to a change-id.",
+            "- Record evidence before review.",
+            "- Do not let the executor self-approve final review.",
+            "- Close out before starting the next round.",
+        ])
+    lines.extend([
+        "",
+        "Read next:",
+        "- docs/getting-started.md",
+    ])
+    return "\n".join(lines)
+
+
 def cmd_status(args):
     from governance.contract import ContractValidationError
     from governance.index import read_current_change
@@ -688,6 +803,21 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("init", help="Initialize minimum governance directory")
     subparsers.add_parser("propose", help="Create an intent draft")
 
+    for command_name in ("onboard", "setup"):
+        p_onboard = subparsers.add_parser(command_name, help="Run interactive or scripted onboarding")
+        p_onboard.add_argument("--target", default=None, help="Target project directory")
+        p_onboard.add_argument(
+            "--mode",
+            choices=["quickstart", "personal", "team", "manual"],
+            default="quickstart",
+            help="Onboarding mode",
+        )
+        p_onboard.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
+        p_onboard.add_argument("--no-diagnose", action="store_true", help="Skip session diagnosis")
+        p_onboard.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
+        p_onboard.add_argument("--create-demo-change", action="store_true", help="Create a demo change after init")
+        p_onboard.add_argument("--demo-change-id", default="personal-demo", help="Demo change id")
+
     p_change = subparsers.add_parser("change", help="Change package management")
     p_change.add_argument("subcmd", choices=["create"], help="Create change package")
     p_change.add_argument("change_id", help="Change identifier")
@@ -827,6 +957,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "init":
         cmd_init(args)
+    elif args.command in {"onboard", "setup"}:
+        return cmd_onboard(args)
     elif args.command == "change" and args.subcmd == "create":
         cmd_change_create(args)
     elif args.command == "status":

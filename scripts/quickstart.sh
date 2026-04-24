@@ -35,24 +35,4 @@ if [[ ! -x "$OCW_BIN" ]]; then
   exit 1
 fi
 
-echo "[1/3] Initialize governance structure"
-"$OCW_BIN" --root "$TARGET_ROOT" init
-
-echo
-echo "[2/3] Show current status"
-"$OCW_BIN" --root "$TARGET_ROOT" status
-
-echo
-echo "[3/3] Run session diagnosis"
-"$OCW_BIN" --root "$TARGET_ROOT" diagnose-session
-
-echo
-echo "Quickstart complete."
-echo
-echo "Next commands you can run:"
-echo "  $OCW_BIN --root \"$TARGET_ROOT\" change create personal-demo --title \"Personal domain pilot\""
-echo "  $OCW_BIN --root \"$TARGET_ROOT\" status"
-echo "  $OCW_BIN --root \"$TARGET_ROOT\" continuity digest --change-id personal-demo"
-echo
-echo "Read next:"
-echo "  $ROOT_DIR/docs/getting-started.md"
+"$OCW_BIN" onboard --target "$TARGET_ROOT" --mode quickstart --yes
