@@ -51,22 +51,23 @@ def cmd_change_prepare(args):
     ))
     print(f"Change prepared: {payload['change_id']}")
     print("")
-    print("Next commands:")
-    print(f"- ocw --root . contract validate --change-id {payload['change_id']}")
-    print(f"- ocw --root . run --change-id {payload['change_id']} ...")
-    print(f"- ocw --root . verify --change-id {payload['change_id']}")
-    print("")
-    print("personal domain Agent prompt:")
-    print(_format_agent_execution_prompt(payload["change_id"]))
+    print(_format_agent_handoff(payload["change_id"]))
     return 0
 
 
-def _format_agent_execution_prompt(change_id: str) -> str:
-    return (
-        f"Please continue open-cowork change {change_id}: read contract.yaml and bindings.yaml, "
-        "execute only inside scope_in, record evidence, run verify, request independent review, "
-        "and do not archive until review approves."
-    )
+def _format_agent_handoff(change_id: str) -> str:
+    return "\n".join([
+        "Agent-first handoff ready.",
+        "Read these files before continuing:",
+        "- .governance/AGENTS.md",
+        "- .governance/current-state.md",
+        "- .governance/agent-playbook.md",
+        f"- .governance/changes/{change_id}/contract.yaml",
+        f"- .governance/changes/{change_id}/bindings.yaml",
+        "",
+        "Report project progress, owner, blocker, next action, and human decisions needed.",
+        "Do not make the human copy long command prompts or memorize ocw commands.",
+    ])
 
 
 def cmd_pilot(args):
@@ -104,8 +105,7 @@ def cmd_pilot(args):
     print("")
     print("open-cowork pilot complete.")
     print("")
-    print("copy this prompt to your personal-domain Agent:")
-    print(_format_agent_execution_prompt(args.change_id))
+    print(_format_agent_handoff(args.change_id))
     return 0
 
 

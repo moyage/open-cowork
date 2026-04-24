@@ -4,30 +4,76 @@
 
 目标不是一次学完全部概念，而是先用最低门槛把一个本地项目接入基本治理结构，并确认它不会替换你的现有 Agent、IDE、脚本或工作流。
 
-## 1. 你需要准备什么
+## 1. 默认入口：在 Agent 中说一句话
 
-- Python 3.10+
-- Git
-- 一个可写的本地项目目录
-- 任意一个能执行 shell、读写文件、遵守边界的 Agent 或 AI Coding 工具
+`open-cowork` 从 V0.2.5 开始把 Agent-first 作为默认使用方式。人不应该先去记命令，而应该先表达意图：
 
-## 2. 一键安装并初始化目标项目
+```text
+安装 open-cowork，并在当前项目中实施这套协同治理框架。
+```
 
-如果你只是想快速试用，推荐先用一条命令完成安装、初始化、状态查看和 session 诊断：
+或者：
+
+```text
+请用 open-cowork 管理当前项目接下来的开发任务。
+```
+
+你可以把这句话交给你当前个人域中的 Codex、Claude Code、Cursor、OpenClaw、Hermes、OMOC、Antigravity 或其他可信 Agent。
+
+Agent 的职责是：理解当前项目目标，安装或定位 `open-cowork`，初始化目标项目，准备当前 change，生成 contract / bindings / Agent handoff pack，并向人汇报真实项目进展。
+
+## 2. 人应该看到什么反馈
+
+Agent 不应该把命令清单当成主要汇报。推荐反馈格式是：
+
+```text
+当前项目推进状态
+
+- 项目目标：
+- 当前阶段：
+- 当前步骤：
+- 当前 Owner：
+- 已完成：
+- 当前阻断：
+- 下一步建议：
+- 需要你决策：
+- Agent 后续动作：
+```
+
+人只需要在目标、范围、风险、review 决策和是否继续等真实判断点介入。
+
+## 3. Agent 应该生成哪些项目入口
+
+当 `open-cowork` 被应用到目标项目后，目标项目中应出现：
+
+- `.governance/AGENTS.md`：给后续 Agent 的项目内入口。
+- `.governance/current-state.md`：当前项目推进状态。
+- `.governance/agent-playbook.md`：Agent 操作规则和人类汇报模板。
+- `.governance/changes/<change-id>/contract.yaml`：执行边界。
+- `.governance/changes/<change-id>/bindings.yaml`：角色和 owner 绑定。
+
+这些文件的目的，是让下一个 Agent 不需要从聊天记录里猜项目状态。
+
+## 4. Shell 备用路径：安装与初始化
+
+如果你需要手动安装、排障，或帮助 Agent 定位工具，可以使用下面路径。
 
 ```bash
 git clone https://github.com/moyage/open-cowork.git
 cd open-cowork
-./scripts/quickstart.sh /path/to/your-project
+./scripts/bootstrap.sh
+source .venv/bin/activate
+ocw version
+./scripts/smoke-test.sh
 ```
 
-`quickstart.sh` 会自动调用 `bootstrap.sh`，再调用 `ocw onboard --mode quickstart --yes`，并在目标项目中执行：
+在目标项目中初始化：
 
-- `ocw --root <project> init`
-- `ocw --root <project> status`
-- `ocw --root <project> diagnose-session`
+```bash
+ocw onboard --target /path/to/your-project --mode quickstart --yes
+```
 
-这一步会创建最小 `.governance/` 结构和索引文件，不会强迫你改造现有仓库结构、CI/CD 或 Agent 工具链。
+`onboard` 会初始化 `.governance/`，输出状态和 session 诊断。它不会强迫你改造现有仓库结构、CI/CD 或 Agent 工具链。
 
 如果你不想在仓库根目录创建 `.venv`，可以指定虚拟环境目录：
 
@@ -35,46 +81,47 @@ cd open-cowork
 OCW_VENV_DIR=/tmp/open-cowork-venv ./scripts/quickstart.sh /path/to/your-project
 ```
 
-## 3. CLI onboarding 路径
+## 5. 让 Agent 准备一个可执行 change
 
-如果已经安装过 `ocw`，可以直接使用正式 onboarding 入口：
-
-```bash
-ocw onboard --target /path/to/your-project --mode quickstart --yes
-ocw setup --target /path/to/your-project --yes
-open-cowork onboard --target /path/to/your-project --yes
-```
-
-可选模式：
-
-- `quickstart`：默认推荐，初始化并输出最小下一步。
-- `personal`：个人域多 Agent 试用，额外提示角色分离建议。
-- `team`：团队试用准备，额外提示 evidence / review / closeout 约定。
-- `manual`：只打印命令，不写入目标项目。
-
-## 4. 手动安装路径
-
-如果你希望分步骤执行，可以使用手动路径：
+如果需要准备一个完整的个人域试用 change，Agent 可以使用 `pilot` 或 `change prepare`。这些命令是 Agent 的内部工具，不是人的默认任务清单。
 
 ```bash
-./scripts/bootstrap.sh
-source .venv/bin/activate
-ocw --help
-./scripts/smoke-test.sh
+ocw pilot \
+  --target /path/to/your-project \
+  --change-id personal-demo \
+  --title "Personal domain pilot" \
+  --goal "在当前项目中试用 open-cowork 主链" \
+  --scope-in "src/**" \
+  --scope-in "tests/**" \
+  --verify-command "<本项目测试命令>" \
+  --yes
 ```
 
-然后进入你要试用的目标项目根目录：
+如果已经创建过 change，只补齐主链准备文件：
 
 ```bash
-cd /path/to/your-project
-ocw --root . init
-ocw --root . status
-ocw --root . diagnose-session
+ocw --root /path/to/your-project change prepare personal-demo \
+  --goal "在当前项目中试用 open-cowork 主链" \
+  --scope-in "src/**" \
+  --scope-in "tests/**" \
+  --verify-command "<本项目测试命令>"
 ```
 
-## 5. 升级和干净重装
+这会填充：
 
-如果你已经安装过 V0.2.3 或更早版本，先在 `open-cowork` 仓库根目录执行：
+- `intent.md`
+- `requirements.md`
+- `design.md`
+- `tasks.md`
+- `contract.yaml`
+- `bindings.yaml`
+- `.governance/AGENTS.md`
+- `.governance/agent-playbook.md`
+- `.governance/current-state.md`
+
+## 6. 升级和干净重装
+
+如果你已经安装过 V0.2.4 或更早版本，先在 `open-cowork` 仓库根目录执行：
 
 ```bash
 git pull --ff-only
@@ -101,13 +148,13 @@ which open-cowork
 ocw version
 ```
 
-可以交给个人域 Agent 的升级提示：
+你也可以直接对 Agent 说：
 
 ```text
-请帮我把本地 open-cowork 升级到最新版：进入 open-cowork 仓库，执行 git pull --ff-only，然后执行 ./scripts/update.sh；如果失败，执行 ./scripts/bootstrap.sh --clean；完成后运行 ocw version 和 ./scripts/smoke-test.sh 确认版本与健康状态。
+请帮我把本地 open-cowork 升级到最新版，并确认当前项目仍可正常使用这套协同治理框架。
 ```
 
-## 6. 个人域多 Agent 推荐用法
+## 7. 个人域多 Agent 推荐用法
 
 个人域中可以一人多角，但不建议让同一个执行会话自审自批。
 
@@ -131,89 +178,35 @@ ocw version
 - Review 尽量由另一个 Agent、另一个会话或人来做。
 - 人只在目标确认、风险确认、review 决策和 closeout 时介入。
 
-## 7. 常见个人域组合样例
+## 8. 常见个人域组合样例
 
 这些样例是匿名的工具组合模式，不代表团队成员身份。
 
 ### 场景 A：概要设计 + 主力编码 + 独立 review
 
-适合组合：Antigravity + GPT-5 做概要设计，Claude Code 做详细设计和编码，Antigravity 独立 review。
-
-推荐绑定：
-
-| 角色 | 建议承载 |
-| --- | --- |
-| Orchestrator | Antigravity + GPT-5 |
-| Analyst / Architect | Antigravity + GPT-5 |
-| Executor | Claude Code |
-| Verifier | Claude Code，必要时 Antigravity 复核 |
-| Reviewer | Antigravity 独立 review 会话 |
-| Sponsor | 人 |
-
-```bash
-ocw --root . init
-ocw --root . change create scenario-a-demo-change --title "Scenario A personal multi-agent trial"
-ocw --root . status
-```
+适合组合：一个分析型 Agent 做概要设计，一个主力 Coding Agent 做详细设计和编码，再由分析型 Agent 的独立会话做 review。
 
 ### 场景 B：日常调度 + 双主力 Coding Agent 交叉验证
 
 适合组合：日常调度 Agent 负责推进状态，两个主力 Coding Agent 分别做方案、执行和交叉 review，轻量 Agent 做调研和文档整理。
 
-推荐绑定：
-
-| 角色 | 建议承载 |
-| --- | --- |
-| Orchestrator | 日常调度 Agent |
-| Analyst / Architect | 两个主力 Coding Agent 双方案交叉验证 |
-| Executor | 当前更适合的一方 |
-| Verifier | 另一方 Coding Agent |
-| Reviewer | 独立交叉 review 会话 |
-| Research / Docs | 轻量调研或文档 Agent |
-| Sponsor | 人 |
-
-```bash
-ocw --root . init
-ocw --root . change create scenario-b-demo-change --title "Scenario B cross-review personal trial"
-ocw --root . status
-ocw --root . continuity digest
-```
-
 ### 场景 C：日常调度 + IDE 主力 + 独立分析 review
 
-适合组合：Openclaw 一类日常调度 Agent 管状态，Cursor 一类 IDE AI Coding 工具做执行，Antigravity 一类工具做分析和 review。
-
-```bash
-ocw --root . init
-ocw --root . change create scenario-c-demo-change --title "Scenario C IDE plus independent review trial"
-ocw --root . status
-ocw --root . diagnose-session
-```
+适合组合：日常调度 Agent 管状态，IDE AI Coding 工具做执行，独立分析工具做方案复核和 review。
 
 ### 场景 D：Demo 导向开发 + 交叉验证
 
 适合组合：主力 IDE AI Coding 工具负责设计、实现和 Demo，辅助 Agent 负责交叉验证，人基于 Demo 可用性和 review 结论做 closeout 判断。
 
-```bash
-ocw --root . init
-ocw --root . change create scenario-d-demo-change --title "Scenario D demo-oriented personal trial"
-ocw --root . status
-```
+### 场景 E：调度 Agent + 主力 Coding Agent + 辅助规范组合
 
-### 场景 E：调度 Agent + 主力 Coding Agent + 辅助组合
+适合组合：调度 Agent 负责状态推进，主力 Coding Agent 负责执行，辅助组合负责方案辩论、规范、验证或 review。
 
-适合组合：调度 Agent 负责状态推进，Codex / Claude Code / OpenCode 等主力 Coding Agent 负责执行，OOSO / OMOC / OpenSpec / Superpowers 等组合负责方案辩论、规范、验证或 review。
-
-```bash
-ocw --root . init
-ocw --root . change create scenario-e-demo-change --title "Scenario E assisted governed change"
-ocw --root . status
-ocw --root . continuity digest
-```
-
-## 8. 推荐首次试用流程
+## 9. 推荐首次试用流程
 
 ### Level 1：只验证接入
+
+Agent 应完成初始化、状态输出和 session 诊断。Shell 备用命令是：
 
 ```bash
 ocw --root . init
@@ -225,73 +218,41 @@ ocw --root . diagnose-session
 
 ### Level 2：创建一个轻量 change
 
+Agent 应创建一个当前任务的 change package，并向人解释它对应的项目目标。Shell 备用命令是：
+
 ```bash
 ocw --root . change create personal-demo --title "Personal domain pilot"
 ocw --root . status
 ocw --root . continuity digest --change-id personal-demo
 ```
 
-目标：确认 `open-cowork` 可以描述当前任务状态，并把多 Agent 工作绑定到一个 `change-id`。如果 `contract.yaml` 还未补齐，`status / digest` 会显示 draft 指引，而不是要求你立刻跑完整主链。
+目标：确认 `open-cowork` 可以描述当前任务状态，并把多 Agent 工作绑定到一个 `change-id`。
 
-### Level 3：一条命令准备可执行 change
+### Level 3：准备可执行 change
 
-V0.2.4 起，推荐用 `pilot` 避免 `change create` 后面对空白 `contract.yaml / bindings.yaml` 卡住：
-
-```bash
-ocw pilot \
-  --target . \
-  --change-id personal-demo \
-  --title "Personal domain pilot" \
-  --goal "在当前项目中试用 open-cowork 主链" \
-  --scope-in "src/**" \
-  --scope-in "tests/**" \
-  --verify-command "<本项目测试命令>" \
-  --yes
-```
-
-如果已经有 change，只补齐主链准备文件：
+Agent 应准备 contract、bindings 和 handoff pack。Shell 备用命令是：
 
 ```bash
-ocw --root . change prepare personal-demo \
-  --goal "在当前项目中试用 open-cowork 主链" \
-  --scope-in "src/**" \
-  --scope-in "tests/**" \
-  --verify-command "<本项目测试命令>"
+ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes
 ```
 
-这会填充：
-
-- `intent.md`
-- `requirements.md`
-- `design.md`
-- `tasks.md`
-- `contract.yaml`
-- `bindings.yaml`
-
-并执行 contract validation 与状态输出。
-
-可以直接交给个人域 Agent 的一句话：
-
-```text
-请帮我在当前项目中使用 open-cowork 启动个人域治理试用：先确认 ocw version 是 0.2.4 或更高；然后运行 ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes；完成后读取 .governance/changes/personal-demo/contract.yaml 和 bindings.yaml，只在 scope_in 内执行，记录 evidence，运行 verify，交给独立 reviewer review，review 通过后再 archive。
-```
+目标：让执行 Agent 可以读取边界并开始受控执行。
 
 ### Level 4：contract ready 后尝试交接和复盘
 
-当当前 change 的 `contract.yaml` 与 `bindings.yaml` 已经由 `pilot`、`change prepare`、主控 Agent 或人补齐后，再执行：
+当当前 change 的 `contract.yaml` 与 `bindings.yaml` 已经补齐后，再让 Agent 验证、生成接续包和 digest。Shell 备用命令是：
 
 ```bash
 ocw --root . contract validate --change-id personal-demo
 ocw --root . runtime-status --change-id personal-demo
 ocw --root . timeline --change-id personal-demo
 ocw --root . continuity handoff-package --change-id personal-demo
-ocw --root . continuity increment-package --change-id personal-demo --reason "first personal pilot checkpoint" --segment-owner "current-agent" --segment-label "first-checkpoint"
 ocw --root . continuity digest --change-id personal-demo
 ```
 
 目标：确认从一个 Agent 切换到另一个 Agent 时，有一份可读、可接续、可审查的上下文输入。
 
-## 9. 团队试用最小约定
+## 10. 团队试用最小约定
 
 团队试用不要求统一本地工具链，但建议统一下面四件事：
 
@@ -300,9 +261,9 @@ ocw --root . continuity digest --change-id personal-demo
 - 最终 review 不由 executor 自审自批。
 - closeout 后再进入下一轮迭代。
 
-首次团队试用建议仍从个人域开始，先让每个人在自己的本地项目上完成 `bootstrap + init + status`，再进入多人协作实践。
+首次团队试用建议仍从个人域开始，先让每个人在自己的本地项目上完成 Agent-first 采用，再进入多人协作实践。
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### 我只想先试，不想改现有流程？
 
@@ -310,7 +271,7 @@ ocw --root . continuity digest --change-id personal-demo
 
 ### Agent 上下文爆炸怎么办？
 
-优先生成结构化接续材料，再开启下一轮：
+优先生成结构化接续材料，再开启下一轮。Shell 备用命令是：
 
 ```bash
 ocw --root . diagnose-session
@@ -321,20 +282,21 @@ ocw --root . session-recovery-packet
 
 先统一 change package、evidence schema、review gate 和 closeout 结构；暂时不要强制统一每个人的 Agent 或 IDE。
 
-## 11. 不推荐的首次试用方式
+## 12. 不推荐的首次试用方式
 
 - 一开始就要求所有 Agent 严格跑完整 `contract -> run -> verify -> review -> archive` 主链。
 - 让执行 Agent 自己完成最终 review 并直接 archive。
 - 把某个个人域工具写死成团队唯一标准。
 - 把 `open-cowork` 当成 AI Coding Runtime 或 IDE 插件替代品。
+- 让人先背命令、schema 和内部文件路径。
 - 每一步都产出大量长文档，而不是维护最小事实、证据和接续摘要。
 
-## 12. 判断试用是否成功
+## 13. 判断试用是否成功
 
 一次个人域试用成功，不要求项目真的进入团队协作，只要求满足：
 
-- 新项目可以在 5 分钟内完成 `bootstrap + init + status`。
+- 新项目可以由 Agent 在 5 分钟内完成安装、初始化和当前状态输出。
 - 任意一个 Agent 能围绕同一个 `change-id` 继续推进。
-- 从一个 Agent 切换到另一个 Agent 时，接手者能通过 digest / handoff 理解当前状态。
+- 从一个 Agent 切换到另一个 Agent 时，接手者能通过 `.governance/AGENTS.md`、`.governance/current-state.md` 和 digest / handoff 理解当前状态。
 - 人能看懂当前处于哪个阶段、下一步需要谁做什么。
 - session 压缩或断裂时，可以生成恢复包，而不是只能回聊天记录里打捞上下文。

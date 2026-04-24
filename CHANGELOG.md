@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.5
+
+- Added repository-level `AGENTS.md` as the Agent-first adoption entry
+- Added `docs/agent-adoption.md` and `docs/agent-playbook.md` for natural-language adoption and Agent operation rules
+- Generated target-project `.governance/AGENTS.md`, `.governance/agent-playbook.md`, and `.governance/current-state.md` from `change prepare` and `pilot`
+- Reframed README and getting-started docs around Agent-first usage instead of CLI-first operation
+- Updated pilot and change prepare output to point Agents at handoff files instead of asking humans to copy long command prompts
+
 ## 0.2.4
 
 - Added `ocw version` / `open-cowork version` for upgrade diagnostics

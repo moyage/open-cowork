@@ -144,8 +144,9 @@ class CliTests(unittest.TestCase):
             change_dir = root / ".governance/changes/CHG-PREPARE"
             self.assertEqual(exit_code, 0)
             self.assertIn("Change prepared: CHG-PREPARE", output)
-            self.assertIn("contract validate", output)
-            self.assertIn("personal domain Agent prompt", output)
+            self.assertIn("Agent-first handoff ready", output)
+            self.assertIn(".governance/current-state.md", output)
+            self.assertNotIn("personal domain Agent prompt", output)
             self.assertIn("Use open-cowork", (change_dir / "intent.md").read_text(encoding="utf-8"))
             self.assertIn("src/**", (change_dir / "requirements.md").read_text(encoding="utf-8"))
             self.assertIn("Step 6", (change_dir / "tasks.md").read_text(encoding="utf-8"))
@@ -162,6 +163,19 @@ class CliTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "step5-prepared")
             self.assertTrue(manifest["readiness"]["step6_entry_ready"])
             self.assertEqual(manifest["target_validation_objects"], contract["validation_objects"])
+
+            governance_dir = root / ".governance"
+            agent_entry = (governance_dir / "AGENTS.md").read_text(encoding="utf-8")
+            agent_playbook = (governance_dir / "agent-playbook.md").read_text(encoding="utf-8")
+            current_state = (governance_dir / "current-state.md").read_text(encoding="utf-8")
+            self.assertIn("Agent-first open-cowork project", agent_entry)
+            self.assertIn("Do not ask the human to memorize ocw commands", agent_entry)
+            self.assertIn("Current phase: Phase 2", current_state)
+            self.assertIn("Current step: Step 5", current_state)
+            self.assertIn("Executor: executor-agent", current_state)
+            self.assertIn("Project goal: Use open-cowork", current_state)
+            self.assertIn("Human update template", agent_playbook)
+            self.assertIn("Need human decision", agent_playbook)
 
             validate_stdout = io.StringIO()
             with contextlib.redirect_stdout(validate_stdout):
@@ -212,13 +226,30 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue((change_dir / "contract.yaml").exists())
             self.assertTrue((change_dir / "bindings.yaml").exists())
+            self.assertTrue((target / ".governance/AGENTS.md").exists())
+            self.assertTrue((target / ".governance/current-state.md").exists())
             self.assertIn("open-cowork pilot complete", output)
             self.assertIn("Contract valid", output)
             self.assertIn("# open-cowork status", output)
             self.assertIn("## Blockers\n- none", output)
             self.assertNotIn("Manifest target_validation_objects must align", output)
-            self.assertIn("copy this prompt to your personal-domain Agent", output)
+            self.assertIn("Agent-first handoff ready", output)
+            self.assertIn(".governance/AGENTS.md", output)
+            self.assertNotIn("copy this prompt to your personal-domain Agent", output)
             self.assertEqual(load_yaml(change_dir / "manifest.yaml")["status"], "step5-prepared")
+
+    def test_repository_agent_first_docs_exist(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        agents = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+        adoption = (repo_root / "docs/agent-adoption.md").read_text(encoding="utf-8")
+        playbook = (repo_root / "docs/agent-playbook.md").read_text(encoding="utf-8")
+
+        self.assertIn("Agent-first", agents)
+        self.assertIn("安装 open-cowork，并在当前项目中实施这套协同治理框架", agents)
+        self.assertIn("do not make the human operate open-cowork as a CLI-first tool", agents)
+        self.assertIn("人表达意图", adoption)
+        self.assertIn("Agent 调用 open-cowork", adoption)
+        self.assertIn("当前项目推进状态", playbook)
 
     def test_contract_validate_and_run_review_archive_flow(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -777,7 +808,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.2.4", output)
+        self.assertIn("open-cowork 0.2.5", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)

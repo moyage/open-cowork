@@ -6,6 +6,7 @@ from pathlib import Path
 from .change_package import read_change_package, update_manifest
 from .index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
 from .simple_yaml import write_yaml
+from .agent_adoption import write_agent_adoption_pack
 
 REQUIRED_FORBIDDEN_ACTIONS = [
     "no_truth_source_pollution",
@@ -44,6 +45,14 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
     bindings = _build_bindings(request.change_id, request.profile)
     write_yaml(package.path / "contract.yaml", contract)
     write_yaml(package.path / "bindings.yaml", bindings)
+    write_agent_adoption_pack(
+        root,
+        change_id=request.change_id,
+        title=title,
+        goal=request.goal,
+        profile=request.profile,
+        bindings=bindings,
+    )
 
     manifest = update_manifest(
         request.root,

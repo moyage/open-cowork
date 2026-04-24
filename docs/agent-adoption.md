@@ -1,0 +1,40 @@
+# Agent-first 采用方式
+
+open-cowork 默认面向 AI 时代的使用路径：
+
+```text
+人表达意图 -> Agent 调用 open-cowork -> open-cowork 维护结构化协作事实 -> Agent 向人反馈项目进展和决策点
+```
+
+它不假设人愿意离开 Agent 环境、阅读命令手册、再手动操作一串 CLI。CLI 存在，但默认由 Agent 调用。
+
+## 人可以怎么说
+
+```text
+安装 open-cowork，并在当前项目中实施这套协同治理框架。
+```
+
+```text
+请用 open-cowork 管理当前项目接下来的开发任务。
+```
+
+```text
+请按 open-cowork 的协同治理方式推进当前需求。
+```
+
+## Agent 应该怎么做
+
+1. 识别目标项目和人的当前意图。
+2. 检查 open-cowork 是否已经安装或可从本地仓库使用。
+3. 如果目标项目还没有 `.governance/`，初始化它。
+4. 创建或准备当前 active change package。
+5. 生成或补齐 contract 和 role bindings。
+6. 生成目标项目内的 Agent 入口文件。
+7. 向人汇报当前项目目标、阶段、步骤、owner、阻断、下一步和需要人决策的事项。
+
+## 不应该怎么做
+
+- 不要把采用过程变成人的命令教程。
+- 不要把命令执行当成主要进度汇报。
+- 除非是真实项目决策，不要要求人选择内部 schema 值。
+- 不要把 open-cowork 当成替代用户现有 Agent 或 IDE 的新 runtime。

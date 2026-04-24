@@ -1,10 +1,30 @@
 # open-cowork
 
-`open-cowork` 是一个面向个人域与团队协作的复杂协作底层框架与协议体系。
+`open-cowork` 是一个面向个人域、团队多人、多 Agent 与多 AI Coding 场景的协同治理框架与协议体系。
 
-它不要求每个人统一 Agent、模型、IDE、CLI 或 workflow，而是用统一的任务入口、角色边界、执行证据、审查门和接续机制，把多个强个人域或多个 Agent 的工作组织成可分工、可验证、可协同、可持续维护的过程。
+它不要求每个人统一 Agent、模型、IDE、CLI 或 workflow，而是把复杂任务中的意图、边界、角色、执行证据、审查门、归档和接续状态沉淀为可读、可验证、可交接的项目事实。
 
-一句话：`open-cowork` 不是替代你的个人域，而是让多个个人域和多个 Agent 可以围绕复杂任务稳定协作。
+一句话：`open-cowork` 不是让人去学习一套新的命令行流程，而是让个人域 Agent 和团队协作 Agent 能用统一协议，把复杂项目稳定推进下去。
+
+## 默认使用方式：对你的 Agent 说一句话
+
+在 AI 时代，`open-cowork` 的默认入口不是让人离开 Agent 环境去手动敲命令，而是让人用自然语言表达意图，让 Agent 负责安装、初始化、准备 change、维护状态和汇报进展。
+
+你可以对当前个人域里的 Codex、Claude Code、Cursor、OpenClaw、Hermes、OMOC、Antigravity 或其他可信 Agent 说：
+
+```text
+安装 open-cowork，并在当前项目中实施这套协同治理框架。
+```
+
+或者：
+
+```text
+请用 open-cowork 管理当前项目接下来的开发任务。
+```
+
+Agent 应该做的是：理解当前项目目标，安装或定位 `open-cowork`，在目标项目中生成 `.governance/`，准备当前 change，维护 contract / bindings / evidence / review / archive / continuity，并用人能理解的方式汇报“当前项目推进到哪里、谁负责、卡在哪里、下一步是什么、需要人做什么决策”。
+
+CLI 仍然存在，但它是给 Agent 和排障场景使用的内部工具，不是要求普通使用者记忆的主界面。
 
 ## 为什么需要 open-cowork
 
@@ -25,7 +45,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 
 `open-cowork` 是：
 
-- 协作协议层：统一 change、contract、evidence、review、archive、continuity 的语义。
+- Agent-first 协作协议层：默认由 Agent 读取和维护协作事实，人用自然语言发起和决策。
 - 低侵入框架：接入现有项目和现有 Agent，不强制替换工具链。
 - 多 Agent 协作骨架：让不同 Agent 有明确角色、边界、输入和输出。
 - 个人域到团队域的桥：先支持单人多 Agent，再自然扩展到多人多 Agent。
@@ -37,6 +57,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - 不是新的 AI Coding runtime。
 - 不是任务管理 SaaS。
 - 不是要求所有成员统一使用某个 Agent 的团队平台。
+- 不是让人背诵命令、schema 或流程术语的 CLI-first 工具。
 - 不是替代人的最终判断和 sponsor 责任。
 
 ## 目标
@@ -50,6 +71,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 5. 让人可以通过 4 阶段视图理解项目进展。
 6. 让 Agent 可以通过结构化文件读取当前状态。
 7. 让个人域工具异构，但协作协议统一。
+8. 让首次试用从“一句话”开始，而不是从命令手册开始。
 
 ## 适用场景
 
@@ -75,12 +97,13 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 | --- | --- |
 | change package | 一个变更或任务的工作单元，承载 intent、requirements、design、tasks、contract、evidence 等。 |
 | execution contract | 执行前的边界契约，定义目标、scope、允许动作、禁止动作、验证对象和证据要求。 |
+| bindings | 当前 change 的角色和 owner 绑定，避免“谁负责”只存在于聊天里。 |
 | evidence | 执行结果的证据，包括命令输出、测试输出、文件变更、执行摘要等。 |
 | verify | 对 evidence 和状态一致性进行验证。 |
 | review | 独立审查并作出 approve / revise / reject 决策。 |
 | archive | 将完成的 change 收束为可追溯历史事实。 |
 | continuity | 交接、owner transfer、increment、closeout、sync、digest 等接续能力。 |
-| runtime status | 面向人和工具的当前状态快照。 |
+| current-state | 给人和下一个 Agent 看的当前状态快照。 |
 | timeline | 运行时事件流，记录关键状态变化。 |
 
 ## 4 阶段与 9 步流程
@@ -93,23 +116,31 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 | 定义与对齐 | 2. Lock the scope | 明确范围、非目标和边界 | requirements / scope |
 | 方案与准备 | 3. Shape the approach | 形成方案方向和风险判断 | design |
 | 方案与准备 | 4. Assemble the change | 组装 change package | manifest / tasks |
-| 方案与准备 | 5. Approve the start | 准备 contract、角色和 gate | contract / bindings |
+| 方案与准备 | 5. Approve the start | 准备 contract、角色和 gate | contract / bindings / current-state |
 | 执行与验证 | 6. Execute the change | 在受控边界内执行 | evidence / execution summary |
 | 执行与验证 | 7. Verify the result | 验证结果与状态一致性 | verify result |
 | 审查与收束 | 8. Review and decide | 独立 review 并决策 | review decision |
 | 审查与收束 | 9. Archive and carry forward | 归档并生成接续输入 | archive / closeout / digest |
 
-默认建议：第一次试用先跑 `onboard / pilot`，让框架完成初始化、change 准备、contract 校验和状态输出；不要一上来强制跑完整 9 步。
+默认建议：第一次试用只要求 Agent 完成初始化、当前 change 准备、contract 校验和状态输出；不要一上来强制跑完整 9 步。
 
 ## 当前版本完成度
 
-当前 `v0.2.4` 是“带升级路径、onboarding/setup 入口和个人域 pilot 主链准备能力的可试用协议框架与 CLI 基线”，重点是让个人域和团队成员能低门槛开始实践，并能从 `change create` 自然走到可执行 contract / bindings。
+当前 `v0.2.5` 是“Agent-first adoption 体验重置版”。重点是把 V0.2.4 的命令行主链准备能力向前包一层：人只表达意图，Agent 使用 `open-cowork` 维护事实和状态，并在目标项目中生成可交接的 Agent 入口文件。
 
 已经具备：
 
+- 根目录 `AGENTS.md`：告诉各类 Agent 如何以 Agent-first 方式采用 `open-cowork`。
+- `docs/agent-adoption.md`：说明“一句话触发 -> Agent 实施 -> 结构化事实 -> 人类进展反馈”的采用路径。
+- `docs/agent-playbook.md`：给 Agent 的操作规则和人类进展汇报模板。
 - `ocw init` 初始化 `.governance/` 结构。
 - `ocw status` 输出人类可读状态面。
 - `ocw change create` 创建 change package。
+- `ocw change prepare` 自动填充主链准备文件，并生成目标项目 Agent handoff pack。
+- `ocw pilot` 完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent handoff pack。
+- 目标项目 `.governance/AGENTS.md`：给后续接手 Agent 的项目内入口。
+- 目标项目 `.governance/agent-playbook.md`：给后续接手 Agent 的操作规则。
+- 目标项目 `.governance/current-state.md`：给人和 Agent 的当前项目推进状态。
 - `ocw contract validate` 校验 execution contract。
 - `ocw run` 写入执行证据。
 - `ocw verify` 写入验证结果。
@@ -119,71 +150,58 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw timeline` 输出运行时事件流。
 - `ocw continuity ...` 支持 handoff、owner transfer、increment、closeout、sync、history、export、digest。
 - `ocw diagnose-session` 和 `ocw session-recovery-packet` 支持 session/context 恢复诊断。
-- `scripts/bootstrap.sh` 支持本地安装。
-- `ocw onboard` / `ocw setup` 支持交互式或脚本式初始化。
-- `open-cowork onboard` 提供更直观的 console script alias。
-- `ocw change prepare` 支持自动填充 change package 主链准备文件。
-- `ocw pilot` 支持一条命令完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent 下一步提示。
-- `ocw version` / `open-cowork version` 支持升级诊断。
-- `scripts/quickstart.sh` 保留为一键脚本入口，并调用 `ocw onboard`。
-- `scripts/update.sh` 和 `scripts/bootstrap.sh --clean` 支持从旧版本优雅升级或干净重装。
+- `scripts/bootstrap.sh`、`scripts/update.sh`、`scripts/bootstrap.sh --clean` 支持安装、升级和干净重装。
 - `scripts/smoke-test.sh` 支持最小健康检查。
 
 还没有覆盖：
 
-- 完整图形化界面或团队看板。
+- `open-cowork` 自身作为完整自带 Agent / TUI / Dashboard 运行。
 - 对所有主流 Agent / IDE 的专用插件。
 - 复杂企业级审批流。
 - 云端协作服务。
 - 自动替你判断业务目标是否正确。
 
-## Quick Start
+## 快速开始
 
-### 一键试用推荐路径
+### 推荐路径：让 Agent 帮你实施
 
-在 `open-cowork` 仓库根目录执行：
+在你的项目或个人域 Agent 会话中，说：
 
-```bash
-./scripts/quickstart.sh /path/to/your-project
+```text
+安装 open-cowork，并在当前项目中实施这套协同治理框架。
 ```
 
-或者安装后直接运行：
+Agent 应该完成：
 
-```bash
-ocw onboard --target /path/to/your-project --mode quickstart --yes
-ocw setup --target /path/to/your-project --yes
-open-cowork onboard --target /path/to/your-project --yes
-```
+1. 确认当前目标项目。
+2. 安装或定位 `open-cowork`。
+3. 初始化 `.governance/`。
+4. 创建或准备当前 change package。
+5. 生成 `contract.yaml`、`bindings.yaml` 和 Agent handoff pack。
+6. 输出“当前项目推进状态”，而不是把命令清单丢给你。
 
-这些命令会：
+人只需要确认目标、范围、风险、review 决策和是否继续。
 
-1. 自动安装 / 激活本地 `ocw` 命令。
-2. 在目标项目中执行 `ocw init`。
-3. 执行 `ocw status`。
-4. 执行 `ocw diagnose-session`。
-5. 输出下一步建议。
+### Shell 备用路径：安装与健康检查
 
-### 手动安装路径
+如果你需要手动安装、排障或帮助 Agent 定位工具，可以使用：
 
 ```bash
 git clone https://github.com/moyage/open-cowork.git
 cd open-cowork
 ./scripts/bootstrap.sh
 source .venv/bin/activate
-ocw --help
+ocw version
 ./scripts/smoke-test.sh
 ```
 
-在你的目标项目中初始化：
+在目标项目中执行一次最小初始化：
 
 ```bash
-cd /path/to/your-project
-ocw --root . init
-ocw --root . status
-ocw --root . diagnose-session
+ocw onboard --target /path/to/your-project --mode quickstart --yes
 ```
 
-### 从 V0.2.3 升级
+### 升级路径
 
 如果你已经安装过早期版本，推荐在 `open-cowork` 仓库根目录执行：
 
@@ -204,61 +222,23 @@ ocw version
 ./scripts/smoke-test.sh
 ```
 
-排查旧命令路径：
+### Agent 继续推进时读取哪里
 
-```bash
-which ocw
-which open-cowork
-ocw version
-```
+目标项目完成采用后，后续 Agent 应优先读取：
 
-### 创建一个轻量 change
+- `.governance/AGENTS.md`
+- `.governance/current-state.md`
+- `.governance/agent-playbook.md`
+- `.governance/changes/<change-id>/contract.yaml`
+- `.governance/changes/<change-id>/bindings.yaml`
 
-```bash
-ocw --root . change create personal-demo --title "Personal domain pilot"
-ocw --root . status
-ocw --root . continuity digest --change-id personal-demo
-```
-
-如果 `contract.yaml` 还未补齐，`status / digest` 会显示 draft 指引，而不是要求你立刻跑完整主链。
-
-### 一条命令准备个人域试用主链
-
-V0.2.4 推荐直接使用 `pilot` 路径，避免 `change create` 后面对空白 `contract.yaml / bindings.yaml` 不知道如何继续：
-
-```bash
-ocw pilot \
-  --target /path/to/your-project \
-  --change-id personal-demo \
-  --title "Personal domain pilot" \
-  --goal "在当前项目中试用 open-cowork 主链" \
-  --scope-in "src/**" \
-  --scope-in "tests/**" \
-  --verify-command "python3 -m unittest discover -s tests" \
-  --yes
-```
-
-如果已经创建过 change，也可以只补齐主链准备文件：
-
-```bash
-ocw --root /path/to/your-project change prepare personal-demo \
-  --goal "在当前项目中试用 open-cowork 主链" \
-  --scope-in "src/**" \
-  --scope-in "tests/**" \
-  --verify-command "python3 -m unittest discover -s tests"
-```
-
-可以直接交给个人域 Agent 的一句话：
-
-```text
-请帮我在当前项目中使用 open-cowork 启动个人域治理试用：先确认 ocw version 是 0.2.4 或更高；然后运行 ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes；完成后读取 .governance/changes/personal-demo/contract.yaml 和 bindings.yaml，只在 scope_in 内执行，记录 evidence，运行 verify，交给独立 reviewer review，review 通过后再 archive。
-```
+这几份文件就是为了防止上下文压缩、会话断裂或 Agent 接力时重新从聊天记录里考古。
 
 ## Roadmap
 
 ### v0.2.x：试用体验与文档稳定
 
-- 强化 README 和上手路径。
+- 强化 README、Agent-first 入口和上手路径。
 - 简化安装、初始化、诊断命令。
 - 清理文档结构，降低首次理解成本。
 - 补更多个人域和多 Agent 试用样例。
@@ -285,7 +265,10 @@ ocw --root /path/to/your-project change prepare personal-demo \
 
 ## 文档索引
 
-- `docs/getting-started.md`：唯一上手入口，包含个人域和团队试用说明。
+- `AGENTS.md`：仓库级 Agent-first 入口。
+- `docs/getting-started.md`：唯一上手入口，包含 Agent-first 采用、个人域试用和 Shell 备用路径。
+- `docs/agent-adoption.md`：Agent-first 采用方式。
+- `docs/agent-playbook.md`：Agent 操作规则与人类进展汇报模板。
 - `docs/README.md`：完整文档地图。
 - `docs/specs/00-top-level-whitepaper.md`：顶层白皮书。
 - `docs/specs/01-prd.md`：产品定义和能力模型。
@@ -304,4 +287,4 @@ ocw --root /path/to/your-project change prepare personal-demo \
 
 ## 一句话总结
 
-`open-cowork` 的核心价值不是让某个 Agent 更强，而是让多个强个人域和多个 Agent 在复杂项目中通过统一协议形成高质量协作。
+`open-cowork` 的核心价值不是让某个 Agent 更强，也不是让人多学一套命令，而是让多个强个人域和多个 Agent 在复杂项目中通过统一协议形成高质量协作。
