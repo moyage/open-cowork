@@ -1450,6 +1450,91 @@ class CliTests(unittest.TestCase):
             self.assertIn("recent sync:", output)
             self.assertIn("需要更高层同步", output)
 
+    def test_continuity_digest_text_output_includes_grouped_sync_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-DIGEST-SYNC-GROUPED"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root", str(root),
+                    "change", "create", change_id,
+                    "--title", "Digest Sync Grouped Text",
+                ])
+
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "digest sync grouped text",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["DigestSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nDigest sync grouped text.\n", encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "continuity", "handoff-package", "--change-id", change_id])
+
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [
+                    {
+                        "event_id": "evt-1",
+                        "change_id": change_id,
+                        "recorded_at": "2026-04-24T12:00:00Z",
+                        "sync_kind": "routine-sync",
+                        "source_kind": "increment",
+                        "target_layer": "ops",
+                        "target_scope": "project-level",
+                        "packet_ref": f".governance/changes/{change_id}/sync-packet-ops.yaml",
+                        "headline": "同步到 ops",
+                    },
+                    {
+                        "event_id": "evt-2",
+                        "change_id": change_id,
+                        "recorded_at": "2026-04-24T12:10:00Z",
+                        "sync_kind": "escalation",
+                        "source_kind": "increment",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": f".governance/changes/{change_id}/sync-packet-sponsor.yaml",
+                        "headline": "同步到 sponsor",
+                    },
+                ],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "digest",
+                    "--format", "text",
+                ])
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("recent sync groups:", output)
+            self.assertIn("sponsor", output)
+            self.assertIn("ops", output)
+
     def test_continuity_digest_text_output_includes_recent_runtime_events(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

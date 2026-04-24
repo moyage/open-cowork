@@ -91,6 +91,8 @@
 - `plans/53-milestone2-sync-history-group-latest-metadata-implementation-plan.md`
 - `plans/54-milestone2-sync-history-distinct-change-count-design.md`
 - `plans/55-milestone2-sync-history-distinct-change-count-implementation-plan.md`
+- `plans/56-milestone2-digest-grouped-sync-summary-design.md`
+- `plans/57-milestone2-digest-grouped-sync-summary-implementation-plan.md`
 
 ## 报告与实践材料
 

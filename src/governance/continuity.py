@@ -996,6 +996,9 @@ def _resolve_active_continuity_digest(paths: GovernancePaths, change_id: str, se
     recent_sync_summary = _recent_sync_summary_for_change(paths.root, change_id)
     if recent_sync_summary:
         payload["recent_sync_summary"] = recent_sync_summary
+    recent_sync_grouped_summary = _recent_sync_grouped_summary_for_change(paths.root, change_id)
+    if recent_sync_grouped_summary:
+        payload["recent_sync_grouped_summary"] = recent_sync_grouped_summary
     recent_runtime_events = _recent_runtime_events_for_change(paths, change_id)
     if recent_runtime_events:
         payload["recent_runtime_events"] = recent_runtime_events
@@ -1063,6 +1066,9 @@ def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, 
     recent_sync_summary = _recent_sync_summary_for_change(paths.root, change_id)
     if recent_sync_summary:
         payload["recent_sync_summary"] = recent_sync_summary
+    recent_sync_grouped_summary = _recent_sync_grouped_summary_for_change(paths.root, change_id)
+    if recent_sync_grouped_summary:
+        payload["recent_sync_grouped_summary"] = recent_sync_grouped_summary
     recent_runtime_events = _recent_runtime_events_for_change(paths, change_id)
     if recent_runtime_events:
         payload["recent_runtime_events"] = recent_runtime_events
@@ -1202,6 +1208,19 @@ def _recent_sync_summary_for_change(root: Path, change_id: str) -> dict | None:
         "latest_target_layer": latest.get("target_layer"),
         "latest_headline": latest.get("headline"),
     }
+
+
+def _recent_sync_grouped_summary_for_change(root: Path, change_id: str, group_by: str = "target_layer") -> dict | None:
+    payload = read_sync_history_across_months(
+        root,
+        change_id=change_id,
+        summary_by=group_by,
+        summary_only=True,
+    )
+    grouped = payload.get("grouped_summary")
+    if not grouped or not grouped.get("groups"):
+        return None
+    return grouped
 
 
 def _recent_runtime_events_for_change(paths: GovernancePaths, change_id: str, limit: int = 3) -> list[dict]:

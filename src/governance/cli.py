@@ -490,6 +490,18 @@ def cmd_continuity_digest(args):
             f"{recent_sync_summary.get('latest_target_layer')} / "
             f"{recent_sync_summary.get('latest_headline')}"
         )
+    recent_sync_grouped_summary = payload.get("recent_sync_grouped_summary")
+    if recent_sync_grouped_summary:
+        print(f"recent sync groups: {recent_sync_grouped_summary.get('group_by')}")
+        for group in recent_sync_grouped_summary.get("groups", []):
+            print(
+                "- "
+                f"{group.get('group_key')} "
+                f"events={group.get('event_count')} "
+                f"distinct_changes={group.get('distinct_change_count')} "
+                f"latest_change={group.get('latest_change_id')} "
+                f"latest_sync_kind={group.get('latest_sync_kind')}"
+            )
     recent_runtime_events = payload.get("recent_runtime_events", [])
     if recent_runtime_events:
         print("recent events:")
