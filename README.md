@@ -146,7 +146,8 @@ ocw --root . session-recovery-packet
 4. `docs/plans/02-boundary-and-product-shape-decision.md`
 5. `docs/plans/03-human-team-experience-feedback-and-design-direction.md`
 6. `docs/QUICKSTART.md`
-7. `docs/reports/04-current-iteration-final-completion-and-next-round-candidate-input.md`
+7. `docs/PERSONAL_AGENT_PILOT.md`
+8. `docs/reports/04-current-iteration-final-completion-and-next-round-candidate-input.md`
 
 ## 一句话总结
 

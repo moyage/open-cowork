@@ -218,6 +218,7 @@ def cmd_init(args):
 
 
 def cmd_status(args):
+    from governance.contract import ContractValidationError
     from governance.index import read_current_change
     from governance.simple_yaml import load_yaml
     from governance.step_matrix import format_status_snapshot_view, write_status_snapshot
@@ -244,9 +245,52 @@ def cmd_status(args):
         snapshot_path = write_status_snapshot(args.root)
         snapshot = load_yaml(snapshot_path)
         print(format_status_snapshot_view(snapshot))
+    except ContractValidationError as e:
+        current = read_current_change(args.root)
+        print(_format_draft_status_view(args.root, current, str(e)))
     except Exception as e:
         print(f"Status check failed: {e}")
         print("Tip: Have you run 'ocw init' or set a current change?")
+
+
+def _format_draft_status_view(root: str | Path, current: dict, contract_error: str) -> str:
+    from governance.simple_yaml import load_yaml
+
+    nested_current = current.get("current_change", {})
+    if not isinstance(nested_current, dict):
+        nested_current = {}
+    change_id = current.get("current_change_id") or nested_current.get("change_id")
+    change_dir = Path(root) / ".governance" / "changes" / str(change_id)
+    manifest = load_yaml(change_dir / "manifest.yaml") if change_id else {}
+    title = manifest.get("title") or change_id or "(untitled change)"
+    current_status = current.get("status") or nested_current.get("status") or manifest.get("status") or "drafting"
+    current_step = current.get("current_step") or nested_current.get("current_step") or manifest.get("current_step") or 5
+    owner = manifest.get("owner") or "orchestrator"
+    lines = [
+        "# open-cowork status",
+        "",
+        "## Draft change snapshot",
+        f"- change_id: {change_id}",
+        "- current_phase: Phase 2 / 方案与准备",
+        f"- current_step: {current_step}",
+        f"- current_status: {current_status}",
+        f"- current_owner: {owner}",
+        "- waiting_on: contract.yaml and bindings.yaml",
+        "- next_decision: Step 5 / Approve the start",
+        "- human_intervention_required: true",
+        f"- project_summary: {title}",
+        "",
+        "## Progress",
+        "- completed_steps: none",
+        "- remaining_steps: 5, 6, 7, 8, 9",
+        "",
+        "## Blockers",
+        "- contract draft is incomplete and not ready for execution",
+        "",
+        "## Next action",
+        "- next_action: complete contract.yaml and bindings.yaml before runtime-status, run, verify, review, or archive",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def cmd_continuity_launch_input(args):
@@ -464,9 +508,14 @@ def cmd_continuity_export_sync_packet(args):
 
 
 def cmd_continuity_digest(args):
+    from governance.contract import ContractValidationError
     from governance.continuity import resolve_continuity_digest
 
-    payload = resolve_continuity_digest(args.root, args.change_id)
+    try:
+        payload = resolve_continuity_digest(args.root, args.change_id)
+    except ContractValidationError:
+        print(_format_draft_digest_guidance(args.root, args.change_id))
+        return 0
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -510,6 +559,35 @@ def cmd_continuity_digest(args):
     for ref in payload["recommended_reading"].get("secondary_refs", []):
         print(f"- {ref}")
     return 0
+
+
+def _format_draft_digest_guidance(root: str | Path, change_id: str | None) -> str:
+    from governance.index import read_current_change
+    from governance.simple_yaml import load_yaml
+
+    current = read_current_change(root)
+    nested_current = current.get("current_change", {})
+    if not isinstance(nested_current, dict):
+        nested_current = {}
+    resolved_change_id = change_id or current.get("current_change_id") or nested_current.get("change_id")
+    change_dir = Path(root) / ".governance" / "changes" / str(resolved_change_id)
+    manifest = load_yaml(change_dir / "manifest.yaml") if resolved_change_id else {}
+    title = manifest.get("title") or resolved_change_id or "(untitled change)"
+    lines = [
+        "# open-cowork continuity digest",
+        "",
+        "Continuity digest unavailable for draft change.",
+        "",
+        f"- change_id: {resolved_change_id}",
+        f"- project_summary: {title}",
+        "- reason: contract.yaml is still a draft, so runtime continuity projections are not ready",
+        "",
+        "## Recommended next commands",
+        "- ocw --root . status",
+        "- ocw --root . diagnose-session",
+        "- complete contract.yaml and bindings.yaml before using runtime-status, timeline, handoff, or digest",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def cmd_runtime_status(args):

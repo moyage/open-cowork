@@ -81,9 +81,10 @@ ocw --root . session-recovery-packet
 ## 8. 建议下一步阅读
 
 1. `README.md`
-2. `docs/specs/00-top-level-whitepaper.md`
-3. `docs/specs/01-prd.md`
-4. `docs/plans/01-execution-plan.md`
+2. `docs/PERSONAL_AGENT_PILOT.md`
+3. `docs/specs/00-top-level-whitepaper.md`
+4. `docs/specs/01-prd.md`
+5. `docs/plans/01-execution-plan.md`
 
 ## 9. 当前说明
 

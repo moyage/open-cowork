@@ -535,6 +535,63 @@ class CliTests(unittest.TestCase):
             self.assertIn("project_summary: Deliver a human-readable progress snapshot.", output)
             self.assertTrue((change_dir / "STATUS_SNAPSHOT.yaml").exists())
 
+    def test_status_after_change_create_reports_draft_contract_guidance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-DRAFT-STATUS",
+                    "--title",
+                    "Draft status should be readable",
+                ])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "status"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("current_status: drafting", output)
+            self.assertIn("waiting_on: contract.yaml", output)
+            self.assertIn("next_action: complete contract.yaml and bindings.yaml", output)
+            self.assertIn("project_summary: Draft status should be readable", output)
+            self.assertNotIn("Status check failed", output)
+            self.assertNotIn("missing required field", output)
+
+    def test_continuity_digest_after_change_create_reports_draft_guidance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "create",
+                    "CHG-DRAFT-DIGEST",
+                    "--title",
+                    "Draft digest should be readable",
+                ])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "continuity", "digest", "--change-id", "CHG-DRAFT-DIGEST"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Continuity digest unavailable for draft change", output)
+            self.assertIn("CHG-DRAFT-DIGEST", output)
+            self.assertIn("ocw --root . status", output)
+            self.assertNotIn("Traceback", output)
+            self.assertNotIn("missing required field", output)
+
     def test_continuity_commands_materialize_launch_input_and_round_entry_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

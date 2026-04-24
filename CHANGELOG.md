@@ -9,6 +9,8 @@
 - Hardened governance reserved boundaries and archive/maintenance consistency checks
 - Added grouped sync summaries and digest reading compression for human/team use
 - Added bootstrap and smoke-test scripts for first-time team adoption
+- Added personal-domain multi-agent pilot guidance and role-mapping samples
+- Made draft change `status` and `continuity digest` outputs friendly before contract completion
 - Updated onboarding docs for the current CLI and v0.2 readiness
 
 ## 0.1.0
