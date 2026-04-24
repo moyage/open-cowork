@@ -24,9 +24,11 @@
 
 1. 先理解自然语言意图，再调用工具。
 2. 把 `ocw` 命令当成内部工具，不要当成人的任务清单。
-3. 保持 `.governance/current-state.md` 对下一个 Agent 可读。
-4. evidence 要客观，review 要尽量独立。
-5. 只有目标、边界、风险、取舍或批准需要判断时，才让人介入。
+3. 优先生成或读取 adoption plan，确认 source docs、active change 生命周期和推荐 read set。
+4. 保持 `.governance/current-state.md` 对下一个 Agent 可读。
+5. evidence 要客观，review 要尽量独立。
+6. 只有目标、边界、风险、取舍或批准需要判断时，才让人介入。
+7. 用 `ocw hygiene` / `ocw doctor` 区分 runtime generated、pending docs、cold archive docs 和建议提交内容。
 
 ## 交接规则
 
@@ -39,3 +41,5 @@
 ```
 
 然后从 active change 的 contract 和 bindings 继续。
+
+不要默认全文读取 `docs/archive/**`。只有 adoption plan、handoff package 或人明确指定某个 source doc 时，才按路径读取对应历史文件。

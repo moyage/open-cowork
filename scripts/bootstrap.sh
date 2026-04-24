@@ -93,5 +93,8 @@ echo
 echo "Verify with:"
 echo "  ocw --help"
 echo "  open-cowork --help"
+echo "  ocw version"
 echo "  ocw --root . init"
 echo "  ocw --root . status"
+echo "  ocw --root . adopt --target . --goal \"Describe the project iteration to govern\" --dry-run"
+echo "  ocw --root . hygiene"

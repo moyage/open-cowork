@@ -249,6 +249,8 @@ def resolve_handoff_package(root: str | Path, change_id: str | None = None) -> d
             "current_gate": _current_gate(runtime_payload["steps_status"]),
         },
         "operator_start_pack": _operator_start_pack(paths, str(resolved_change_id)),
+        "recommended_read_set": _handoff_recommended_read_set(paths, str(resolved_change_id)),
+        "context_budget_rule": "Do not full-scan archive history; read recommended_read_set first and follow refs only when needed.",
         "refs": _handoff_refs(paths, str(resolved_change_id)),
     }
     carry_forward = _carry_forward_section(paths, str(resolved_change_id), current_entry, manifest)
@@ -1312,6 +1314,22 @@ def _operator_start_pack(paths: GovernancePaths, change_id: str) -> list[str]:
         if path.exists():
             refs.append(str(path.relative_to(paths.root)))
     return refs
+
+
+def _handoff_recommended_read_set(paths: GovernancePaths, change_id: str) -> list[str]:
+    refs = [
+        ".governance/current-state.md",
+        ".governance/agent-playbook.md",
+        ".governance/index/current-change.yaml",
+        *_operator_start_pack(paths, change_id),
+    ]
+    deduped = []
+    seen = set()
+    for ref in refs:
+        if ref not in seen:
+            seen.add(ref)
+            deduped.append(ref)
+    return deduped
 
 
 def _intended_receiver_role(steps_status: dict) -> str | None:

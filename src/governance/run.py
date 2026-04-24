@@ -60,12 +60,14 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
 
     contract = load_contract(request.contract_path)
     forbidden_actions = contract.get("forbidden_actions", [])
+    contract_scope_in = list(contract.get("scope_in", []))
+    effective_write_scope = contract_scope_in or request.allowed_write_scope
     if "no_executor_stable_write_authority" in forbidden_actions:
-        for scope in request.allowed_write_scope:
+        for scope in effective_write_scope:
             if ".governance/index" in scope or "current/" in scope:
                 raise ValueError(f"executor does not have stable write authority for truth-source '{scope}'")
-    _ensure_artifacts_within_write_boundary(request.artifacts, request.allowed_write_scope, contract.get("scope_out", []))
-    _ensure_governance_reserved_boundaries(request.change_id, request.artifacts)
+    _ensure_artifacts_within_write_boundary(request.artifacts, effective_write_scope, contract.get("scope_out", []))
+    _ensure_governance_reserved_boundaries(request.change_id, request.artifacts, effective_write_scope)
 
     response = run_generic_file_command(request.__dict__)
     evidence_dir = GovernancePaths(Path(root)).evidence_dir(request.change_id)
@@ -91,21 +93,25 @@ def _ensure_artifacts_within_write_boundary(artifacts: dict, allowed_scopes: lis
             raise ValueError(f"artifact '{normalized}' is outside the allowed write boundary")
 
 
-def _ensure_governance_reserved_boundaries(change_id: str, artifacts: dict) -> None:
+def _ensure_governance_reserved_boundaries(change_id: str, artifacts: dict, allowed_scopes: list[str]) -> None:
     touched_paths = list(artifacts.get("created", [])) + list(artifacts.get("modified", []))
     for path in touched_paths:
         normalized = _normalize_artifact_path(path)
-        if _is_reserved_governance_artifact(normalized):
+        if _is_reserved_governance_artifact(change_id, normalized, allowed_scopes):
             raise ValueError(f"artifact '{normalized}' touches a reserved governance boundary")
 
 
-def _is_reserved_governance_artifact(path: str) -> bool:
+def _is_reserved_governance_artifact(change_id: str, path: str, allowed_scopes: list[str]) -> bool:
     if path.startswith(".governance/index/"):
         return True
     if path.startswith(".governance/runtime/"):
         return True
     if path.startswith(".governance/archive/"):
         return True
+    evidence_prefix = f".governance/changes/{change_id}/evidence/"
+    explicit_evidence_scope = f".governance/changes/{change_id}/evidence/**"
+    if path.startswith(evidence_prefix) and explicit_evidence_scope in allowed_scopes:
+        return False
     if path.startswith(".governance/changes/"):
         return True
     return False

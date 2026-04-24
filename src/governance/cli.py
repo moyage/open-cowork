@@ -30,6 +30,7 @@ def cmd_change_create(args):
         current_change_id=package.change_id,
     )
     print(f"Created change package {package.change_id} at {package.path}")
+    return 0
 
 
 def cmd_change_prepare(args):
@@ -37,6 +38,10 @@ def cmd_change_prepare(args):
 
     if not (args.goal or "").strip():
         print("--goal is required for 'ocw change prepare'.")
+        return 1
+    lifecycle_error = _active_change_lifecycle_error(args.root, args.change_id, getattr(args, "active_policy", None))
+    if lifecycle_error:
+        print(lifecycle_error)
         return 1
 
     payload = prepare_change_package(PrepareChangeRequest(
@@ -47,6 +52,7 @@ def cmd_change_prepare(args):
         scope_in=list(args.scope_in or []),
         scope_out=list(args.scope_out or []),
         verify_commands=list(args.verify_command or []),
+        source_docs=list(args.source_doc or []),
         profile=args.profile,
     ))
     print(f"Change prepared: {payload['change_id']}")
@@ -72,6 +78,10 @@ def _format_agent_handoff(change_id: str) -> str:
 
 def cmd_pilot(args):
     target = Path(args.target or args.root).expanduser().resolve()
+    lifecycle_error = _active_change_lifecycle_error(target, args.change_id, getattr(args, "active_policy", None))
+    if lifecycle_error:
+        print(lifecycle_error)
+        return 1
     if not args.yes and not _confirm_pilot(target, args.change_id):
         print("Pilot cancelled.")
         return 1
@@ -83,8 +93,10 @@ def cmd_pilot(args):
     print(f"- change_id: {args.change_id}")
     print("")
     cmd_init(argparse.Namespace(root=str(target)))
-    cmd_change_create(argparse.Namespace(root=str(target), change_id=args.change_id, title=args.title or args.change_id))
-    cmd_change_prepare(argparse.Namespace(
+    create_exit = cmd_change_create(argparse.Namespace(root=str(target), change_id=args.change_id, title=args.title or args.change_id, active_policy=args.active_policy))
+    if create_exit:
+        return create_exit
+    prepare_exit = cmd_change_prepare(argparse.Namespace(
         root=str(target),
         change_id=args.change_id,
         title=args.title or args.change_id,
@@ -92,8 +104,12 @@ def cmd_pilot(args):
         scope_in=list(args.scope_in or []),
         scope_out=list(args.scope_out or []),
         verify_command=list(args.verify_command or []),
+        source_doc=[],
         profile=args.profile,
+        active_policy=args.active_policy,
     ))
+    if prepare_exit:
+        return prepare_exit
     print("")
     validate_exit = cmd_contract_validate(argparse.Namespace(root=str(target), change_id=args.change_id, path=None))
     if validate_exit != 0:
@@ -119,6 +135,36 @@ def _confirm_pilot(target: Path, change_id: str) -> bool:
     print(f"- change_id: {change_id}")
     answer = input("Continue? [y/N] ").strip().lower()
     return answer in {"y", "yes"}
+
+
+def _active_change_lifecycle_error(root: str | Path, requested_change_id: str | None, active_policy: str | None) -> str | None:
+    from governance.index import read_current_change
+
+    current_path = Path(root) / ".governance/index/current-change.yaml"
+    if not current_path.exists():
+        return None
+    current = read_current_change(root)
+    nested = current.get("current_change", {})
+    if not isinstance(nested, dict):
+        nested = {}
+    active_change_id = current.get("current_change_id") or nested.get("change_id")
+    active_status = current.get("status") or nested.get("status")
+    if not active_change_id or str(active_status) in {"idle", "archived", "abandoned", "superseded", "none"}:
+        return None
+    if requested_change_id and str(active_change_id) == str(requested_change_id):
+        return None
+    if active_policy == "force":
+        return None
+    if active_policy in {"supersede", "abandon", "archive-first"}:
+        return (
+            "Active change lifecycle decision required: "
+            f"active change '{active_change_id}' is '{active_status}', and policy '{active_policy}' requires an explicit lifecycle operation before switching."
+        )
+    return (
+        "Active change lifecycle decision required: "
+        f"active change '{active_change_id}' is '{active_status}'. "
+        "Use --active-policy force only after deciding to override, or close/supersede/archive the active change first."
+    )
 
 
 def cmd_contract_validate(args):
@@ -184,6 +230,7 @@ def cmd_run(args):
         command_output=args.command_output,
         test_output=args.test_output,
         artifacts={"created": list(args.created or []), "modified": list(args.modified or [])},
+        evidence_refs=list(args.evidence_ref or []),
     )
     response = run_change(args.root, request)
     manifest = update_manifest(args.root, package.change_id, status="step6-executed-pre-step7", current_step=6)
@@ -220,6 +267,70 @@ def cmd_run(args):
         source_path=execution_summary_path if execution_summary_path.exists() else package.path / "manifest.yaml",
     )
     print(f"Run completed: {package.change_id} ({response.run_id})")
+    return 0
+
+
+def cmd_adopt(args):
+    from governance.agent_adoption import build_adoption_plan
+
+    if not (args.goal or "").strip():
+        print("--goal is required for 'ocw adopt'.")
+        return 1
+    if not args.dry_run:
+        print("ocw adopt currently requires --dry-run before mutating governance state.")
+        return 1
+    payload = build_adoption_plan(
+        args.root,
+        target=args.target or args.root,
+        goal=args.goal,
+        source_docs=list(args.source_doc or []),
+        agent_inventory=list(args.agent or []),
+    )
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print("open-cowork adoption plan")
+    print("")
+    print(f"- target: {payload['target']}")
+    print(f"- candidate_change_id: {payload['candidate_change']['change_id']}")
+    print(f"- active_change: {payload['active_change'].get('change_id')}")
+    print(f"- lifecycle_decision_required: {payload['active_change']['requires_lifecycle_decision']}")
+    print("")
+    print("Recommended read set:")
+    for item in payload["recommended_read_set"]:
+        print(f"- {item}")
+    return 0
+
+
+def cmd_hygiene(args):
+    from governance.hygiene import build_hygiene_report
+
+    payload = build_hygiene_report(args.root)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print("open-cowork hygiene")
+    print("")
+    print("Runtime generated:")
+    for item in payload["runtime_generated"]:
+        print(f"- {item}")
+    print("")
+    print("Agent handoff files:")
+    for item in payload["agent_handoff_files"]:
+        print(f"- {item}")
+    print("")
+    print("Pending docs:")
+    for item in payload["pending_docs"]:
+        print(f"- {item}")
+    print("")
+    print("Recommendations:")
+    for item in payload["recommendations"]:
+        print(f"- {item}")
     return 0
 
 
@@ -364,11 +475,11 @@ def cmd_onboard(args):
             context_budget=args.context_budget,
         ))
     if args.create_demo_change:
-        demo_change_id = args.demo_change_id or "personal-demo"
+        demo_change_id = args.demo_change_id or "current-iteration"
         print("")
         cmd_change_create(argparse.Namespace(root=str(target), change_id=demo_change_id, title="Personal domain pilot"))
     print("")
-    print(_format_onboard_next_steps(target, mode, args.create_demo_change, args.demo_change_id or "personal-demo"))
+    print(_format_onboard_next_steps(target, mode, args.create_demo_change, args.demo_change_id or "current-iteration"))
     return 0
 
 
@@ -406,7 +517,7 @@ def _format_manual_onboard_plan(target: Path) -> str:
         f"- ocw --root \"{target}\" diagnose-session",
         "",
         "Optional next step:",
-        f"- ocw --root \"{target}\" change create personal-demo --title \"Personal domain pilot\"",
+        f"- ocw --root \"{target}\" adopt --target \"{target}\" --goal \"Describe the project iteration to govern\" --dry-run",
     ]) + "\n"
 
 
@@ -414,12 +525,12 @@ def _format_onboard_next_steps(target: Path, mode: str, created_demo_change: boo
     lines = [
         "open-cowork onboard complete.",
         "",
-        "Next commands you can run:",
+        "Agent next action:",
+        "- Use ocw adopt to build an Agent-first adoption plan before mutating governance state.",
     ]
     if not created_demo_change:
-        lines.append(f"- ocw --root \"{target}\" change create personal-demo --title \"Personal domain pilot\"")
+        lines.append(f"- ocw --root \"{target}\" adopt --target \"{target}\" --goal \"Describe the project iteration to govern\" --dry-run")
         lines.append(f"- ocw --root \"{target}\" status")
-        lines.append(f"- ocw --root \"{target}\" continuity digest --change-id personal-demo")
     else:
         lines.append(f"- ocw --root \"{target}\" status")
         lines.append(f"- ocw --root \"{target}\" continuity digest --change-id {demo_change_id}")
@@ -932,18 +1043,31 @@ def build_parser() -> argparse.ArgumentParser:
         p_onboard.add_argument("--no-diagnose", action="store_true", help="Skip session diagnosis")
         p_onboard.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
         p_onboard.add_argument("--create-demo-change", action="store_true", help="Create a demo change after init")
-        p_onboard.add_argument("--demo-change-id", default="personal-demo", help="Demo change id")
+        p_onboard.add_argument("--demo-change-id", default="current-iteration", help="Demo change id")
 
     p_pilot = subparsers.add_parser("pilot", help="Prepare a personal-domain pilot change in one command")
     p_pilot.add_argument("--target", default=None, help="Target project directory")
-    p_pilot.add_argument("--change-id", default="personal-demo", help="Change identifier")
-    p_pilot.add_argument("--title", default="Personal domain pilot", help="Change title")
+    p_pilot.add_argument("--change-id", default="current-iteration", help="Change identifier")
+    p_pilot.add_argument("--title", default="Current iteration", help="Change title")
     p_pilot.add_argument("--goal", required=True, help="Pilot goal")
     p_pilot.add_argument("--scope-in", action="append", default=[], help="Allowed implementation path or glob")
     p_pilot.add_argument("--scope-out", action="append", default=[], help="Excluded path or glob")
     p_pilot.add_argument("--verify-command", action="append", default=[], help="Verification command")
     p_pilot.add_argument("--profile", choices=["personal", "team"], default="personal", help="Role binding profile")
+    p_pilot.add_argument("--active-policy", choices=["continue", "supersede", "abandon", "archive-first", "force"], default=None, help="Policy for unresolved active change conflicts")
     p_pilot.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
+
+    p_adopt = subparsers.add_parser("adopt", help="Build an Agent-first adoption plan")
+    p_adopt.add_argument("--target", default=None, help="Target project directory")
+    p_adopt.add_argument("--goal", required=True, help="Natural-language adoption goal")
+    p_adopt.add_argument("--source-doc", action="append", default=[], help="Source document path")
+    p_adopt.add_argument("--agent", action="append", default=[], help="Available personal-domain agent or tool")
+    p_adopt.add_argument("--dry-run", action="store_true", help="Plan without mutating governance state")
+    p_adopt.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    for command_name in ("hygiene", "doctor"):
+        p_hygiene = subparsers.add_parser(command_name, help="Classify governance artifacts and repository hygiene")
+        p_hygiene.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     p_change = subparsers.add_parser("change", help="Change package management")
     p_change.add_argument("subcmd", choices=["create", "prepare"], help="Create or prepare change package")
@@ -953,6 +1077,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_change.add_argument("--scope-in", action="append", default=[], help="Allowed implementation path or glob")
     p_change.add_argument("--scope-out", action="append", default=[], help="Excluded path or glob")
     p_change.add_argument("--verify-command", action="append", default=[], help="Verification command")
+    p_change.add_argument("--source-doc", action="append", default=[], help="Source document path")
+    p_change.add_argument("--active-policy", choices=["continue", "supersede", "abandon", "archive-first", "force"], default=None, help="Policy for unresolved active change conflicts")
     p_change.add_argument("--profile", choices=["personal", "team"], default="personal", help="Role binding profile")
 
     p_contract = subparsers.add_parser("contract", help="Contract management")
@@ -969,6 +1095,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--test-output", default="", help="Test output summary")
     p_run.add_argument("--created", action="append", default=[], help="Created artifact path")
     p_run.add_argument("--modified", action="append", default=[], help="Modified artifact path")
+    p_run.add_argument("--evidence-ref", action="append", default=[], help="Additional evidence reference path")
 
     p_verify = subparsers.add_parser("verify", help="Verify execution results")
     p_verify.add_argument("--change-id", required=True, help="Target change id")
@@ -1095,6 +1222,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_onboard(args)
     elif args.command == "pilot":
         return cmd_pilot(args)
+    elif args.command == "adopt":
+        return cmd_adopt(args)
+    elif args.command in {"hygiene", "doctor"}:
+        return cmd_hygiene(args)
     elif args.command == "change" and args.subcmd == "create":
         cmd_change_create(args)
     elif args.command == "change" and args.subcmd == "prepare":

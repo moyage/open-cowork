@@ -39,6 +39,29 @@ class ContractTests(unittest.TestCase):
         self.assertTrue(errors)
         self.assertTrue(any("forbidden_actions missing required governance guards" in error for error in errors))
 
+    def test_contract_rejects_scope_in_scope_out_conflicts(self):
+        contract = {
+            "objective": "bounded-governance-hardening",
+            "scope_in": ["docs/**", ".governance/changes/CHG-1/evidence/**"],
+            "scope_out": ["docs/archive/**", ".governance/changes/**"],
+            "allowed_actions": ["edit_files"],
+            "forbidden_actions": [
+                "no_truth_source_pollution",
+                "no_executor_reviewer_merge",
+                "no_executor_stable_write_authority",
+                "no_step6_before_step5_ready",
+            ],
+            "validation_objects": ["StateConsistencyCheck"],
+            "verification": {"checks": ["state-consistency"], "commands": ["python -m unittest"]},
+            "evidence_expectations": {"required": ["changed_files_manifest"]},
+        }
+
+        errors = validate_contract(contract)
+
+        self.assertTrue(any("scope_in conflicts with scope_out" in error for error in errors))
+        self.assertTrue(any("docs/** overlaps docs/archive/**" in error for error in errors))
+        self.assertTrue(any(".governance/changes/CHG-1/evidence/** overlaps .governance/changes/**" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

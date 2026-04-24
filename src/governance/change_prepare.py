@@ -24,6 +24,7 @@ class PrepareChangeRequest:
     scope_in: list[str]
     scope_out: list[str]
     verify_commands: list[str]
+    source_docs: list[str] | None = None
     profile: str = "personal"
     title: str = ""
 
@@ -40,7 +41,8 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
     ]
     verify_commands = request.verify_commands or []
 
-    _write_markdown_files(package.path, request.change_id, title, request.goal, scope_in, scope_out, verify_commands)
+    source_docs = list(request.source_docs or [])
+    _write_markdown_files(package.path, request.change_id, title, request.goal, scope_in, scope_out, verify_commands, source_docs)
     contract = _build_contract(request.change_id, title, request.goal, scope_in, scope_out, verify_commands, request.profile)
     bindings = _build_bindings(request.change_id, request.profile)
     write_yaml(package.path / "contract.yaml", contract)
@@ -60,6 +62,7 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         title=title,
         status="step5-prepared",
         current_step=5,
+        source_docs=source_docs,
         target_validation_objects=contract["validation_objects"],
         readiness={"step6_entry_ready": True, "missing_items": []},
     )
@@ -91,6 +94,7 @@ def _write_markdown_files(
     scope_in: list[str],
     scope_out: list[str],
     verify_commands: list[str],
+    source_docs: list[str],
 ) -> None:
     (change_dir / "intent.md").write_text(
         "\n".join([
@@ -101,6 +105,9 @@ def _write_markdown_files(
             "",
             "## Change ID",
             change_id,
+            "",
+            "## Source Docs",
+            *([f"- {item}" for item in source_docs] or ["- No source docs recorded."]),
             "",
         ]),
         encoding="utf-8",
@@ -117,6 +124,9 @@ def _write_markdown_files(
             "",
             "## Verification Commands",
             *([f"- `{item}`" for item in verify_commands] or ["- No automated command provided; record manual verification evidence."]),
+            "",
+            "## Source Docs",
+            *([f"- {item}" for item in source_docs] or ["- No source docs recorded."]),
             "",
         ]),
         encoding="utf-8",

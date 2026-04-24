@@ -1,6 +1,70 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
+
+
+DEFAULT_RECOMMENDED_READ_SET = [
+    ".governance/current-state.md",
+    ".governance/index/current-change.yaml",
+    ".governance/agent-playbook.md",
+]
+
+
+def build_adoption_plan(
+    root: str | Path,
+    *,
+    target: str | Path,
+    goal: str,
+    source_docs: list[str] | None = None,
+    agent_inventory: list[str] | None = None,
+) -> dict:
+    from .index import read_current_change
+
+    root_path = Path(root)
+    target_path = Path(target).expanduser().resolve()
+    current = read_current_change(root_path)
+    nested_current = current.get("current_change", {})
+    if not isinstance(nested_current, dict):
+        nested_current = {}
+    active_change_id = current.get("current_change_id") or nested_current.get("change_id")
+    active_status = current.get("status") or nested_current.get("status")
+    requires_lifecycle_decision = bool(active_change_id and active_status not in {"idle", "archived", "abandoned", "superseded"})
+    candidate_change_id = _candidate_change_id(goal)
+    source_docs = list(source_docs or [])
+    agent_inventory = list(agent_inventory or [])
+    recommended_read_set = [
+        *DEFAULT_RECOMMENDED_READ_SET,
+        f".governance/changes/{active_change_id}/contract.yaml" if active_change_id else ".governance/changes/<change-id>/contract.yaml",
+        f".governance/changes/{active_change_id}/bindings.yaml" if active_change_id else ".governance/changes/<change-id>/bindings.yaml",
+    ]
+    return {
+        "schema": "adoption-plan/v1",
+        "target": str(target_path),
+        "goal": goal,
+        "candidate_change": {
+            "change_id": candidate_change_id,
+            "title": _candidate_title(goal),
+            "scope_in": ["src/**", "tests/**", "docs/**"],
+            "scope_out": [
+                ".governance/index/**",
+                ".governance/archive/**",
+                ".governance/runtime/**",
+            ],
+            "verify_commands": ["python3 -m unittest discover -s tests"],
+        },
+        "source_docs": source_docs,
+        "active_change": {
+            "change_id": active_change_id,
+            "status": active_status,
+            "requires_lifecycle_decision": requires_lifecycle_decision,
+            "allowed_policies": ["continue", "supersede", "abandon", "archive-first", "force"] if requires_lifecycle_decision else ["prepare"],
+        },
+        "recommended_read_set": recommended_read_set,
+        "role_suggestions": _suggest_roles(agent_inventory),
+        "human_decisions_needed": _human_decisions_needed(requires_lifecycle_decision, bool(agent_inventory)),
+        "mutation": "none",
+    }
 
 
 def write_agent_adoption_pack(
@@ -35,6 +99,8 @@ def _agent_entry(change_id: str) -> str:
         f"3. `.governance/changes/{change_id}/contract.yaml`：执行边界。",
         f"4. `.governance/changes/{change_id}/bindings.yaml`：owner 和角色绑定。",
         "",
+        "只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。",
+        "",
         "## 操作规则",
         "",
         "Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, archive, and continuity.",
@@ -65,6 +131,7 @@ def _agent_playbook(change_id: str) -> str:
         f"4. 使用 `.governance/changes/{change_id}/bindings.yaml` 作为 owner 映射。",
         "5. verify、review 或 archive 前先记录客观 evidence。",
         "6. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。",
+        "7. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。",
         "",
         "## Human update template",
         "",
@@ -115,4 +182,47 @@ def _current_state(change_id: str, title: str, goal: str, profile: str, bindings
         f"- `.governance/changes/{change_id}/bindings.yaml`",
         "- `.governance/agent-playbook.md`",
         "",
+        "## Context budget / 上下文预算",
+        "",
+        "- 默认只读取 active working set。",
+        "- 不要批量读取 `docs/archive/plans/**`。",
+        "- source docs 先作为路径引用，需要核实时再单独读取。",
+        "",
     ])
+
+
+def _candidate_change_id(goal: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", goal.lower()).strip("-")
+    return slug[:72] or "agent-first-adoption"
+
+
+def _candidate_title(goal: str) -> str:
+    return goal.strip()[:80] or "Agent-first adoption"
+
+
+def _suggest_roles(agent_inventory: list[str]) -> dict[str, list[str]]:
+    suggestions: dict[str, list[str]] = {}
+    for agent in agent_inventory:
+        normalized = agent.strip()
+        lowered = normalized.lower()
+        if not normalized:
+            continue
+        if "openclaw" in lowered or "hermes" in lowered:
+            suggestions[normalized] = ["orchestrator"]
+        elif "codex" in lowered:
+            suggestions[normalized] = ["executor", "verifier"]
+        elif "ooso" in lowered:
+            suggestions[normalized] = ["reviewer", "verification_assistant"]
+        else:
+            suggestions[normalized] = ["participant"]
+    return suggestions
+
+
+def _human_decisions_needed(requires_lifecycle_decision: bool, has_agent_inventory: bool) -> list[str]:
+    decisions = []
+    if requires_lifecycle_decision:
+        decisions.append("Choose active change policy before mutating governance state.")
+    if has_agent_inventory:
+        decisions.append("Confirm role bindings before writing bindings.yaml.")
+    decisions.append("Confirm scope and verification command before Step 6 execution.")
+    return decisions

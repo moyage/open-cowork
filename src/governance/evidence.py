@@ -70,8 +70,33 @@ def _requirement_satisfied(requirement: str, written: dict, refs: list[str]) -> 
         return _ref_contains(refs, "POST_ROUND_RETROSPECTIVE_AND_ITERATION_SYNTHESIS")
     if "verification evidence" in normalized:
         return all(key in written and Path(written[key]).exists() for key in ["command_output", "test_output"])
+    if ("analysis" in normalized or "report" in normalized) and "evidence" in normalized:
+        return _has_manual_report_ref(refs)
+    if "first_instruction" in normalized or "first instruction" in normalized:
+        return _has_first_instruction_dogfood_ref(refs)
     return False
 
 
 def _ref_contains(refs: list[str], fragment: str) -> bool:
     return any(fragment in ref for ref in refs)
+
+
+def _has_manual_report_ref(refs: list[str]) -> bool:
+    for ref in refs:
+        lowered = ref.lower()
+        if lowered.endswith((".md", ".yaml", ".yml", ".txt")) and (
+            "evidence/" in lowered
+            or "report" in lowered
+            or "finding" in lowered
+            or "analysis" in lowered
+        ):
+            return True
+    return False
+
+
+def _has_first_instruction_dogfood_ref(refs: list[str]) -> bool:
+    for ref in refs:
+        lowered = ref.lower().replace("_", "-")
+        if "first-instruction" in lowered and "dogfood" in lowered:
+            return True
+    return False

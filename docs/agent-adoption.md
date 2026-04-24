@@ -27,10 +27,19 @@ open-cowork 默认面向 AI 时代的使用路径：
 1. 识别目标项目和人的当前意图。
 2. 检查 open-cowork 是否已经安装或可从本地仓库使用。
 3. 如果目标项目还没有 `.governance/`，初始化它。
-4. 创建或准备当前 active change package。
-5. 生成或补齐 contract 和 role bindings。
-6. 生成目标项目内的 Agent 入口文件。
-7. 向人汇报当前项目目标、阶段、步骤、owner、阻断、下一步和需要人决策的事项。
+4. 先生成 adoption plan：目标、source docs、候选 change、bounded read set、role suggestions、active change lifecycle decision。
+5. 在人确认目标、范围或 lifecycle policy 后，创建或准备当前 active change package。
+6. 生成或补齐 contract 和 role bindings。
+7. 生成目标项目内的 Agent 入口文件。
+8. 向人汇报当前项目目标、阶段、步骤、owner、阻断、下一步和需要人决策的事项。
+
+v0.2.6 起，Agent 可以用下面的内部命令预览采用计划：
+
+```bash
+ocw --root . adopt --target . --goal "当前项目迭代目标" --dry-run
+```
+
+如果有需求基线、dogfood 报告或审计报告，Agent 应通过 `--source-doc` 绑定来源，而不是把归档历史全文读进上下文。
 
 ## 不应该怎么做
 
@@ -38,3 +47,4 @@ open-cowork 默认面向 AI 时代的使用路径：
 - 不要把命令执行当成主要进度汇报。
 - 除非是真实项目决策，不要要求人选择内部 schema 值。
 - 不要把 open-cowork 当成替代用户现有 Agent 或 IDE 的新 runtime。
+- 不要默认全文扫描 `docs/archive/**`；先读 adoption plan / handoff 给出的 recommended read set。

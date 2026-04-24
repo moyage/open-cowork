@@ -6,7 +6,7 @@
 
 ## 1. 默认入口：在 Agent 中说一句话
 
-`open-cowork` 从 V0.2.5 开始把 Agent-first 作为默认使用方式。人不应该先去记命令，而应该先表达意图：
+`open-cowork` 从 v0.2.5 开始把 Agent-first 作为默认使用方式；v0.2.6 起默认先生成 adoption plan。人不应该先去记命令，而应该先表达意图：
 
 ```text
 安装 open-cowork，并在当前项目中实施这套协同治理框架。
@@ -20,7 +20,7 @@
 
 你可以把这句话交给你当前个人域中的 Codex、Claude Code、Cursor、OpenClaw、Hermes、OMOC、Antigravity 或其他可信 Agent。
 
-Agent 的职责是：理解当前项目目标，安装或定位 `open-cowork`，初始化目标项目，准备当前 change，生成 contract / bindings / Agent handoff pack，并向人汇报真实项目进展。
+Agent 的职责是：理解当前项目目标，安装或定位 `open-cowork`，初始化目标项目，先生成 adoption plan，再准备当前 change，生成 contract / bindings / Agent handoff pack，并向人汇报真实项目进展。
 
 ## 2. 人应该看到什么反馈
 
@@ -81,15 +81,30 @@ ocw onboard --target /path/to/your-project --mode quickstart --yes
 OCW_VENV_DIR=/tmp/open-cowork-venv ./scripts/quickstart.sh /path/to/your-project
 ```
 
-## 5. 让 Agent 准备一个可执行 change
+## 5. 让 Agent 先生成 adoption plan
+
+v0.2.6 推荐 Agent 先用 dry-run adoption plan 对齐目标、source docs、active change 生命周期和候选角色绑定，再决定是否写入 change package。
+
+```bash
+ocw --root /path/to/your-project adopt \
+  --target /path/to/your-project \
+  --goal "在当前项目中实施 open-cowork 协同治理框架" \
+  --source-doc "docs/archive/plans/60-v0.2.6-agent-first-adoption-closure-change-package.md" \
+  --agent Codex \
+  --dry-run
+```
+
+adoption plan 应输出 bounded recommended read set。Agent 不应默认全文扫描 `docs/archive/plans/**`。
+
+## 6. 让 Agent 准备一个可执行 change
 
 如果需要准备一个完整的个人域试用 change，Agent 可以使用 `pilot` 或 `change prepare`。这些命令是 Agent 的内部工具，不是人的默认任务清单。
 
 ```bash
 ocw pilot \
   --target /path/to/your-project \
-  --change-id personal-demo \
-  --title "Personal domain pilot" \
+  --change-id "current-iteration" \
+  --title "Current iteration" \
   --goal "在当前项目中试用 open-cowork 主链" \
   --scope-in "src/**" \
   --scope-in "tests/**" \
@@ -100,10 +115,11 @@ ocw pilot \
 如果已经创建过 change，只补齐主链准备文件：
 
 ```bash
-ocw --root /path/to/your-project change prepare personal-demo \
+ocw --root /path/to/your-project change prepare current-iteration \
   --goal "在当前项目中试用 open-cowork 主链" \
   --scope-in "src/**" \
   --scope-in "tests/**" \
+  --source-doc "docs/archive/plans/60-v0.2.6-agent-first-adoption-closure-change-package.md" \
   --verify-command "<本项目测试命令>"
 ```
 
@@ -216,24 +232,23 @@ ocw --root . diagnose-session
 
 目标：确认命令可用、目录可写、个人项目不会被重型改造。
 
-### Level 2：创建一个轻量 change
+### Level 2：生成 adoption plan
 
-Agent 应创建一个当前任务的 change package，并向人解释它对应的项目目标。Shell 备用命令是：
+Agent 应先生成当前任务的 adoption plan，并向人解释它对应的项目目标、source docs、已有 active change 风险和需要确认的角色绑定。Shell 备用命令是：
 
 ```bash
-ocw --root . change create personal-demo --title "Personal domain pilot"
+ocw --root . adopt --target . --goal "在当前项目中实施 open-cowork 协同治理框架" --dry-run
 ocw --root . status
-ocw --root . continuity digest --change-id personal-demo
 ```
 
-目标：确认 `open-cowork` 可以描述当前任务状态，并把多 Agent 工作绑定到一个 `change-id`。
+目标：确认 `open-cowork` 可以描述当前任务状态，并在写入 change package 前对齐边界和下一步。
 
 ### Level 3：准备可执行 change
 
 Agent 应准备 contract、bindings 和 handoff pack。Shell 备用命令是：
 
 ```bash
-ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes
+ocw pilot --target . --change-id current-iteration --title "Current iteration" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes
 ```
 
 目标：让执行 Agent 可以读取边界并开始受控执行。
@@ -243,11 +258,12 @@ ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" -
 当当前 change 的 `contract.yaml` 与 `bindings.yaml` 已经补齐后，再让 Agent 验证、生成接续包和 digest。Shell 备用命令是：
 
 ```bash
-ocw --root . contract validate --change-id personal-demo
-ocw --root . runtime-status --change-id personal-demo
-ocw --root . timeline --change-id personal-demo
-ocw --root . continuity handoff-package --change-id personal-demo
-ocw --root . continuity digest --change-id personal-demo
+ocw --root . contract validate --change-id current-iteration
+ocw --root . runtime-status --change-id current-iteration
+ocw --root . timeline --change-id current-iteration
+ocw --root . continuity handoff-package --change-id current-iteration
+ocw --root . continuity digest --change-id current-iteration
+ocw --root . hygiene
 ```
 
 目标：确认从一个 Agent 切换到另一个 Agent 时，有一份可读、可接续、可审查的上下文输入。

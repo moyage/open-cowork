@@ -46,6 +46,10 @@ def validate_contract(contract: dict) -> list[str]:
         errors.append("scope_in must be a list")
     if not isinstance(contract.get("scope_out"), list):
         errors.append("scope_out must be a list")
+    if isinstance(contract.get("scope_in"), list) and isinstance(contract.get("scope_out"), list):
+        conflicts = _scope_conflicts(contract.get("scope_in", []), contract.get("scope_out", []))
+        if conflicts:
+            errors.append("scope_in conflicts with scope_out: " + ", ".join(conflicts))
     if not isinstance(contract.get("allowed_actions"), list):
         errors.append("allowed_actions must be a list")
     if not isinstance(contract.get("forbidden_actions"), list):
@@ -69,3 +73,22 @@ def validate_contract(contract: dict) -> list[str]:
     if role_constraints is not None and not isinstance(role_constraints, dict):
         errors.append("role_constraints must be a mapping when present")
     return errors
+
+
+def _scope_conflicts(scope_in: list[str], scope_out: list[str]) -> list[str]:
+    conflicts = []
+    for include in scope_in:
+        include_base = _scope_base(include)
+        for exclude in scope_out:
+            exclude_base = _scope_base(exclude)
+            if include_base == exclude_base or include_base.startswith(exclude_base + "/") or exclude_base.startswith(include_base + "/"):
+                conflicts.append(f"{include} overlaps {exclude}")
+    return conflicts
+
+
+def _scope_base(pattern: str) -> str:
+    normalized = str(pattern).replace("\\", "/").strip("/")
+    for suffix in ("/**", "/*"):
+        if normalized.endswith(suffix):
+            return normalized[: -len(suffix)]
+    return normalized

@@ -11,7 +11,7 @@ from pathlib import Path
 import test_support  # noqa: F401
 
 from governance.cli import main
-from governance.index import ensure_governance_index, read_changes_index, read_current_change, upsert_change_entry
+from governance.index import ensure_governance_index, read_changes_index, read_current_change, set_current_change, upsert_change_entry
 from governance.simple_yaml import load_yaml, write_yaml
 
 
@@ -183,6 +183,89 @@ class CliTests(unittest.TestCase):
             self.assertEqual(validate_exit, 0)
             self.assertIn("Contract valid", validate_stdout.getvalue())
 
+    def test_change_prepare_records_source_docs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-SOURCE-DOCS", "--title", "Source docs"])
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "CHG-SOURCE-DOCS",
+                    "--goal",
+                    "Bind source documents to a change package",
+                    "--source-doc",
+                    "docs/archive/plans/58-v0.2.6-agent-first-dogfood-requirements.md",
+                    "--source-doc",
+                    "docs/archive/reports/2026-04-24-v025-agent-first-dogfood-findings.md",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-SOURCE-DOCS"
+            manifest = load_yaml(change_dir / "manifest.yaml")
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(manifest["source_docs"], [
+                "docs/archive/plans/58-v0.2.6-agent-first-dogfood-requirements.md",
+                "docs/archive/reports/2026-04-24-v025-agent-first-dogfood-findings.md",
+            ])
+            self.assertIn("58-v0.2.6", (change_dir / "requirements.md").read_text(encoding="utf-8"))
+            self.assertIn("v025-agent-first-dogfood", (change_dir / "intent.md").read_text(encoding="utf-8"))
+
+    def test_adopt_dry_run_outputs_agent_first_plan_without_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "change", "create", "ACTIVE-CHANGE", "--title", "Active work"])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root",
+                    str(root),
+                    "adopt",
+                    "--target",
+                    str(root),
+                    "--goal",
+                    "Install open-cowork and govern the current project iteration",
+                    "--source-doc",
+                    "docs/archive/plans/58-v0.2.6-agent-first-dogfood-requirements.md",
+                    "--source-doc",
+                    "docs/archive/plans/59-v0.2.7-first-step-personal-agent-dogfood-requirements.md",
+                    "--agent",
+                    "Openclaw",
+                    "--agent",
+                    "Codex",
+                    "--agent",
+                    "OOSO",
+                    "--dry-run",
+                    "--format",
+                    "json",
+                ])
+
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["schema"], "adoption-plan/v1")
+            self.assertEqual(payload["target"], str(root.resolve()))
+            self.assertEqual(payload["goal"], "Install open-cowork and govern the current project iteration")
+            self.assertEqual(payload["source_docs"], [
+                "docs/archive/plans/58-v0.2.6-agent-first-dogfood-requirements.md",
+                "docs/archive/plans/59-v0.2.7-first-step-personal-agent-dogfood-requirements.md",
+            ])
+            self.assertEqual(payload["active_change"]["change_id"], "ACTIVE-CHANGE")
+            self.assertTrue(payload["active_change"]["requires_lifecycle_decision"])
+            self.assertIn("continue", payload["active_change"]["allowed_policies"])
+            self.assertIn(".governance/current-state.md", payload["recommended_read_set"])
+            self.assertEqual(payload["role_suggestions"]["Openclaw"], ["orchestrator"])
+            self.assertEqual(payload["role_suggestions"]["Codex"], ["executor", "verifier"])
+            self.assertEqual(payload["role_suggestions"]["OOSO"], ["reviewer", "verification_assistant"])
+            self.assertFalse((root / ".governance/changes/install-open-cowork-and-govern-the-current-project-iteration").exists())
+
     def test_change_prepare_requires_goal(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -237,6 +320,50 @@ class CliTests(unittest.TestCase):
             self.assertIn(".governance/AGENTS.md", output)
             self.assertNotIn("copy this prompt to your personal-domain Agent", output)
             self.assertEqual(load_yaml(change_dir / "manifest.yaml")["status"], "step5-prepared")
+
+    def test_pilot_default_change_id_is_current_iteration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target-project"
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "pilot",
+                    "--target",
+                    str(target),
+                    "--goal",
+                    "Prepare the current project iteration",
+                    "--yes",
+                ])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / ".governance/changes/current-iteration/contract.yaml").exists())
+            self.assertIn("current-iteration", stdout.getvalue())
+
+    def test_pilot_blocks_existing_active_change_without_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target-project"
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(target), "init"])
+                main(["--root", str(target), "change", "create", "ACTIVE", "--title", "Active"])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "pilot",
+                    "--target",
+                    str(target),
+                    "--change-id",
+                    "NEXT",
+                    "--title",
+                    "Next",
+                    "--goal",
+                    "Prepare next pilot",
+                    "--yes",
+                ])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("Active change lifecycle decision required", stdout.getvalue())
 
     def test_repository_agent_first_docs_exist(self):
         repo_root = Path(__file__).resolve().parents[1]
@@ -317,6 +444,8 @@ class CliTests(unittest.TestCase):
                     "ok",
                     "--test-output",
                     "tests passed",
+                    "--evidence-ref",
+                    "evidence/first-instruction-dogfood-result.md",
                     "--created",
                     "src/governance/runtime_stage1.py",
                     "--modified",
@@ -324,6 +453,8 @@ class CliTests(unittest.TestCase):
                 ])
             self.assertEqual(run_exit, 0)
             self.assertTrue((change_dir / "evidence/execution-summary.yaml").exists())
+            execution_summary = load_yaml(change_dir / "evidence/execution-summary.yaml")
+            self.assertIn("evidence/first-instruction-dogfood-result.md", execution_summary["evidence_refs"])
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -749,6 +880,8 @@ class CliTests(unittest.TestCase):
             self.assertIn("# open-cowork status", output)
             self.assertIn("# Session Execution Diagnosis", output)
             self.assertIn("onboard complete", output)
+            self.assertNotIn("personal-demo", output)
+            self.assertIn("ocw adopt", output)
 
     def test_onboard_manual_mode_prints_plan_without_writing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -795,6 +928,83 @@ class CliTests(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
+    def test_hygiene_command_classifies_repo_governance_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            (root / ".governance/AGENTS.md").write_text("# Agent entry\n", encoding="utf-8")
+            (root / ".governance/current-state.md").write_text("# Current State\n", encoding="utf-8")
+            (root / ".governance/agent-playbook.md").write_text("# Playbook\n", encoding="utf-8")
+            (root / "docs/archive/plans").mkdir(parents=True, exist_ok=True)
+            (root / "docs/archive/plans/60-v0.2.6-agent-first-adoption-closure-change-package.md").write_text("# Change Package\n", encoding="utf-8")
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "hygiene", "--format", "json"])
+
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["schema"], "hygiene-report/v1")
+            self.assertIn(".governance/index/current-change.yaml", payload["runtime_generated"])
+            self.assertIn(".governance/AGENTS.md", payload["agent_handoff_files"])
+            self.assertNotIn("docs/archive/plans/60-v0.2.6-agent-first-adoption-closure-change-package.md", payload["pending_docs"])
+            self.assertIn("docs/archive/plans/60-v0.2.6-agent-first-adoption-closure-change-package.md", payload["cold_archive_docs"])
+            self.assertIn(".governance/changes/**", payload["ignored_artifact_patterns"])
+            self.assertIn(".governance/AGENTS.md", payload["suggested_commit"])
+            self.assertIn(".governance/changes/**", payload["suggested_ignore"])
+            self.assertTrue(payload["suggested_cleanup"])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                alias_exit = main(["--root", str(root), "doctor"])
+            self.assertEqual(alias_exit, 0)
+            self.assertIn("open-cowork hygiene", stdout.getvalue())
+
+    def test_change_prepare_blocks_silent_active_change_switch_without_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "ACTIVE", "--title", "Active"])
+                main(["--root", str(root), "change", "create", "NEXT", "--title", "Next"])
+            set_current_change(root, {
+                "change_id": "ACTIVE",
+                "path": ".governance/changes/ACTIVE",
+                "status": "drafting",
+                "current_step": 5,
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "NEXT",
+                    "--goal",
+                    "Prepare next without lifecycle policy",
+                ])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("Active change lifecycle decision required", stdout.getvalue())
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                force_exit = main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "NEXT",
+                    "--goal",
+                    "Prepare next with explicit force policy",
+                    "--active-policy",
+                    "force",
+                ])
+            self.assertEqual(force_exit, 0)
+            self.assertIn("Change prepared: NEXT", stdout.getvalue())
+
     def test_pyproject_exposes_open_cowork_console_alias(self):
         pyproject_text = Path(__file__).resolve().parents[1].joinpath("pyproject.toml").read_text(encoding="utf-8")
 
@@ -808,7 +1018,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.2.5", output)
+        self.assertIn("open-cowork 0.2.6", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)
@@ -972,7 +1182,13 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("Handoff package written:", stdout.getvalue())
-            self.assertTrue((root / f".governance/changes/{change_id}/handoff-package.yaml").exists())
+            handoff_path = root / f".governance/changes/{change_id}/handoff-package.yaml"
+            self.assertTrue(handoff_path.exists())
+            handoff = load_yaml(handoff_path)
+            self.assertIn("recommended_read_set", handoff)
+            self.assertIn(".governance/current-state.md", handoff["recommended_read_set"])
+            self.assertIn(f".governance/changes/{change_id}/contract.yaml", handoff["recommended_read_set"])
+            self.assertIn("Do not full-scan archive history", handoff["context_budget_rule"])
 
 
 

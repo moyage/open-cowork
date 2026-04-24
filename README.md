@@ -126,7 +126,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 
 ## 当前版本完成度
 
-当前 `v0.2.5` 是“Agent-first adoption 体验重置版”。重点是把 V0.2.4 的命令行主链准备能力向前包一层：人只表达意图，Agent 使用 `open-cowork` 维护事实和状态，并在目标项目中生成可交接的 Agent 入口文件。
+当前 `v0.2.6` 是“Agent-first adoption 闭环版”。重点是让团队成员第一条自然语言采用指令能进入 adoption plan、source docs、bounded read set、role suggestions、contract scope、evidence 和仓库卫生诊断，而不是让人手工拼 CLI 参数。
 
 已经具备：
 
@@ -137,6 +137,8 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw status` 输出人类可读状态面。
 - `ocw change create` 创建 change package。
 - `ocw change prepare` 自动填充主链准备文件，并生成目标项目 Agent handoff pack。
+- `ocw adopt --dry-run` 根据自然语言目标、source docs 和个人域 agent inventory 生成 adoption plan。
+- `ocw change prepare --source-doc` 将需求来源绑定进 change package。
 - `ocw pilot` 完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent handoff pack。
 - 目标项目 `.governance/AGENTS.md`：给后续接手 Agent 的项目内入口。
 - 目标项目 `.governance/agent-playbook.md`：给后续接手 Agent 的操作规则。
@@ -150,6 +152,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw timeline` 输出运行时事件流。
 - `ocw continuity ...` 支持 handoff、owner transfer、increment、closeout、sync、history、export、digest。
 - `ocw diagnose-session` 和 `ocw session-recovery-packet` 支持 session/context 恢复诊断。
+- `ocw hygiene` / `ocw doctor` 分类 runtime generated、Agent handoff、pending docs、tracked truth source 和 ignored artifacts。
 - `scripts/bootstrap.sh`、`scripts/update.sh`、`scripts/bootstrap.sh --clean` 支持安装、升级和干净重装。
 - `scripts/smoke-test.sh` 支持最小健康检查。
 
@@ -199,6 +202,7 @@ ocw version
 
 ```bash
 ocw onboard --target /path/to/your-project --mode quickstart --yes
+ocw --root /path/to/your-project adopt --target /path/to/your-project --goal "Describe the project iteration to govern" --dry-run
 ```
 
 ### 升级路径

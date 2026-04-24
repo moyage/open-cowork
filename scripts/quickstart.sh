@@ -36,3 +36,9 @@ if [[ ! -x "$OCW_BIN" ]]; then
 fi
 
 "$OCW_BIN" onboard --target "$TARGET_ROOT" --mode quickstart --yes
+echo
+echo "Agent-first adoption plan preview:"
+"$OCW_BIN" --root "$TARGET_ROOT" adopt \
+  --target "$TARGET_ROOT" \
+  --goal "Apply open-cowork governance to this project iteration" \
+  --dry-run

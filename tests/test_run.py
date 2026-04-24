@@ -269,6 +269,151 @@ class RunTests(unittest.TestCase):
                     artifacts={"created": ["docs/README.md"], "modified": []},
                 ))
 
+    def test_run_uses_contract_scope_in_instead_of_request_default_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            create_change_package(root, "CHG-11")
+            contract_path = root / ".governance/changes/CHG-11/contract.yaml"
+            write_yaml(contract_path, {
+                "objective": "use-contract-write-boundary",
+                "scope_in": ["docs/**", "src/**", "tests/**"],
+                "scope_out": [".governance/index/**", ".governance/runtime/**", ".governance/archive/**"],
+                "allowed_actions": ["edit_files"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["StateConsistencyCheck"],
+                "verification": {"commands": [], "checks": ["evidence persisted"]},
+                "evidence_expectations": {"required": ["changed_files_manifest", "command_output", "test_output", "file_diff"]},
+            })
+            manifest_path = root / ".governance/changes/CHG-11/manifest.yaml"
+            manifest = load_yaml(manifest_path)
+            manifest.setdefault("readiness", {})["step6_entry_ready"] = True
+            write_yaml(manifest_path, manifest)
+            write_yaml(root / ".governance/changes/CHG-11/bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+
+            response = run_change(root, AdapterRequest(
+                change_id="CHG-11",
+                contract_path=str(contract_path),
+                working_directory=str(root),
+                allowed_write_scope=["src/**", "tests/**"],
+                timeout_seconds=60,
+                command="python -m unittest",
+                command_output="ok",
+                test_output="tests passed",
+                artifacts={"created": ["docs/adoption-note.md"], "modified": []},
+            ))
+
+            self.assertTrue(response.completed)
+
+    def test_run_allows_explicitly_scoped_manual_report_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            create_change_package(root, "CHG-12")
+            change_dir = root / ".governance/changes/CHG-12"
+            contract_path = change_dir / "contract.yaml"
+            write_yaml(contract_path, {
+                "objective": "record-manual-report-evidence",
+                "scope_in": ["src/**", ".governance/changes/CHG-12/evidence/**"],
+                "scope_out": [".governance/index/**", ".governance/runtime/**", ".governance/archive/**"],
+                "allowed_actions": ["edit_files", "write_evidence"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["StateConsistencyCheck"],
+                "verification": {"commands": [], "checks": ["manual report evidence persisted"]},
+                "evidence_expectations": {"required": ["analysis report evidence"]},
+            })
+            manifest_path = change_dir / "manifest.yaml"
+            manifest = load_yaml(manifest_path)
+            manifest.setdefault("readiness", {})["step6_entry_ready"] = True
+            write_yaml(manifest_path, manifest)
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+
+            response = run_change(root, AdapterRequest(
+                change_id="CHG-12",
+                contract_path=str(contract_path),
+                working_directory=str(root),
+                allowed_write_scope=["src/**"],
+                timeout_seconds=60,
+                command="manual analysis",
+                command_output="ok",
+                test_output="not applicable",
+                artifacts={"created": [".governance/changes/CHG-12/evidence/dogfood-findings.md"], "modified": []},
+                evidence_refs=["evidence/dogfood-findings.md"],
+            ))
+
+            self.assertTrue(response.completed)
+            self.assertIn("evidence/dogfood-findings.md", response.evidence_refs)
+
+    def test_run_accepts_first_instruction_dogfood_result_ref(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            create_change_package(root, "CHG-13")
+            change_dir = root / ".governance/changes/CHG-13"
+            contract_path = change_dir / "contract.yaml"
+            write_yaml(contract_path, {
+                "objective": "record-first-instruction-dogfood",
+                "scope_in": ["src/**", ".governance/changes/CHG-13/evidence/**"],
+                "scope_out": [".governance/index/**", ".governance/runtime/**", ".governance/archive/**"],
+                "allowed_actions": ["edit_files", "write_evidence"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["StateConsistencyCheck"],
+                "verification": {"commands": [], "checks": ["first instruction dogfood evidence persisted"]},
+                "evidence_expectations": {"required": ["first_instruction_dogfood_result"]},
+            })
+            manifest = load_yaml(change_dir / "manifest.yaml")
+            manifest.setdefault("readiness", {})["step6_entry_ready"] = True
+            write_yaml(change_dir / "manifest.yaml", manifest)
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+
+            response = run_change(root, AdapterRequest(
+                change_id="CHG-13",
+                contract_path=str(contract_path),
+                working_directory=str(root),
+                allowed_write_scope=["src/**"],
+                timeout_seconds=60,
+                command="first instruction dogfood",
+                command_output="ok",
+                test_output="not applicable",
+                artifacts={"created": [".governance/changes/CHG-13/evidence/first-instruction-dogfood-result.md"], "modified": []},
+                evidence_refs=["evidence/first-instruction-dogfood-result.md"],
+            ))
+
+            self.assertTrue(response.completed)
+
     def test_run_blocks_when_artifacts_touch_governance_reserved_index_runtime_or_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

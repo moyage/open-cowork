@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.6
+
+- Added `ocw adopt --dry-run` for Agent-first adoption planning from natural-language goals, source docs, and personal-domain agent inventory
+- Added `--source-doc` support to `ocw change prepare` and records source documents in generated intent, requirements, and manifest files
+- Aligned `ocw run` write boundaries with contract `scope_in/scope_out` and added scope conflict validation
+- Added bounded recommended read sets to Agent handoff outputs to avoid archive-history context explosions
+- Added `ocw hygiene` / `ocw doctor` to classify runtime artifacts, Agent handoff files, pending docs, tracked truth sources, and ignored governance artifacts
+- Added support for manual analysis/report evidence refs as first-class evidence inputs when explicitly scoped by contract
+- Updated onboard/pilot defaults so Agents start from adoption planning and `current-iteration` instead of a fixed `personal-demo` path
+- Updated bootstrap, quickstart, and smoke-test release checks to validate `ocw version`, adoption planning, and hygiene diagnostics
+
 ## 0.2.5
 
 - Added repository-level `AGENTS.md` as the Agent-first adoption entry
