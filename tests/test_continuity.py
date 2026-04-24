@@ -659,6 +659,38 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(payload["grouped_summary"]["groups"][0]["event_count"], 2)
             self.assertEqual(payload["grouped_summary"]["groups"][0]["latest_headline"], "A2")
 
+    def test_read_sync_history_across_months_supports_summary_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [{
+                    "event_id": "evt-1",
+                    "change_id": "CHG-A",
+                    "recorded_at": "2026-04-24T12:00:00Z",
+                    "sync_kind": "escalation",
+                    "source_kind": "closeout",
+                    "target_layer": "sponsor",
+                    "target_scope": "project-level",
+                    "packet_ref": ".governance/archive/CHG-A/sync-packet.yaml",
+                    "headline": "A1",
+                }],
+            })
+
+            payload = read_sync_history_across_months(
+                root,
+                summary_by="change_id",
+                summary_only=True,
+            )
+
+            self.assertEqual(payload["summary"]["matched_events"], 1)
+            self.assertEqual(payload["grouped_summary"]["group_by"], "change_id")
+            self.assertEqual(payload["events"], [])
+
     def test_materialize_increment_package_records_delta_and_handoff_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

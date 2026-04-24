@@ -83,6 +83,8 @@
 - `plans/45-milestone2-digest-recent-runtime-events-implementation-plan.md`
 - `plans/46-milestone2-sync-history-grouped-summary-design.md`
 - `plans/47-milestone2-sync-history-grouped-summary-implementation-plan.md`
+- `plans/48-milestone2-sync-history-summary-only-design.md`
+- `plans/49-milestone2-sync-history-summary-only-implementation-plan.md`
 
 ## 报告与实践材料
 

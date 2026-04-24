@@ -737,6 +737,7 @@ def read_sync_history(
     source_kind: str | None = None,
     sync_kind: str | None = None,
     summary_by: str | None = None,
+    summary_only: bool = False,
 ) -> dict:
     paths = GovernancePaths(Path(root))
     target = paths.sync_history_month_file(month)
@@ -768,6 +769,8 @@ def read_sync_history(
     }
     if summary_by is not None:
         payload["grouped_summary"] = _group_sync_history_events(filtered, summary_by)
+    if summary_only:
+        payload["events"] = []
     return payload
 
 
@@ -790,6 +793,7 @@ def read_sync_history_across_months(
     source_kind: str | None = None,
     sync_kind: str | None = None,
     summary_by: str | None = None,
+    summary_only: bool = False,
 ) -> dict:
     paths = GovernancePaths(Path(root))
     months = list_sync_history_months(root)
@@ -825,6 +829,8 @@ def read_sync_history_across_months(
     }
     if summary_by is not None:
         payload["grouped_summary"] = _group_sync_history_events(filtered, summary_by)
+    if summary_only:
+        payload["events"] = []
     return payload
 
 

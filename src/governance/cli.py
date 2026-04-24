@@ -383,6 +383,7 @@ def cmd_continuity_sync_history_query(args):
             source_kind=args.source_kind,
             sync_kind=args.sync_kind,
             summary_by=args.summary_by,
+            summary_only=args.summary_only,
         )
     else:
         payload = read_sync_history(
@@ -392,6 +393,7 @@ def cmd_continuity_sync_history_query(args):
             source_kind=args.source_kind,
             sync_kind=args.sync_kind,
             summary_by=args.summary_by,
+            summary_only=args.summary_only,
         )
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -415,11 +417,12 @@ def cmd_continuity_sync_history_query(args):
                 f"events={group.get('event_count')} "
                 f"latest={group.get('latest_headline')}"
             )
-    for event in payload["events"]:
-        print(
-            f"- {event.get('recorded_at')} {event.get('change_id')} "
-            f"[{event.get('source_kind')}/{event.get('sync_kind')}] {event.get('headline')}"
-        )
+    if not args.summary_only:
+        for event in payload["events"]:
+            print(
+                f"- {event.get('recorded_at')} {event.get('change_id')} "
+                f"[{event.get('source_kind')}/{event.get('sync_kind')}] {event.get('headline')}"
+            )
     return 0
 
 
@@ -700,6 +703,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_sync_history_query.add_argument("--source-kind", choices=["closeout", "increment"], default=None, help="Optional source kind filter")
     p_continuity_sync_history_query.add_argument("--sync-kind", choices=["routine-sync", "escalation"], default=None, help="Optional sync kind filter")
     p_continuity_sync_history_query.add_argument("--summary-by", choices=["change_id", "source_kind", "sync_kind"], default=None, help="Optional grouped summary view")
+    p_continuity_sync_history_query.add_argument("--summary-only", action="store_true", help="Return only grouped summary and hide raw event list")
     p_continuity_sync_history_query.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_continuity_export = p_continuity_sub.add_parser("export-sync-packet", help="Export sync packet to external directory")
     p_continuity_export.add_argument("--change-id", required=True, help="Target change id")
