@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- Landed the Milestone 1 complex collaboration runtime chain
+- Added verify/review/archive gates and minimum state transition protection
+- Added runtime status and timeline machine-readable outputs
+- Added continuity primitives: handoff, owner transfer, increment, closeout, sync, history, export, and digest
+- Hardened governance reserved boundaries and archive/maintenance consistency checks
+- Added grouped sync summaries and digest reading compression for human/team use
+- Added bootstrap and smoke-test scripts for first-time team adoption
+- Updated onboarding docs for the current CLI and v0.2 readiness
+
 ## 0.1.0
 
 - Repository cleanup for public sharing

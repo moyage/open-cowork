@@ -60,7 +60,7 @@
 
 ### 5.2 最小字段建议
 ```yaml
-actor_id: hermes-1
+actor_id: coordinator-1
 actor_type: agent
 role: analyst
 change_id: CHG-20260420-001
@@ -132,7 +132,7 @@ schema: collaboration-event/v1
 change_id: CHG-20260420-001
 event_id: EVT-20260420-001
 entity_type: participant
-entity_id: hermes-1
+entity_id: coordinator-1
 role: analyst
 step: 5
 event_type: status_transition

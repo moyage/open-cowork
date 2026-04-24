@@ -2,7 +2,7 @@
 
 ## 说明
 
-本报告遵循 [ROUND_CLOSE_REPORT_TEMPLATE.md](/Users/mlabs/Programs/open-cowork/.governance/templates/ROUND_CLOSE_REPORT_TEMPLATE.md) 的结构编写。  
+本报告遵循 [ROUND_CLOSE_REPORT_TEMPLATE.md](../../.governance/templates/ROUND_CLOSE_REPORT_TEMPLATE.md) 的结构编写。
 它服务于当前这一轮 `Milestone 1 + Milestone 2` 的人类默认阅读、团队复盘与下一轮启动参考，不替代 `.governance/**` authoritative artifacts。
 
 ---
@@ -18,8 +18,8 @@
 - 最终 authoritative 执行链：
   - `change create -> contract validate -> run -> verify -> review -> archive`
 - 本轮结果锚点：
-  - [01-status-report.md](/Users/mlabs/Programs/open-cowork/docs/reports/01-status-report.md)
-  - [04-current-iteration-final-completion-and-next-round-candidate-input.md](/Users/mlabs/Programs/open-cowork/docs/reports/04-current-iteration-final-completion-and-next-round-candidate-input.md)
+  - [01-status-report.md](01-status-report.md)
+  - [04-current-iteration-final-completion-and-next-round-candidate-input.md](04-current-iteration-final-completion-and-next-round-candidate-input.md)
 
 ## 2. 本轮变更汇总
 
@@ -77,13 +77,13 @@
 
 重点落在：
 
-1. [cli.py](/Users/mlabs/Programs/open-cowork/src/governance/cli.py)
-2. [continuity.py](/Users/mlabs/Programs/open-cowork/src/governance/continuity.py)
-3. [runtime_status.py](/Users/mlabs/Programs/open-cowork/src/governance/runtime_status.py)
-4. [run.py](/Users/mlabs/Programs/open-cowork/src/governance/run.py)
-5. [index.py](/Users/mlabs/Programs/open-cowork/src/governance/index.py)
-6. [01-status-report.md](/Users/mlabs/Programs/open-cowork/docs/reports/01-status-report.md)
-7. [04-current-iteration-final-completion-and-next-round-candidate-input.md](/Users/mlabs/Programs/open-cowork/docs/reports/04-current-iteration-final-completion-and-next-round-candidate-input.md)
+1. [cli.py](../../src/governance/cli.py)
+2. [continuity.py](../../src/governance/continuity.py)
+3. [runtime_status.py](../../src/governance/runtime_status.py)
+4. [run.py](../../src/governance/run.py)
+5. [index.py](../../src/governance/index.py)
+6. [01-status-report.md](01-status-report.md)
+7. [04-current-iteration-final-completion-and-next-round-candidate-input.md](04-current-iteration-final-completion-and-next-round-candidate-input.md)
 
 ## 3. 步骤和阶段信息
 

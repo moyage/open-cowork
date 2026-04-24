@@ -603,7 +603,7 @@ def cmd_session_recovery_packet(args):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="open-cowork MVP CLI")
+    parser = argparse.ArgumentParser(description="open-cowork CLI")
     parser.add_argument("--root", default=".", help="Project root directory")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

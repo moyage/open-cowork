@@ -71,7 +71,7 @@
 
 - 团队总控 PM agent
 - 主导型 orchestration agent
-- 替代 Hermes / OMOC / OpenAgent 的统一工作代理
+- 替代特定 PM agent / open-agent 工具的统一工作代理
 
 结论：
 `open-cowork` 可以有辅助 agent 能力，也可以有可选的 agent shell，但核心身份仍是复杂协作协议层，而不是执行主脑。

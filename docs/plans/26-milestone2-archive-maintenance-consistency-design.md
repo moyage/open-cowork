@@ -120,7 +120,7 @@
 
 这份设计的价值在于：
 
-1. 让 retrospective / continuity / hermes recovery 共用同一条最近归档基线；
+1. 让 retrospective / continuity / session recovery 共用同一条最近归档基线；
 2. 减少“maintenance 写了一个最近归档 change，但 archive-map 并没有它”的漂移；
 3. 让 archive 主链之外的错误写入更早暴露在入口层；
 4. 保持本轮范围小、收益直接、容易回归验证。

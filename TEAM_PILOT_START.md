@@ -23,16 +23,18 @@
 ```bash
 git clone https://github.com/moyage/open-cowork.git
 cd open-cowork
-python3 -m venv .venv
+./scripts/bootstrap.sh
 source .venv/bin/activate
-pip install -e .
 ```
 
 验证 CLI：
 
 ```bash
 ocw --help
+./scripts/smoke-test.sh
 ```
+
+说明：如果本地 `pip / setuptools` 较旧，bootstrap 会自动生成本地 `ocw` shim，仍可继续试用。
 
 ## 4. 在你的个人域接入（推荐最小路径）
 
@@ -40,14 +42,27 @@ ocw --help
 
 ```bash
 ocw init
-ocw create-change --id demo-change --title "First governed change"
-ocw run --change demo-change
+ocw status
+ocw diagnose-session
 ```
 
 说明：
 - `init`：初始化治理目录与索引
-- `create-change`：建立变更包
-- `run`：按契约执行并产出证据
+- `status`：查看当前 4 阶段状态面
+- `diagnose-session`：在 session/context 不稳定时生成诊断判断
+
+如果要尝试完整 change 主链，当前 CLI 入口是：
+
+```bash
+ocw change create demo-change --title "First governed change"
+ocw contract validate --change-id demo-change
+ocw run --change-id demo-change
+ocw verify --change-id demo-change
+ocw review --change-id demo-change --decision approve --reviewer reviewer-agent
+ocw archive --change-id demo-change
+```
+
+完整主链需要先准备对应 change 的 contract、bindings 与 evidence 条件；首次团队试用建议先从 `init / status / diagnose / digest` 开始。
 
 ## 5. 团队协作最小约定
 

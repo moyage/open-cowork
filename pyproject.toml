@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "open-cowork"
-version = "0.1.0"
-description = "Collaboration Governance Runtime for intent-to-delivery closed-loop teamwork"
+version = "0.2.0"
+description = "Protocol-first framework for complex multi-person and multi-agent collaboration"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

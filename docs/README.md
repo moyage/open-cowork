@@ -20,6 +20,10 @@
    - 团队体验反馈与默认体验层方向
 7. `QUICKSTART.md`
    - 低门槛上手说明
+8. `../scripts/bootstrap.sh`
+   - 本地安装与 CLI 激活入口
+9. `../scripts/smoke-test.sh`
+   - 发布前和首次使用前的最小健康检查
 
 ## 顶层文档
 

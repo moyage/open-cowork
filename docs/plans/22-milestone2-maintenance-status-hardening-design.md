@@ -20,7 +20,7 @@
 1. 为同一活动 `change` 增加最小不可回退保护；
 2. 为最近归档基线增加最小 sticky 保护；
 3. 保持 archive 之后切回 `idle/none` 的行为不受影响；
-4. 保持现有 CLI 主链、retrospective、continuity、hermes recovery 的调用方式不变。
+4. 保持现有 CLI 主链、retrospective、continuity、session recovery 的调用方式不变。
 
 ## 3. 边界
 

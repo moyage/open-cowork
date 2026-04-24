@@ -81,25 +81,45 @@ Harness、workflow、runtime、SoD、docs-as-code 等方法，只要有助于高
 
 ## 快速开始
 
-### 1. 安装
+### 1. 克隆并一键安装
 
 ```bash
-python3 -m pip install -e .
+git clone https://github.com/moyage/open-cowork.git
+cd open-cowork
+./scripts/bootstrap.sh
+source .venv/bin/activate
 ```
 
-### 2. 在项目中初始化治理结构
+`bootstrap.sh` 会优先使用标准 Python 安装方式；如果本地 `pip / setuptools` 太旧，会自动生成一个本地 `ocw` shim，保证首次试用不被安装工具版本卡住。
+
+### 2. 验证本地安装
+
+```bash
+ocw --help
+./scripts/smoke-test.sh
+```
+
+### 3. 在你的项目中初始化治理结构
+
+进入你要接入 `open-cowork` 的目标项目根目录：
 
 ```bash
 ocw --root . init
 ```
 
-### 3. 查看当前协作状态
+### 4. 查看当前协作状态
 
 ```bash
 ocw --root . status
 ```
 
-### 4. 在出现上下文压缩或 session 不稳定时做诊断
+### 5. 读取默认接续摘要
+
+```bash
+ocw --root . continuity digest
+```
+
+### 6. 在出现上下文压缩或 session 不稳定时做诊断
 
 ```bash
 ocw --root . diagnose-session
@@ -108,14 +128,13 @@ ocw --root . session-recovery-packet
 
 ## 当前状态
 
-当前公开版本已经具备：
+当前 `v0.2` 预备基线已经具备：
 
-- 基础治理目录初始化
-- 状态查看能力
-- session/context 不稳定诊断与恢复包生成
-- 一组正在持续收敛的顶层规范与计划文档
-
-下一阶段重点不是继续堆概念，而是把主链闭环、边界硬化、连续性原语和人类体验层逐步做实。
+- 主链闭环：`change -> contract -> run -> verify -> review -> archive`
+- 运行时状态与 timeline 的 machine-readable 输出
+- handoff、owner transfer、increment、closeout、sync、history、export、digest 等 continuity 原语
+- 治理保留区、状态回退、archive anchor、continuity refs 的最小硬化
+- 面向团队首次试用的 bootstrap 与 smoke-test 脚本
 
 ## 文档入口
 
@@ -127,6 +146,7 @@ ocw --root . session-recovery-packet
 4. `docs/plans/02-boundary-and-product-shape-decision.md`
 5. `docs/plans/03-human-team-experience-feedback-and-design-direction.md`
 6. `docs/QUICKSTART.md`
+7. `docs/reports/04-current-iteration-final-completion-and-next-round-candidate-input.md`
 
 ## 一句话总结
 

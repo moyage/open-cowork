@@ -98,12 +98,12 @@
 
 如果后续启动下一轮，建议优先读取以下材料：
 
-1. [README.md](/Users/mlabs/Programs/open-cowork/README.md)
-2. [01-execution-plan.md](/Users/mlabs/Programs/open-cowork/docs/plans/01-execution-plan.md)
-3. [06-milestone2-scope-and-splitting.md](/Users/mlabs/Programs/open-cowork/docs/plans/06-milestone2-scope-and-splitting.md)
-4. [01-status-report.md](/Users/mlabs/Programs/open-cowork/docs/reports/01-status-report.md)
-5. [03-milestone1-milestone2-closeout-and-remaining-items.md](/Users/mlabs/Programs/open-cowork/docs/reports/03-milestone1-milestone2-closeout-and-remaining-items.md)
-6. 本文件 [04-current-iteration-final-completion-and-next-round-candidate-input.md](/Users/mlabs/Programs/open-cowork/docs/reports/04-current-iteration-final-completion-and-next-round-candidate-input.md)
+1. [README.md](../../README.md)
+2. [01-execution-plan.md](../plans/01-execution-plan.md)
+3. [06-milestone2-scope-and-splitting.md](../plans/06-milestone2-scope-and-splitting.md)
+4. [01-status-report.md](01-status-report.md)
+5. [03-milestone1-milestone2-closeout-and-remaining-items.md](03-milestone1-milestone2-closeout-and-remaining-items.md)
+6. 本文件 [04-current-iteration-final-completion-and-next-round-candidate-input.md](04-current-iteration-final-completion-and-next-round-candidate-input.md)
 
 ## 6. 下一轮启动建议
 

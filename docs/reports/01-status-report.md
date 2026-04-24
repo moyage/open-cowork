@@ -46,7 +46,7 @@
 2. `STATUS_SNAPSHOT.yaml`
 3. `diagnose-session`
 4. `session-recovery-packet`
-5. Hermes 会话压缩 / 断连诊断与恢复包机制
+5. 会话压缩 / 断连诊断与恢复包机制
 
 默认状态面当前已可见：
 
