@@ -96,6 +96,7 @@
 
 - `reports/01-status-report.md`
 - `reports/02-session-recovery-playbook.md`
+- `reports/03-milestone1-milestone2-closeout-and-remaining-items.md`
 - `QUICKSTART.md`
 
 ## 说明

@@ -1,20 +1,26 @@
-# open-cowork 状态报告（Milestone 1 基线已成立，Milestone 2 / Workstream B 已落地）
+# open-cowork 状态报告（Milestone 1 已成立，Milestone 2 已进入收口阶段）
 
-## 1. 当前状态
+## 1. 当前总体判断
 
-`open-cowork` 当前已经完成 `Milestone 1` 的基线成立工作，并完成了 `Milestone 2 / Workstream B` 的第一段协议输出层落地。
+截至当前主线，`open-cowork` 已经不再只是“有顶层定义的框架草案”，而是已经形成了一条可运行、可验证、可交接、可同步、可查询的项目级复杂协作协议基线。
 
-当前仓库不再只是“文档定义的框架基线”，而是已经具备：
+如果按本轮 `Milestone 1 + Milestone 2` 的实际推进结果看，当前状态可以概括为：
 
-1. 顶层白皮书、PRD、执行计划与实现口径已对齐
-2. 主链最小闭环已经落地
-3. 最小 continuity 与最小人类状态面已经落地
-4. 关键边界与状态迁移已经具备最小真实约束
-5. machine-readable runtime status / timeline 协议层已经落地
+1. `Milestone 1` 已完整成立  
+   - 主链闭环成立  
+   - 最小边界硬化成立  
+   - 最小 continuity 成立  
+   - 最小人类状态面成立
+2. `Milestone 2` 的核心子线已经大面积落地  
+   - 边界与状态硬化第二轮已落地  
+   - continuity primitives 已形成完整最小链  
+   - machine-readable runtime / timeline 协议层已落地  
+   - sync / closeout / export / query / digest 的最小读写消费面已落地
+3. 当前阶段不再主要缺“新主链能力”，而主要进入“收口、对齐、压缩默认阅读入口”的阶段。
 
 ## 2. 已完成能力
 
-### 2.1 主链
+### 2.1 Milestone 1：复杂协作闭环主链
 
 已实现：
 
@@ -25,41 +31,48 @@
 5. `review`
 6. `archive`
 
-### 2.2 最小边界硬化
+并且以下最小约束已经成立：
+
+1. `review` 需要 `verify=pass`
+2. `archive` 需要 `review=approve`
+3. `verify / review / archive` 状态迁移门已存在
+4. `executor / verifier / reviewer` 最小分离已存在
+
+### 2.2 Milestone 1：最小状态面与诊断恢复
 
 已实现：
 
-1. Step 6 entry gate
-2. `executor / verifier / reviewer` 最小分离
-3. 最小 write-boundary 产物路径校验
-4. state consistency 基本检查
-5. `review/archive` 前置 gate
-6. `verify/review/archive` 的最小状态迁移门
+1. `status` 默认 4 阶段视图
+2. `STATUS_SNAPSHOT.yaml`
+3. `diagnose-session`
+4. `session-recovery-packet`
+5. Hermes 会话压缩 / 断连诊断与恢复包机制
 
-### 2.3 最小 continuity 与状态面
+默认状态面当前已可见：
 
-已实现：
+1. `current_phase`
+2. `current_owner`
+3. `waiting_on`
+4. `next_decision`
+5. `project_summary`
 
-1. `continuity launch-input`
-2. `continuity round-entry-summary`
-3. 最小决策摘要字段
-4. 默认 `status` 人类状态快照
-5. 4 阶段视图中的关键字段：
-   - `current_phase`
-   - `current_owner`
-   - `waiting_on`
-   - `next_decision`
-   - `project_summary`
+## 3. Milestone 2 已完成能力
 
-### 2.4 诊断与恢复
+### 3.1 边界与状态硬化
 
 已实现：
 
-1. `diagnose-session`
-2. `session-recovery-packet`
-3. Hermes 会话压缩 / 断连诊断与恢复包机制
+1. `.governance/index/**` 治理保留区阻断
+2. `.governance/runtime/**` 治理保留区阻断
+3. `.governance/archive/**` 治理保留区阻断
+4. `.governance/changes/**` 包体保留区阻断
+5. `current-change / changes-index` 最小不可回退保护
+6. `maintenance-status` 最小不可回退保护
+7. `archive-map` 与 `maintenance-status` 最近归档锚点一致性
+8. archived continuity refs 与 `archive-map / archive-receipt` 一致性
+9. continuity / closeout / sync refs 的存在性与目标匹配约束
 
-### 2.5 Milestone 2 / Workstream B 协议输出层
+### 3.2 runtime / timeline 协议层
 
 已实现：
 
@@ -70,7 +83,8 @@
 5. `participants-status.yaml`
 6. 月度 append-only `events-YYYYMM.yaml`
 7. 关键动作事件落盘：
-   - `contract_validate_pass/fail`
+   - `contract_validate_pass`
+   - `contract_validate_fail`
    - `run_completed`
    - `verify_completed`
    - `review_completed`
@@ -80,42 +94,87 @@
    - `text`
    - `yaml`
    - `json`
+9. `runtime/status` 与 `timeline` 的 `projection_sources`
 
-## 3. 当前验证状态
+### 3.3 continuity primitives
 
-当前主线测试结果：
+已实现：
 
-- `39/39` 通过
+1. `continuity launch-input`
+2. `round-entry-summary`
+3. `handoff-package`
+4. `owner-transfer-continuity`
+5. `increment-package`
+6. `closeout-packet`
+7. `sync-packet`
 
-这意味着当前基线已经不只是“方向正确”，而是：
+### 3.4 sync / export / history / digest
 
-1. `Milestone 1` 最小协议面真实成立
-2. `Milestone 2 / Workstream B` 最小 machine-readable 协议切片真实成立
+已实现：
 
-## 4. 当前限制
+1. `sync-history`
+2. `export-sync-packet`
+3. `sync-history-query`
+4. `sync-history-months`
+5. `sync-history-query --all-months`
+6. `sync-history-query --summary-by ...`
+7. `sync-history-query --summary-only`
+8. grouped summary 支持：
+   - `change_id`
+   - `source_kind`
+   - `sync_kind`
+   - `target_layer`
+9. grouped summary 已带：
+   - `event_count`
+   - `distinct_change_count`
+   - `latest_headline`
+   - `latest_change_id`
+   - `latest_sync_kind`
+10. `continuity digest`
+11. `digest` 中的：
+   - `recent_sync_summary`
+   - `recent_runtime_events`
+   - `projection_sources`
 
-当前仍然存在以下限制：
+## 4. 当前验证状态
 
-1. write-boundary 仍是最小实现，尚未做到更强的真实写入拦截
-2. adapter 仍是单一最小 MVP，不代表完整适配层能力
-3. handoff / owner transfer / increment package 仍需进一步标准化
-4. 人类体验层仍是最小成立，而非完整深化版本
-5. Workstream B 已落地最小查询输出，但更完整的对外读取面仍可继续增强
+当前主线完整测试结果：
 
-## 5. 下一步方向
+- `124/124` 通过
 
-下一步进入 `Milestone 2`，重点不是重复补主链，而是继续做硬化与扩展：
+这意味着当前主线已经具备：
 
-1. 更强的边界与状态硬化
-2. continuity primitives 完整化
-3. 协议与适配层继续深化
-4. 人类体验层进一步深化
-5. Workstream B 结果合回主线并作为后续消费基线
+1. 一个可运行的复杂协作闭环
+2. 一个可读取的 runtime / timeline 协议层
+3. 一组可接续、可转移、可收束、可同步的 continuity primitives
+4. 一层正在收口中的人类默认阅读入口
 
-对应收口文档：
+## 5. 当前仍未收口的部分
 
-- `docs/plans/06-milestone2-scope-and-splitting.md`
+如果严格按“本轮最终收口”来看，当前剩余项已经不多，且不应再扩成新主线。
 
-## 6. 文档边界说明
+仍建议完成的事项主要是这 3 类：
 
-本报告用于公开仓库状态摘要，不替代 `.governance/` 运行时事实层产物，也不替代后续 `Milestone 2` 的正式 change package。
+1. 状态与计划口径收口  
+   - 把当前主线进展同步到公开状态报告与 closeout 摘要
+2. 本轮迭代收束文档  
+   - 明确当前轮哪些已完成、哪些留待下一轮
+3. 非扩张式阅读层小压缩  
+   - 只允许在现有 `digest / sync-history / query` 上继续做很小的摘要压缩
+
+## 6. 当前不建议再做的事
+
+为了遵守本轮 `Milestone 1 / Milestone 2` 边界，当前不建议继续扩张到以下方向：
+
+1. 新的协议对象
+2. 新的 adapter 生态面
+3. 平台化 UI / Dashboard / TUI
+4. 生态级治理与项目组合层
+5. 重型企业控制台
+
+## 7. 一句话结论
+
+当前 `open-cowork` 已经完成了本轮最重要的目标：  
+它不再只是一个“复杂协作框架概念”，而已经成为一个具备闭环、约束、交接、同步、查询和轻量摘要入口的项目级复杂协作协议基线。
+
+接下来的重点不是“继续长更多对象”，而是把这轮已经长出来的协议面和阅读面稳稳收口。
