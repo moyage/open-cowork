@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- Consolidated onboarding docs into `docs/getting-started.md`
+- Moved historical plans and reports into `docs/archive/`
+- Rewrote `docs/README.md` as a concise document map
+- Localized governance and community docs into Chinese
+- Clarified `.governance/` as runtime artifact storage instead of a documentation area
+
 ## 0.2.0
 
 - Landed the Milestone 1 complex collaboration runtime chain
@@ -18,6 +26,6 @@
 - Repository cleanup for public sharing
 - Runtime residue removed from tracked baseline
 - Added packaging (`pyproject.toml`) and installable `ocw` entrypoint
-- Added open-source onboarding docs (`README`, `docs/QUICKSTART`, `CONTRIBUTING`)
+- Added open-source onboarding docs (`README`, `docs/getting-started.md`, `CONTRIBUTING`)
 - Added session diagnosis/recovery command names (`diagnose-session`, `session-recovery-packet`)
 - Hardened tests to use self-contained fixtures instead of repo-bound historical data

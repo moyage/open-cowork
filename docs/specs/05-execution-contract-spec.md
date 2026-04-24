@@ -19,8 +19,8 @@ objective: >-
   在不进入工程实现的前提下，完成规格化主干文档。
 scope_in:
   - docs/specs/**
-  - docs/plans/**
-  - docs/reports/**
+  - docs/archive/plans/**
+  - docs/archive/reports/**
 scope_out:
   - src/**
   - package.json

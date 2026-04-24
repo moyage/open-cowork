@@ -1,13 +1,20 @@
-# Security Policy
+# 安全说明
 
-## Reporting a Vulnerability
+如果你发现安全敏感问题，请不要直接创建公开 issue。
 
-Please do not open public issues for security-sensitive problems.
+请通过私有渠道联系维护者，并尽量提供：
 
-Report privately to the maintainers with:
-- affected version/commit
-- reproduction steps
-- impact assessment
-- suggested mitigation (if available)
+- 受影响版本或 commit。
+- 复现步骤。
+- 潜在影响范围。
+- 建议缓解方案。
 
-We will acknowledge reports and provide remediation guidance as quickly as possible.
+## 请特别注意
+
+`open-cowork` 面向个人域和团队协作场景，提交前请确认没有包含：
+
+- 个人本地绝对路径。
+- 私有仓库地址或内部系统地址。
+- API key、token、cookie、密钥文件。
+- 团队成员姓名、账号、个人 Agent 配置等不应公开的信息。
+- 未脱敏的项目业务数据。

@@ -1,21 +1,21 @@
-# Code of Conduct
+# 行为准则
 
-## Our Pledge
+`open-cowork` 希望保持开放、尊重、清晰和基于证据的协作氛围。
 
-We are committed to making participation in this project a respectful and harassment-free experience for everyone.
+## 我们鼓励
 
-## Our Standards
+- 尊重不同经验水平和工具偏好。
+- 用事实、复现步骤和证据讨论问题。
+- 对复杂任务保持耐心，避免把问题归咎于个人。
+- 讨论分歧时聚焦方案、边界和风险。
 
-Examples of behavior that contributes to a positive environment:
-- respectful and constructive feedback
-- empathy for different experience levels
-- focus on evidence and technical clarity
+## 我们不接受
 
-Examples of unacceptable behavior:
-- personal attacks or harassment
-- doxxing, threats, or intimidation
-- bad-faith disruption of collaboration
+- 人身攻击、骚扰、威胁或恶意羞辱。
+- 公开泄露他人隐私、密钥、个人路径或个人域配置。
+- 明知会破坏项目事实一致性却故意提交误导性内容。
+- 持续的恶意干扰、刷屏或无视维护者边界。
 
-## Enforcement
+## 执行
 
-Project maintainers are responsible for clarifying and enforcing these standards.
+维护者负责解释和执行本准则。严重违反者可能被限制参与 issue、PR、讨论或发布流程。

@@ -32,18 +32,20 @@
     - 测试策略、审计清单、规格完成/实现完成判定
 
 ### 配套文档
-11. `docs/plans/01-execution-plan.md`
-    - 从规格化进入工程执行的阶段计划，仅到执行准备，不直接实现
-12. `docs/reports/01-status-report.md`
-    - 已完成 / 未完成 / 阻断项 / 建议下一步
+11. `docs/archive/plans/01-execution-plan.md`
+    - 历史阶段计划，已归档，仅作为演进记录
+12. `docs/archive/reports/01-status-report.md`
+    - 历史状态报告，已归档，仅作为演进记录
 
 ## 3. 目录规划
 ```text
 <repo-root>/
   docs/
+    getting-started.md
     specs/
-    plans/
-    reports/
+    archive/
+      plans/
+      reports/
 ```
 
 ## 4. 规格化优先级

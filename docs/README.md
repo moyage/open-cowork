@@ -1,117 +1,63 @@
-# 文档索引
+# 文档地图
 
-本目录用于承载 `open-cowork` 的顶层定义、产品需求、执行计划、设计规范与实践说明。
+本目录承载 `open-cowork` 的项目说明、上手指南、框架规格和历史迭代材料。
 
-建议优先阅读顶层文档，再进入细化规格与操作文档。
+如果你是第一次打开这个仓库，请只按“新用户阅读路径”阅读，不需要进入 `docs/archive/`。
 
-## 建议阅读顺序
+## 新用户阅读路径
 
 1. `../README.md`
-   - 项目入口、问题定义、适用场景与快速开始
-2. `specs/00-top-level-whitepaper.md`
-   - 顶层身份、时代背景、能力边界与长期方向
-3. `specs/01-prd.md`
-   - 产品定义、能力模型、目标用户与成功标准
-4. `plans/01-execution-plan.md`
-   - 能力包路线图与执行顺序
-5. `plans/02-boundary-and-product-shape-decision.md`
-   - 项目边界与产品形态决议
-6. `plans/03-human-team-experience-feedback-and-design-direction.md`
-   - 团队体验反馈与默认体验层方向
-7. `QUICKSTART.md`
-   - 低门槛上手说明
-8. `PERSONAL_AGENT_PILOT.md`
-   - 个人域多 Agent 首次试用、角色映射与样例
-9. `../scripts/bootstrap.sh`
-   - 本地安装与 CLI 激活入口
-10. `../scripts/smoke-test.sh`
-   - 发布前和首次使用前的最小健康检查
+   - 项目是什么、适合谁、5 分钟如何开始。
+2. `getting-started.md`
+   - 安装、个人域多 Agent 试用、团队试用最小约定和常见问题。
+3. `specs/00-top-level-whitepaper.md`
+   - 顶层定位、问题背景、能力边界和长期方向。
+4. `specs/01-prd.md`
+   - 产品定义、用户、能力模型和成功标准。
+5. `specs/04-change-package-spec.md`
+   - change package 的结构和工作单元定义。
+6. `specs/06-evidence-verify-review-schema.md`
+   - evidence、verify、review 的最小闭环。
 
-## 顶层文档
+## 文档分区
 
-- `specs/00-top-level-whitepaper.md`
-- `specs/01-prd.md`
-- `plans/01-execution-plan.md`
+| 路径 | 定位 | 默认是否需要阅读 |
+| --- | --- | --- |
+| `getting-started.md` | 唯一上手入口 | 是 |
+| `specs/` | 当前框架规格和协议定义 | 按需 |
+| `archive/plans/` | 历史迭代计划和设计过程记录 | 否 |
+| `archive/reports/` | 历史总结、closeout 和复盘材料 | 否 |
+| `.governance/` | 运行时治理产物目录，不是文档区 | 否 |
 
-## 细化规格
+## 当前规格文档
 
-- `specs/03-fact-layer-directory-spec.md`
-- `specs/04-change-package-spec.md`
-- `specs/05-execution-contract-spec.md`
-- `specs/06-evidence-verify-review-schema.md`
-- `specs/07-standard-9-step-runtime-flow.md`
-- `specs/09-mvp-cli-entry-spec.md`
-- `specs/13-round-close-report-and-closeout-package-spec.md`
+- `specs/00-top-level-whitepaper.md`：顶层白皮书。
+- `specs/01-prd.md`：产品需求与能力模型。
+- `specs/02-terminology.md`：术语表。
+- `specs/03-fact-layer-directory-spec.md`：事实层目录结构。
+- `specs/04-change-package-spec.md`：变更包规格。
+- `specs/05-execution-contract-spec.md`：执行契约规格。
+- `specs/06-evidence-verify-review-schema.md`：证据、验证和审查规格。
+- `specs/07-standard-9-step-runtime-flow.md`：底层 9 步运行流。
+- `specs/08-role-binding-spec.md`：角色绑定规则。
+- `specs/09-mvp-cli-entry-spec.md`：CLI 入口规格。
+- `specs/10-test-audit-done-criteria.md`：测试、审计和完成标准。
+- `specs/11-executor-adapter-interface.md`：执行器适配接口。
+- `specs/12-index-and-artifact-governance.md`：索引和产物治理。
+- `specs/13-round-close-report-and-closeout-package-spec.md`：轮次收束报告和 closeout package。
+- `specs/14-collaboration-state-output-and-visualization-extension.md`：协作状态输出和可视化扩展。
 
-## 计划与方向
+## 历史材料
 
-- `plans/01-execution-plan.md`
-- `plans/02-boundary-and-product-shape-decision.md`
-- `plans/03-human-team-experience-feedback-and-design-direction.md`
-- `plans/04-milestone1-change-package.md`
-- `plans/05-milestone1-implementation-design-package.md`
-- `plans/06-milestone2-scope-and-splitting.md`
-- `plans/07-milestone2-runtime-status-and-timeline-design.md`
-- `plans/08-milestone2-handoff-package-design.md`
-- `plans/09-milestone2-handoff-package-implementation-plan.md`
-- `plans/10-milestone2-owner-transfer-continuity-design.md`
-- `plans/12-milestone2-increment-package-design.md`
-- `plans/13-milestone2-increment-package-implementation-plan.md`
-- `plans/14-milestone2-closeout-packet-design.md`
-- `plans/15-milestone2-closeout-packet-implementation-plan.md`
-- `plans/16-milestone2-sync-escalation-packet-design.md`
-- `plans/17-milestone2-sync-escalation-packet-implementation-plan.md`
-- `plans/18-milestone2-sync-history-and-external-export-design.md`
-- `plans/19-milestone2-sync-history-and-external-export-implementation-plan.md`
-- `plans/20-milestone2-boundary-hardening-design.md`
-- `plans/21-milestone2-boundary-hardening-implementation-plan.md`
-- `plans/22-milestone2-maintenance-status-hardening-design.md`
-- `plans/23-milestone2-maintenance-status-hardening-implementation-plan.md`
-- `plans/24-milestone2-truth-source-artifact-boundary-design.md`
-- `plans/25-milestone2-truth-source-artifact-boundary-implementation-plan.md`
-- `plans/26-milestone2-archive-maintenance-consistency-design.md`
-- `plans/27-milestone2-archive-maintenance-consistency-implementation-plan.md`
-- `plans/28-milestone2-continuity-refs-consistency-design.md`
-- `plans/29-milestone2-continuity-refs-consistency-implementation-plan.md`
-- `plans/30-milestone2-archive-receipt-and-archived-refs-consistency-design.md`
-- `plans/31-milestone2-archive-receipt-and-archived-refs-consistency-implementation-plan.md`
-- `plans/32-milestone2-sync-history-query-design.md`
-- `plans/33-milestone2-sync-history-query-implementation-plan.md`
-- `plans/34-milestone2-sync-history-month-list-and-aggregate-query-design.md`
-- `plans/35-milestone2-sync-history-month-list-and-aggregate-query-implementation-plan.md`
-- `plans/36-milestone2-continuity-and-sync-digest-design.md`
-- `plans/37-milestone2-continuity-and-sync-digest-implementation-plan.md`
-- `plans/38-milestone2-sync-history-summary-in-digest-design.md`
-- `plans/39-milestone2-sync-history-summary-in-digest-implementation-plan.md`
-- `plans/40-milestone2-digest-projection-schema-design.md`
-- `plans/41-milestone2-digest-projection-schema-implementation-plan.md`
-- `plans/44-milestone2-digest-recent-runtime-events-design.md`
-- `plans/45-milestone2-digest-recent-runtime-events-implementation-plan.md`
-- `plans/46-milestone2-sync-history-grouped-summary-design.md`
-- `plans/47-milestone2-sync-history-grouped-summary-implementation-plan.md`
-- `plans/48-milestone2-sync-history-summary-only-design.md`
-- `plans/49-milestone2-sync-history-summary-only-implementation-plan.md`
-- `plans/50-milestone2-sync-history-target-layer-summary-design.md`
-- `plans/51-milestone2-sync-history-target-layer-summary-implementation-plan.md`
-- `plans/52-milestone2-sync-history-group-latest-metadata-design.md`
-- `plans/53-milestone2-sync-history-group-latest-metadata-implementation-plan.md`
-- `plans/54-milestone2-sync-history-distinct-change-count-design.md`
-- `plans/55-milestone2-sync-history-distinct-change-count-implementation-plan.md`
-- `plans/56-milestone2-digest-grouped-sync-summary-design.md`
-- `plans/57-milestone2-digest-grouped-sync-summary-implementation-plan.md`
+历史设计过程、Milestone 计划、closeout 和复盘材料已经移入：
 
-## 报告与实践材料
+- `archive/plans/`
+- `archive/reports/`
 
-- `reports/01-status-report.md`
-- `reports/02-session-recovery-playbook.md`
-- `reports/03-milestone1-milestone2-closeout-and-remaining-items.md`
-- `reports/04-current-iteration-final-completion-and-next-round-candidate-input.md`
-- `reports/05-current-iteration-round-close-report.md`
-- `QUICKSTART.md`
+这些文件保留项目演进证据，但不再作为默认阅读入口。新用户不要从这里开始。
 
 ## 说明
 
-- `docs/specs/` 用于承载框架级定义、结构规范与关键协作语义。
-- `docs/plans/` 用于承载阶段计划、边界决议与方向性设计文档。
-- 运行时生成的治理产物默认位于 `.governance/`，不应与顶层定义文档混淆。
-- 人类阅读文档不能直接充当机器事实真相源。
+- 文档真相源优先级：`README.md` / `getting-started.md` / `specs/` 高于 `archive/`。
+- 运行时生成的治理产物默认位于目标项目的 `.governance/`。
+- 人类阅读文档不能直接充当机器事实真相源；机器事实应落在 `.governance/**` 结构化文件中。
