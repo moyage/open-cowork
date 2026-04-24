@@ -415,6 +415,7 @@ def cmd_continuity_sync_history_query(args):
             print(
                 f"- {group.get('group_key')} "
                 f"events={group.get('event_count')} "
+                f"distinct_changes={group.get('distinct_change_count')} "
                 f"latest={group.get('latest_headline')} "
                 f"latest_change={group.get('latest_change_id')} "
                 f"latest_sync_kind={group.get('latest_sync_kind')}"

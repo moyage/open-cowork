@@ -786,6 +786,59 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(group["latest_change_id"], "CHG-B")
             self.assertEqual(group["latest_sync_kind"], "routine-sync")
 
+    def test_grouped_summary_exposes_distinct_change_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [
+                    {
+                        "event_id": "evt-1",
+                        "change_id": "CHG-A",
+                        "recorded_at": "2026-04-24T12:00:00Z",
+                        "sync_kind": "escalation",
+                        "source_kind": "closeout",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/archive/CHG-A/sync-packet.yaml",
+                        "headline": "A1",
+                    },
+                    {
+                        "event_id": "evt-2",
+                        "change_id": "CHG-A",
+                        "recorded_at": "2026-04-24T13:00:00Z",
+                        "sync_kind": "routine-sync",
+                        "source_kind": "increment",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/changes/CHG-A/sync-packet.yaml",
+                        "headline": "A2",
+                    },
+                    {
+                        "event_id": "evt-3",
+                        "change_id": "CHG-B",
+                        "recorded_at": "2026-04-24T14:00:00Z",
+                        "sync_kind": "routine-sync",
+                        "source_kind": "increment",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/changes/CHG-B/sync-packet.yaml",
+                        "headline": "B1",
+                    },
+                ],
+            })
+
+            payload = read_sync_history_across_months(root, summary_by="target_layer")
+
+            group = payload["grouped_summary"]["groups"][0]
+            self.assertEqual(group["group_key"], "sponsor")
+            self.assertEqual(group["event_count"], 3)
+            self.assertEqual(group["distinct_change_count"], 2)
+
     def test_materialize_increment_package_records_delta_and_handoff_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
