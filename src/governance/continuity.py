@@ -845,12 +845,16 @@ def _group_sync_history_events(events: list[dict], group_by: str) -> dict:
                 "event_count": 1,
                 "latest_recorded_at": event.get("recorded_at"),
                 "latest_headline": event.get("headline"),
+                "latest_change_id": event.get("change_id"),
+                "latest_sync_kind": event.get("sync_kind"),
             }
             continue
         existing["event_count"] += 1
         if str(event.get("recorded_at") or "") >= str(existing.get("latest_recorded_at") or ""):
             existing["latest_recorded_at"] = event.get("recorded_at")
             existing["latest_headline"] = event.get("headline")
+            existing["latest_change_id"] = event.get("change_id")
+            existing["latest_sync_kind"] = event.get("sync_kind")
     ordered = sorted(
         groups.values(),
         key=lambda item: (-int(item.get("event_count") or 0), str(item.get("group_key") or "")),
