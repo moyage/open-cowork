@@ -702,7 +702,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_sync_history_query.add_argument("--change-id", default=None, help="Optional change id filter")
     p_continuity_sync_history_query.add_argument("--source-kind", choices=["closeout", "increment"], default=None, help="Optional source kind filter")
     p_continuity_sync_history_query.add_argument("--sync-kind", choices=["routine-sync", "escalation"], default=None, help="Optional sync kind filter")
-    p_continuity_sync_history_query.add_argument("--summary-by", choices=["change_id", "source_kind", "sync_kind"], default=None, help="Optional grouped summary view")
+    p_continuity_sync_history_query.add_argument("--summary-by", choices=["change_id", "source_kind", "sync_kind", "target_layer"], default=None, help="Optional grouped summary view")
     p_continuity_sync_history_query.add_argument("--summary-only", action="store_true", help="Return only grouped summary and hide raw event list")
     p_continuity_sync_history_query.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_continuity_export = p_continuity_sub.add_parser("export-sync-packet", help="Export sync packet to external directory")

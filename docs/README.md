@@ -85,6 +85,8 @@
 - `plans/47-milestone2-sync-history-grouped-summary-implementation-plan.md`
 - `plans/48-milestone2-sync-history-summary-only-design.md`
 - `plans/49-milestone2-sync-history-summary-only-implementation-plan.md`
+- `plans/50-milestone2-sync-history-target-layer-summary-design.md`
+- `plans/51-milestone2-sync-history-target-layer-summary-implementation-plan.md`
 
 ## 报告与实践材料
 
