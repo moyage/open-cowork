@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4
+
+- Added `ocw version` / `open-cowork version` for upgrade diagnostics
+- Added `scripts/update.sh` and `scripts/bootstrap.sh --clean` for smooth V0.2.3 -> V0.2.4 upgrades
+- Added `ocw change prepare` to fill intent, requirements, design, tasks, contract, and bindings for a change package
+- Added `ocw pilot` as a one-command personal-domain pilot setup path
+- Updated README and getting-started docs with upgrade, reinstall, guided pilot, and agent prompt instructions
+
 ## 0.2.3
 
 - Added `ocw onboard` and `ocw setup` for interactive or scripted project onboarding

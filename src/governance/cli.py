@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import sys
 from pathlib import Path
 
 
@@ -28,6 +30,95 @@ def cmd_change_create(args):
         current_change_id=package.change_id,
     )
     print(f"Created change package {package.change_id} at {package.path}")
+
+
+def cmd_change_prepare(args):
+    from governance.change_prepare import PrepareChangeRequest, prepare_change_package
+
+    if not (args.goal or "").strip():
+        print("--goal is required for 'ocw change prepare'.")
+        return 1
+
+    payload = prepare_change_package(PrepareChangeRequest(
+        root=args.root,
+        change_id=args.change_id,
+        title=args.title or "",
+        goal=args.goal,
+        scope_in=list(args.scope_in or []),
+        scope_out=list(args.scope_out or []),
+        verify_commands=list(args.verify_command or []),
+        profile=args.profile,
+    ))
+    print(f"Change prepared: {payload['change_id']}")
+    print("")
+    print("Next commands:")
+    print(f"- ocw --root . contract validate --change-id {payload['change_id']}")
+    print(f"- ocw --root . run --change-id {payload['change_id']} ...")
+    print(f"- ocw --root . verify --change-id {payload['change_id']}")
+    print("")
+    print("personal domain Agent prompt:")
+    print(_format_agent_execution_prompt(payload["change_id"]))
+    return 0
+
+
+def _format_agent_execution_prompt(change_id: str) -> str:
+    return (
+        f"Please continue open-cowork change {change_id}: read contract.yaml and bindings.yaml, "
+        "execute only inside scope_in, record evidence, run verify, request independent review, "
+        "and do not archive until review approves."
+    )
+
+
+def cmd_pilot(args):
+    target = Path(args.target or args.root).expanduser().resolve()
+    if not args.yes and not _confirm_pilot(target, args.change_id):
+        print("Pilot cancelled.")
+        return 1
+
+    target.mkdir(parents=True, exist_ok=True)
+    print("open-cowork pilot")
+    print("")
+    print(f"- target: {target}")
+    print(f"- change_id: {args.change_id}")
+    print("")
+    cmd_init(argparse.Namespace(root=str(target)))
+    cmd_change_create(argparse.Namespace(root=str(target), change_id=args.change_id, title=args.title or args.change_id))
+    cmd_change_prepare(argparse.Namespace(
+        root=str(target),
+        change_id=args.change_id,
+        title=args.title or args.change_id,
+        goal=args.goal,
+        scope_in=list(args.scope_in or []),
+        scope_out=list(args.scope_out or []),
+        verify_command=list(args.verify_command or []),
+        profile=args.profile,
+    ))
+    print("")
+    validate_exit = cmd_contract_validate(argparse.Namespace(root=str(target), change_id=args.change_id, path=None))
+    if validate_exit != 0:
+        return validate_exit
+    print("")
+    cmd_status(argparse.Namespace(root=str(target)))
+    print("")
+    cmd_continuity_digest(argparse.Namespace(root=str(target), change_id=args.change_id, format="text"))
+    print("")
+    print("open-cowork pilot complete.")
+    print("")
+    print("copy this prompt to your personal-domain Agent:")
+    print(_format_agent_execution_prompt(args.change_id))
+    return 0
+
+
+def _confirm_pilot(target: Path, change_id: str) -> bool:
+    print("open-cowork pilot")
+    print("")
+    print("This will initialize .governance/ and prepare a governed change package.")
+    print("It will not modify application source files.")
+    print("")
+    print(f"- target: {target}")
+    print(f"- change_id: {change_id}")
+    answer = input("Continue? [y/N] ").strip().lower()
+    return answer in {"y", "yes"}
 
 
 def cmd_contract_validate(args):
@@ -215,6 +306,30 @@ def cmd_init(args):
 
     ensure_governance_index(args.root)
     print(f"Initialized open-cowork governance in {args.root}/.governance")
+
+
+def cmd_version(args):
+    project_root = Path(__file__).resolve().parents[2]
+    version = _read_project_version(project_root)
+    print(f"open-cowork {version}")
+    print(f"python: {sys.executable}")
+    print(f"cli: {Path(sys.argv[0]).resolve()}")
+    print(f"project_root: {project_root}")
+    return 0
+
+
+def _read_project_version(project_root: Path) -> str:
+    pyproject_path = project_root / "pyproject.toml"
+    if pyproject_path.exists():
+        match = re.search(r'^version = "([^"]+)"', pyproject_path.read_text(encoding="utf-8"), re.MULTILINE)
+        if match:
+            return match.group(1)
+    try:
+        from importlib.metadata import version
+
+        return version("open-cowork")
+    except Exception:
+        return "unknown"
 
 
 def cmd_onboard(args):
@@ -802,6 +917,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("init", help="Initialize minimum governance directory")
     subparsers.add_parser("propose", help="Create an intent draft")
+    subparsers.add_parser("version", help="Show open-cowork version and command paths")
 
     for command_name in ("onboard", "setup"):
         p_onboard = subparsers.add_parser(command_name, help="Run interactive or scripted onboarding")
@@ -818,10 +934,26 @@ def build_parser() -> argparse.ArgumentParser:
         p_onboard.add_argument("--create-demo-change", action="store_true", help="Create a demo change after init")
         p_onboard.add_argument("--demo-change-id", default="personal-demo", help="Demo change id")
 
+    p_pilot = subparsers.add_parser("pilot", help="Prepare a personal-domain pilot change in one command")
+    p_pilot.add_argument("--target", default=None, help="Target project directory")
+    p_pilot.add_argument("--change-id", default="personal-demo", help="Change identifier")
+    p_pilot.add_argument("--title", default="Personal domain pilot", help="Change title")
+    p_pilot.add_argument("--goal", required=True, help="Pilot goal")
+    p_pilot.add_argument("--scope-in", action="append", default=[], help="Allowed implementation path or glob")
+    p_pilot.add_argument("--scope-out", action="append", default=[], help="Excluded path or glob")
+    p_pilot.add_argument("--verify-command", action="append", default=[], help="Verification command")
+    p_pilot.add_argument("--profile", choices=["personal", "team"], default="personal", help="Role binding profile")
+    p_pilot.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
+
     p_change = subparsers.add_parser("change", help="Change package management")
-    p_change.add_argument("subcmd", choices=["create"], help="Create change package")
+    p_change.add_argument("subcmd", choices=["create", "prepare"], help="Create or prepare change package")
     p_change.add_argument("change_id", help="Change identifier")
     p_change.add_argument("--title", default="", help="Optional change title")
+    p_change.add_argument("--goal", default="", help="Change goal for generated authoring files")
+    p_change.add_argument("--scope-in", action="append", default=[], help="Allowed implementation path or glob")
+    p_change.add_argument("--scope-out", action="append", default=[], help="Excluded path or glob")
+    p_change.add_argument("--verify-command", action="append", default=[], help="Verification command")
+    p_change.add_argument("--profile", choices=["personal", "team"], default="personal", help="Role binding profile")
 
     p_contract = subparsers.add_parser("contract", help="Contract management")
     p_contract_sub = p_contract.add_subparsers(dest="subcmd")
@@ -957,10 +1089,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "init":
         cmd_init(args)
+    elif args.command == "version":
+        return cmd_version(args)
     elif args.command in {"onboard", "setup"}:
         return cmd_onboard(args)
+    elif args.command == "pilot":
+        return cmd_pilot(args)
     elif args.command == "change" and args.subcmd == "create":
         cmd_change_create(args)
+    elif args.command == "change" and args.subcmd == "prepare":
+        return cmd_change_prepare(args)
     elif args.command == "status":
         cmd_status(args)
     elif args.command == "contract" and args.subcmd == "validate":

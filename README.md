@@ -99,11 +99,11 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 | 审查与收束 | 8. Review and decide | 独立 review 并决策 | review decision |
 | 审查与收束 | 9. Archive and carry forward | 归档并生成接续输入 | archive / closeout / digest |
 
-默认建议：第一次试用只跑到 `init -> status -> diagnose -> change create -> status`，不要一上来强制跑完整 9 步。
+默认建议：第一次试用先跑 `onboard / pilot`，让框架完成初始化、change 准备、contract 校验和状态输出；不要一上来强制跑完整 9 步。
 
 ## 当前版本完成度
 
-当前 `v0.2.3` 是“带 onboarding/setup 入口的可试用协议框架与 CLI 基线”，重点是让个人域和团队成员能低门槛开始实践。
+当前 `v0.2.4` 是“带升级路径、onboarding/setup 入口和个人域 pilot 主链准备能力的可试用协议框架与 CLI 基线”，重点是让个人域和团队成员能低门槛开始实践，并能从 `change create` 自然走到可执行 contract / bindings。
 
 已经具备：
 
@@ -122,7 +122,11 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `scripts/bootstrap.sh` 支持本地安装。
 - `ocw onboard` / `ocw setup` 支持交互式或脚本式初始化。
 - `open-cowork onboard` 提供更直观的 console script alias。
+- `ocw change prepare` 支持自动填充 change package 主链准备文件。
+- `ocw pilot` 支持一条命令完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent 下一步提示。
+- `ocw version` / `open-cowork version` 支持升级诊断。
 - `scripts/quickstart.sh` 保留为一键脚本入口，并调用 `ocw onboard`。
+- `scripts/update.sh` 和 `scripts/bootstrap.sh --clean` 支持从旧版本优雅升级或干净重装。
 - `scripts/smoke-test.sh` 支持最小健康检查。
 
 还没有覆盖：
@@ -179,6 +183,35 @@ ocw --root . status
 ocw --root . diagnose-session
 ```
 
+### 从 V0.2.3 升级
+
+如果你已经安装过早期版本，推荐在 `open-cowork` 仓库根目录执行：
+
+```bash
+git pull --ff-only
+./scripts/update.sh
+source .venv/bin/activate
+ocw version
+```
+
+如果怀疑本地虚拟环境残留或命令路径混乱，使用干净重装：
+
+```bash
+git pull --ff-only
+./scripts/bootstrap.sh --clean
+source .venv/bin/activate
+ocw version
+./scripts/smoke-test.sh
+```
+
+排查旧命令路径：
+
+```bash
+which ocw
+which open-cowork
+ocw version
+```
+
 ### 创建一个轻量 change
 
 ```bash
@@ -188,6 +221,38 @@ ocw --root . continuity digest --change-id personal-demo
 ```
 
 如果 `contract.yaml` 还未补齐，`status / digest` 会显示 draft 指引，而不是要求你立刻跑完整主链。
+
+### 一条命令准备个人域试用主链
+
+V0.2.4 推荐直接使用 `pilot` 路径，避免 `change create` 后面对空白 `contract.yaml / bindings.yaml` 不知道如何继续：
+
+```bash
+ocw pilot \
+  --target /path/to/your-project \
+  --change-id personal-demo \
+  --title "Personal domain pilot" \
+  --goal "在当前项目中试用 open-cowork 主链" \
+  --scope-in "src/**" \
+  --scope-in "tests/**" \
+  --verify-command "python3 -m unittest discover -s tests" \
+  --yes
+```
+
+如果已经创建过 change，也可以只补齐主链准备文件：
+
+```bash
+ocw --root /path/to/your-project change prepare personal-demo \
+  --goal "在当前项目中试用 open-cowork 主链" \
+  --scope-in "src/**" \
+  --scope-in "tests/**" \
+  --verify-command "python3 -m unittest discover -s tests"
+```
+
+可以直接交给个人域 Agent 的一句话：
+
+```text
+请帮我在当前项目中使用 open-cowork 启动个人域治理试用：先确认 ocw version 是 0.2.4 或更高；然后运行 ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes；完成后读取 .governance/changes/personal-demo/contract.yaml 和 bindings.yaml，只在 scope_in 内执行，记录 evidence，运行 verify，交给独立 reviewer review，review 通过后再 archive。
+```
 
 ## Roadmap
 

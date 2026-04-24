@@ -112,6 +112,114 @@ class CliTests(unittest.TestCase):
             self.assertEqual(changes_index["changes"][0]["change_id"], "CHG-CLI-1")
             self.assertIn("Created change package CHG-CLI-1", stdout.getvalue())
 
+    def test_change_prepare_fills_main_chain_files_and_valid_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-PREPARE", "--title", "Prepare pilot"])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "CHG-PREPARE",
+                    "--goal",
+                    "Use open-cowork to govern a first personal domain change",
+                    "--scope-in",
+                    "src/**",
+                    "--scope-in",
+                    "tests/**",
+                    "--verify-command",
+                    "python3 -m unittest discover -s tests",
+                    "--profile",
+                    "personal",
+                ])
+
+            output = stdout.getvalue()
+            change_dir = root / ".governance/changes/CHG-PREPARE"
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Change prepared: CHG-PREPARE", output)
+            self.assertIn("contract validate", output)
+            self.assertIn("personal domain Agent prompt", output)
+            self.assertIn("Use open-cowork", (change_dir / "intent.md").read_text(encoding="utf-8"))
+            self.assertIn("src/**", (change_dir / "requirements.md").read_text(encoding="utf-8"))
+            self.assertIn("Step 6", (change_dir / "tasks.md").read_text(encoding="utf-8"))
+
+            contract = load_yaml(change_dir / "contract.yaml")
+            bindings = load_yaml(change_dir / "bindings.yaml")
+            manifest = load_yaml(change_dir / "manifest.yaml")
+            self.assertEqual(contract["change_id"], "CHG-PREPARE")
+            self.assertIn(".governance/changes/CHG-PREPARE/evidence/**", contract["scope_in"])
+            self.assertEqual(contract["verification"]["commands"], ["python3 -m unittest discover -s tests"])
+            self.assertIn("no_executor_reviewer_merge", contract["forbidden_actions"])
+            self.assertEqual(bindings["profile"], "personal")
+            self.assertEqual(bindings["steps"]["6"]["owner"], "executor")
+            self.assertEqual(manifest["status"], "step5-prepared")
+            self.assertTrue(manifest["readiness"]["step6_entry_ready"])
+            self.assertEqual(manifest["target_validation_objects"], contract["validation_objects"])
+
+            validate_stdout = io.StringIO()
+            with contextlib.redirect_stdout(validate_stdout):
+                validate_exit = main(["--root", str(root), "contract", "validate", "--change-id", "CHG-PREPARE"])
+            self.assertEqual(validate_exit, 0)
+            self.assertIn("Contract valid", validate_stdout.getvalue())
+
+    def test_change_prepare_requires_goal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-NO-GOAL", "--title", "Missing goal"])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "change", "prepare", "CHG-NO-GOAL"])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("--goal is required", stdout.getvalue())
+
+    def test_pilot_prepares_personal_change_from_one_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target-project"
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "pilot",
+                    "--target",
+                    str(target),
+                    "--change-id",
+                    "personal-demo",
+                    "--title",
+                    "Personal pilot",
+                    "--goal",
+                    "Prepare a governed personal-domain trial",
+                    "--scope-in",
+                    "src/**",
+                    "--verify-command",
+                    "python3 -m unittest discover -s tests",
+                    "--yes",
+                ])
+
+            output = stdout.getvalue()
+            change_dir = target / ".governance/changes/personal-demo"
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((change_dir / "contract.yaml").exists())
+            self.assertTrue((change_dir / "bindings.yaml").exists())
+            self.assertIn("open-cowork pilot complete", output)
+            self.assertIn("Contract valid", output)
+            self.assertIn("# open-cowork status", output)
+            self.assertIn("## Blockers\n- none", output)
+            self.assertNotIn("Manifest target_validation_objects must align", output)
+            self.assertIn("copy this prompt to your personal-domain Agent", output)
+            self.assertEqual(load_yaml(change_dir / "manifest.yaml")["status"], "step5-prepared")
+
     def test_contract_validate_and_run_review_archive_flow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -661,6 +769,18 @@ class CliTests(unittest.TestCase):
 
         self.assertIn('ocw = "governance.cli:main"', pyproject_text)
         self.assertIn('open-cowork = "governance.cli:main"', pyproject_text)
+
+    def test_version_command_reports_version_and_paths(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            exit_code = main(["version"])
+
+        output = stdout.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("open-cowork 0.2.4", output)
+        self.assertIn("python:", output)
+        self.assertIn("cli:", output)
+        self.assertIn("project_root:", output)
 
     def test_continuity_commands_materialize_launch_input_and_round_entry_summary(self):
         with tempfile.TemporaryDirectory() as tmp:

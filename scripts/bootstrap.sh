@@ -4,10 +4,33 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${OCW_VENV_DIR:-"$ROOT_DIR/.venv"}"
 PYTHON_BIN="${PYTHON:-python3}"
+CLEAN=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --clean)
+      CLEAN=1
+      ;;
+    *)
+      echo "Unknown bootstrap option: $arg" >&2
+      echo "Usage: ./scripts/bootstrap.sh [--clean]" >&2
+      exit 2
+      ;;
+  esac
+done
 
 echo "open-cowork bootstrap"
 echo "root: $ROOT_DIR"
 echo "venv: $VENV_DIR"
+
+if [[ "$CLEAN" == "1" ]]; then
+  if [[ -z "$VENV_DIR" || "$VENV_DIR" == "/" ]]; then
+    echo "Refusing to clean unsafe venv path: $VENV_DIR" >&2
+    exit 2
+  fi
+  echo "clean: removing existing venv before reinstall"
+  rm -rf "$VENV_DIR"
+fi
 
 "$PYTHON_BIN" -m venv "$VENV_DIR"
 

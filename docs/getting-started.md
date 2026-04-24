@@ -72,7 +72,42 @@ ocw --root . status
 ocw --root . diagnose-session
 ```
 
-## 5. 个人域多 Agent 推荐用法
+## 5. 升级和干净重装
+
+如果你已经安装过 V0.2.3 或更早版本，先在 `open-cowork` 仓库根目录执行：
+
+```bash
+git pull --ff-only
+./scripts/update.sh
+source .venv/bin/activate
+ocw version
+```
+
+如果遇到旧 venv、旧命令路径或安装残留，使用干净重装：
+
+```bash
+git pull --ff-only
+./scripts/bootstrap.sh --clean
+source .venv/bin/activate
+ocw version
+./scripts/smoke-test.sh
+```
+
+排查当前 shell 是否还在使用旧版本：
+
+```bash
+which ocw
+which open-cowork
+ocw version
+```
+
+可以交给个人域 Agent 的升级提示：
+
+```text
+请帮我把本地 open-cowork 升级到最新版：进入 open-cowork 仓库，执行 git pull --ff-only，然后执行 ./scripts/update.sh；如果失败，执行 ./scripts/bootstrap.sh --clean；完成后运行 ocw version 和 ./scripts/smoke-test.sh 确认版本与健康状态。
+```
+
+## 6. 个人域多 Agent 推荐用法
 
 个人域中可以一人多角，但不建议让同一个执行会话自审自批。
 
@@ -96,7 +131,7 @@ ocw --root . diagnose-session
 - Review 尽量由另一个 Agent、另一个会话或人来做。
 - 人只在目标确认、风险确认、review 决策和 closeout 时介入。
 
-## 6. 常见个人域组合样例
+## 7. 常见个人域组合样例
 
 这些样例是匿名的工具组合模式，不代表团队成员身份。
 
@@ -176,7 +211,7 @@ ocw --root . status
 ocw --root . continuity digest
 ```
 
-## 7. 推荐首次试用流程
+## 8. 推荐首次试用流程
 
 ### Level 1：只验证接入
 
@@ -198,9 +233,52 @@ ocw --root . continuity digest --change-id personal-demo
 
 目标：确认 `open-cowork` 可以描述当前任务状态，并把多 Agent 工作绑定到一个 `change-id`。如果 `contract.yaml` 还未补齐，`status / digest` 会显示 draft 指引，而不是要求你立刻跑完整主链。
 
-### Level 3：contract ready 后尝试交接和复盘
+### Level 3：一条命令准备可执行 change
 
-当当前 change 的 `contract.yaml` 与 `bindings.yaml` 已经由主控 Agent 或人补齐后，再执行：
+V0.2.4 起，推荐用 `pilot` 避免 `change create` 后面对空白 `contract.yaml / bindings.yaml` 卡住：
+
+```bash
+ocw pilot \
+  --target . \
+  --change-id personal-demo \
+  --title "Personal domain pilot" \
+  --goal "在当前项目中试用 open-cowork 主链" \
+  --scope-in "src/**" \
+  --scope-in "tests/**" \
+  --verify-command "<本项目测试命令>" \
+  --yes
+```
+
+如果已经有 change，只补齐主链准备文件：
+
+```bash
+ocw --root . change prepare personal-demo \
+  --goal "在当前项目中试用 open-cowork 主链" \
+  --scope-in "src/**" \
+  --scope-in "tests/**" \
+  --verify-command "<本项目测试命令>"
+```
+
+这会填充：
+
+- `intent.md`
+- `requirements.md`
+- `design.md`
+- `tasks.md`
+- `contract.yaml`
+- `bindings.yaml`
+
+并执行 contract validation 与状态输出。
+
+可以直接交给个人域 Agent 的一句话：
+
+```text
+请帮我在当前项目中使用 open-cowork 启动个人域治理试用：先确认 ocw version 是 0.2.4 或更高；然后运行 ocw pilot --target . --change-id personal-demo --title "Personal domain pilot" --goal "在当前项目中试用 open-cowork 主链" --scope-in "src/**" --scope-in "tests/**" --verify-command "<本项目测试命令>" --yes；完成后读取 .governance/changes/personal-demo/contract.yaml 和 bindings.yaml，只在 scope_in 内执行，记录 evidence，运行 verify，交给独立 reviewer review，review 通过后再 archive。
+```
+
+### Level 4：contract ready 后尝试交接和复盘
+
+当当前 change 的 `contract.yaml` 与 `bindings.yaml` 已经由 `pilot`、`change prepare`、主控 Agent 或人补齐后，再执行：
 
 ```bash
 ocw --root . contract validate --change-id personal-demo
@@ -213,7 +291,7 @@ ocw --root . continuity digest --change-id personal-demo
 
 目标：确认从一个 Agent 切换到另一个 Agent 时，有一份可读、可接续、可审查的上下文输入。
 
-## 8. 团队试用最小约定
+## 9. 团队试用最小约定
 
 团队试用不要求统一本地工具链，但建议统一下面四件事：
 
@@ -224,7 +302,7 @@ ocw --root . continuity digest --change-id personal-demo
 
 首次团队试用建议仍从个人域开始，先让每个人在自己的本地项目上完成 `bootstrap + init + status`，再进入多人协作实践。
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### 我只想先试，不想改现有流程？
 
@@ -243,7 +321,7 @@ ocw --root . session-recovery-packet
 
 先统一 change package、evidence schema、review gate 和 closeout 结构；暂时不要强制统一每个人的 Agent 或 IDE。
 
-## 10. 不推荐的首次试用方式
+## 11. 不推荐的首次试用方式
 
 - 一开始就要求所有 Agent 严格跑完整 `contract -> run -> verify -> review -> archive` 主链。
 - 让执行 Agent 自己完成最终 review 并直接 archive。
@@ -251,7 +329,7 @@ ocw --root . session-recovery-packet
 - 把 `open-cowork` 当成 AI Coding Runtime 或 IDE 插件替代品。
 - 每一步都产出大量长文档，而不是维护最小事实、证据和接续摘要。
 
-## 11. 判断试用是否成功
+## 12. 判断试用是否成功
 
 一次个人域试用成功，不要求项目真的进入团队协作，只要求满足：
 
