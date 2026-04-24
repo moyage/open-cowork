@@ -75,6 +75,8 @@
 - `plans/35-milestone2-sync-history-month-list-and-aggregate-query-implementation-plan.md`
 - `plans/36-milestone2-continuity-and-sync-digest-design.md`
 - `plans/37-milestone2-continuity-and-sync-digest-implementation-plan.md`
+- `plans/38-milestone2-sync-history-summary-in-digest-design.md`
+- `plans/39-milestone2-sync-history-summary-in-digest-implementation-plan.md`
 
 ## 报告与实践材料
 

@@ -464,6 +464,15 @@ def cmd_continuity_digest(args):
     print(f"headline: {payload['summary'].get('headline')}")
     print(f"status: {payload['summary'].get('status')} / {payload['summary'].get('phase')}")
     print(f"recommended reading: {payload['recommended_reading'].get('primary_ref')}")
+    recent_sync_summary = payload.get("recent_sync_summary")
+    if recent_sync_summary:
+        print(
+            "recent sync: "
+            f"{recent_sync_summary.get('total_events')} events / "
+            f"{recent_sync_summary.get('latest_sync_kind')} -> "
+            f"{recent_sync_summary.get('latest_target_layer')} / "
+            f"{recent_sync_summary.get('latest_headline')}"
+        )
     for ref in payload["recommended_reading"].get("secondary_refs", []):
         print(f"- {ref}")
     return 0

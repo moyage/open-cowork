@@ -918,7 +918,7 @@ def _resolve_active_continuity_digest(paths: GovernancePaths, change_id: str, se
 
     change_status = runtime_payload.get("change_status", {})
     gate_posture = change_status.get("gate_posture", {}) or {}
-    return {
+    payload = {
         "schema": CONTINUITY_DIGEST_SCHEMA,
         "change_id": change_id,
         "digest_kind": "active",
@@ -943,6 +943,10 @@ def _resolve_active_continuity_digest(paths: GovernancePaths, change_id: str, se
             "sync_packet_ref": refs.get("sync_packet"),
         },
     }
+    recent_sync_summary = _recent_sync_summary_for_change(paths.root, change_id)
+    if recent_sync_summary:
+        payload["recent_sync_summary"] = recent_sync_summary
+    return payload
 
 
 def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, selected_by: str) -> dict:
@@ -976,7 +980,7 @@ def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, 
 
     closure_summary = closeout.get("closure_summary", {}) or {}
     human_reading_entry = closeout.get("human_reading_entry", {}) or {}
-    return {
+    payload = {
         "schema": CONTINUITY_DIGEST_SCHEMA,
         "change_id": change_id,
         "digest_kind": "archived",
@@ -1002,6 +1006,10 @@ def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, 
             "review_status": review.get("decision", {}).get("status"),
         },
     }
+    recent_sync_summary = _recent_sync_summary_for_change(paths.root, change_id)
+    if recent_sync_summary:
+        payload["recent_sync_summary"] = recent_sync_summary
+    return payload
 
 
 def _find_change_entry(changes_index: dict, change_id: str) -> dict:
@@ -1121,6 +1129,22 @@ def _merge_sync_history_events(existing: list[dict], new_event: dict) -> list[di
         if item.get("packet_ref") == new_event.get("packet_ref"):
             return existing
     return list(existing) + [new_event]
+
+
+def _recent_sync_summary_for_change(root: Path, change_id: str) -> dict | None:
+    payload = read_sync_history_across_months(root, change_id=change_id)
+    events = list(payload.get("events", []))
+    if not events:
+        return None
+    latest = events[-1]
+    return {
+        "total_events": payload.get("summary", {}).get("matched_events", len(events)),
+        "latest_recorded_at": latest.get("recorded_at"),
+        "latest_source_kind": latest.get("source_kind"),
+        "latest_sync_kind": latest.get("sync_kind"),
+        "latest_target_layer": latest.get("target_layer"),
+        "latest_headline": latest.get("headline"),
+    }
 
 
 def _render_sync_export_readme(change_id: str, packet: dict, manifest: dict) -> str:
