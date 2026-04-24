@@ -728,6 +728,44 @@ def append_sync_history(root: str | Path, *, change_id: str, source_kind: str) -
     return str(target)
 
 
+def read_sync_history(
+    root: str | Path,
+    *,
+    month: str,
+    change_id: str | None = None,
+    source_kind: str | None = None,
+    sync_kind: str | None = None,
+) -> dict:
+    paths = GovernancePaths(Path(root))
+    target = paths.sync_history_month_file(month)
+    current = load_yaml(target) if target.exists() else {
+        "schema": SYNC_HISTORY_SCHEMA,
+        "month": month,
+        "events": [],
+    }
+    events = list(current.get("events", []))
+    filtered = [
+        event for event in events
+        if (change_id is None or event.get("change_id") == change_id)
+        and (source_kind is None or event.get("source_kind") == source_kind)
+        and (sync_kind is None or event.get("sync_kind") == sync_kind)
+    ]
+    return {
+        "schema": "sync-history-query/v1",
+        "month": month,
+        "filters": {
+            "change_id": change_id,
+            "source_kind": source_kind,
+            "sync_kind": sync_kind,
+        },
+        "summary": {
+            "total_events": len(events),
+            "matched_events": len(filtered),
+        },
+        "events": filtered,
+    }
+
+
 def export_sync_packet(root: str | Path, *, change_id: str, source_kind: str, output_dir: str | Path) -> str:
     paths = GovernancePaths(Path(root))
     packet_path = paths.sync_packet_file(change_id, source_kind=source_kind)

@@ -373,6 +373,37 @@ def cmd_continuity_sync_history(args):
     return 0
 
 
+def cmd_continuity_sync_history_query(args):
+    from governance.continuity import read_sync_history
+
+    payload = read_sync_history(
+        args.root,
+        month=args.month,
+        change_id=args.change_id,
+        source_kind=args.source_kind,
+        sync_kind=args.sync_kind,
+    )
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+
+    print(f"Sync history month: {payload['month']}")
+    print(f"matched events: {payload['summary']['matched_events']}")
+    if any(value is not None for value in payload["filters"].values()):
+        print(f"filters: {payload['filters']}")
+    for event in payload["events"]:
+        print(
+            f"- {event.get('recorded_at')} {event.get('change_id')} "
+            f"[{event.get('source_kind')}/{event.get('sync_kind')}] {event.get('headline')}"
+        )
+    return 0
+
+
 def cmd_continuity_export_sync_packet(args):
     from governance.continuity import export_sync_packet
 
@@ -582,6 +613,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_sync_history = p_continuity_sub.add_parser("sync-history", help="Append sync packet to project history")
     p_continuity_sync_history.add_argument("--change-id", required=True, help="Target change id")
     p_continuity_sync_history.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
+    p_continuity_sync_history_query = p_continuity_sub.add_parser("sync-history-query", help="Read sync history with optional filters")
+    p_continuity_sync_history_query.add_argument("--month", required=True, help="Month key in YYYYMM")
+    p_continuity_sync_history_query.add_argument("--change-id", default=None, help="Optional change id filter")
+    p_continuity_sync_history_query.add_argument("--source-kind", choices=["closeout", "increment"], default=None, help="Optional source kind filter")
+    p_continuity_sync_history_query.add_argument("--sync-kind", choices=["routine-sync", "escalation"], default=None, help="Optional sync kind filter")
+    p_continuity_sync_history_query.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_continuity_export = p_continuity_sub.add_parser("export-sync-packet", help="Export sync packet to external directory")
     p_continuity_export.add_argument("--change-id", required=True, help="Target change id")
     p_continuity_export.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
@@ -644,6 +681,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_sync_packet(args)
     elif args.command == "continuity" and args.subcmd == "sync-history":
         return cmd_continuity_sync_history(args)
+    elif args.command == "continuity" and args.subcmd == "sync-history-query":
+        return cmd_continuity_sync_history_query(args)
     elif args.command == "continuity" and args.subcmd == "export-sync-packet":
         return cmd_continuity_export_sync_packet(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:

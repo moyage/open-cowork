@@ -8,11 +8,14 @@ import test_support  # noqa: F401
 
 from governance.continuity import (
     accept_owner_transfer_continuity,
+    append_sync_history,
+    export_sync_packet,
     materialize_increment_package,
     materialize_continuity_launch_input,
     materialize_handoff_package,
     materialize_round_entry_input_summary,
     prepare_owner_transfer_continuity,
+    read_sync_history,
     resolve_increment_package,
     resolve_continuity_launch_input,
     resolve_handoff_package,
@@ -23,6 +26,62 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class ContinuityTests(unittest.TestCase):
+    def test_read_sync_history_returns_empty_payload_when_month_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            payload = read_sync_history(root, month="202604")
+
+            self.assertEqual(payload["schema"], "sync-history-query/v1")
+            self.assertEqual(payload["month"], "202604")
+            self.assertEqual(payload["summary"]["total_events"], 0)
+            self.assertEqual(payload["summary"]["matched_events"], 0)
+            self.assertEqual(payload["events"], [])
+
+    def test_read_sync_history_filters_by_change_id_and_source_kind(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [
+                    {
+                        "event_id": "evt-1",
+                        "change_id": "CHG-1",
+                        "recorded_at": "2026-04-24T12:00:00Z",
+                        "sync_kind": "escalation",
+                        "source_kind": "closeout",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/archive/CHG-1/sync-packet.yaml",
+                        "headline": "A",
+                    },
+                    {
+                        "event_id": "evt-2",
+                        "change_id": "CHG-2",
+                        "recorded_at": "2026-04-24T13:00:00Z",
+                        "sync_kind": "routine-sync",
+                        "source_kind": "increment",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/changes/CHG-2/sync-packet.yaml",
+                        "headline": "B",
+                    },
+                ],
+            })
+
+            payload = read_sync_history(root, month="202604", change_id="CHG-1", source_kind="closeout")
+
+            self.assertEqual(payload["summary"]["total_events"], 2)
+            self.assertEqual(payload["summary"]["matched_events"], 1)
+            self.assertEqual(len(payload["events"]), 1)
+            self.assertEqual(payload["events"][0]["change_id"], "CHG-1")
+            self.assertEqual(payload["events"][0]["source_kind"], "closeout")
+
     def test_materialize_increment_package_records_delta_and_handoff_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
