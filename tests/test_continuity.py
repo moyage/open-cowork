@@ -243,6 +243,151 @@ class ContinuityTests(unittest.TestCase):
             self.assertEqual(payload["recent_sync_summary"]["latest_target_layer"], "sponsor")
             self.assertEqual(payload["recent_sync_summary"]["latest_headline"], "需要更高层同步")
 
+    def test_resolve_continuity_digest_active_includes_projection_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-DIGEST-PROJ-ACTIVE"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            set_current_change(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            upsert_change_entry(root, {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "Projection Active",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "projection active",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["DigestSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nProjection active.\n", encoding="utf-8")
+            materialize_handoff_package(root, change_id)
+
+            payload = resolve_continuity_digest(root)
+
+            projections = payload["projection_sources"]["summary"]
+            self.assertEqual(
+                projections["status"]["source_ref"],
+                ".governance/runtime/status/change-status.yaml",
+            )
+            self.assertEqual(projections["status"]["source_field"], "current_status")
+            self.assertEqual(
+                projections["title"]["source_ref"],
+                f".governance/changes/{change_id}/manifest.yaml",
+            )
+
+    def test_resolve_continuity_digest_archived_includes_projection_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-DIGEST-PROJ-ARCH"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00Z",
+                "residual_followups": [],
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00Z",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00Z",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "Projection Archived",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+            materialize_closeout_packet(
+                root,
+                change_id=change_id,
+                closeout_statement="本轮已完成归档",
+                delivered_scope=["closeout-packet"],
+                deferred_scope=[],
+                key_outcomes=["done"],
+                unresolved_items=[],
+                next_direction="sync",
+                attention_points=[],
+                carry_forward_items=[],
+                operator_summary="archived summary",
+                sponsor_summary="archived sponsor",
+            )
+
+            payload = resolve_continuity_digest(root)
+
+            projections = payload["projection_sources"]["summary"]
+            self.assertEqual(
+                projections["status"]["source_ref"],
+                f".governance/archive/{change_id}/closeout-packet.yaml",
+            )
+            self.assertEqual(projections["status"]["source_field"], "closure_summary.final_status")
+            self.assertEqual(
+                projections["title"]["source_ref"],
+                f".governance/archive/{change_id}/manifest.yaml",
+            )
+
     def test_list_sync_history_months_returns_sorted_month_keys(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

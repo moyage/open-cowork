@@ -937,6 +937,7 @@ def _resolve_active_continuity_digest(paths: GovernancePaths, change_id: str, se
             "primary_ref": primary_ref,
             "secondary_refs": secondary_refs,
         },
+        "projection_sources": _active_digest_projection_sources(paths, change_id),
         "refs": refs,
         "sync_view": {
             "available": bool(refs.get("sync_packet")),
@@ -999,6 +1000,7 @@ def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, 
             "primary_ref": primary_ref,
             "secondary_refs": secondary_refs,
         },
+        "projection_sources": _archived_digest_projection_sources(paths, change_id),
         "refs": refs,
         "sync_view": {
             "available": bool(refs.get("sync_packet")),
@@ -1144,6 +1146,45 @@ def _recent_sync_summary_for_change(root: Path, change_id: str) -> dict | None:
         "latest_sync_kind": latest.get("sync_kind"),
         "latest_target_layer": latest.get("target_layer"),
         "latest_headline": latest.get("headline"),
+    }
+
+
+def _active_digest_projection_sources(paths: GovernancePaths, change_id: str) -> dict:
+    manifest_ref = str(paths.change_file(change_id, "manifest.yaml").relative_to(paths.root))
+    runtime_ref = str(paths.runtime_change_status_file().relative_to(paths.root))
+    return {
+        "summary": {
+            "title": {"source_ref": manifest_ref, "source_field": "title"},
+            "status": {"source_ref": runtime_ref, "source_field": "current_status"},
+            "phase": {"source_ref": runtime_ref, "source_field": "phase"},
+            "step": {"source_ref": runtime_ref, "source_field": "current_step"},
+            "headline": {"source_ref": manifest_ref, "source_field": "title"},
+            "next_attention": {
+                "source_ref": runtime_ref,
+                "source_field": "gate_posture.waiting_on|gate_posture.next_decision",
+            },
+        }
+    }
+
+
+def _archived_digest_projection_sources(paths: GovernancePaths, change_id: str) -> dict:
+    manifest_ref = str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root))
+    closeout_ref = str(paths.closeout_packet_file(change_id).relative_to(paths.root))
+    return {
+        "summary": {
+            "title": {"source_ref": manifest_ref, "source_field": "title"},
+            "status": {"source_ref": closeout_ref, "source_field": "closure_summary.final_status"},
+            "phase": {"source_ref": closeout_ref, "source_field": "closure_summary.final_phase"},
+            "step": {"source_ref": closeout_ref, "source_field": "closure_summary.final_step"},
+            "headline": {
+                "source_ref": closeout_ref,
+                "source_field": "human_reading_entry.operator_summary|closure_summary.closeout_statement",
+            },
+            "next_attention": {
+                "source_ref": closeout_ref,
+                "source_field": "continuity_bridge.next_round_default_direction",
+            },
+        }
     }
 
 
