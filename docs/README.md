@@ -99,6 +99,7 @@
 - `reports/01-status-report.md`
 - `reports/02-session-recovery-playbook.md`
 - `reports/03-milestone1-milestone2-closeout-and-remaining-items.md`
+- `reports/04-current-iteration-final-completion-and-next-round-candidate-input.md`
 - `QUICKSTART.md`
 
 ## 说明
