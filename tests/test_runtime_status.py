@@ -284,6 +284,239 @@ class RuntimeStatusTests(unittest.TestCase):
             self.assertTrue(any(item["role"] == "reviewer" and item["actor_id"] == "reviewer-agent" for item in participants_status["participants"]))
             self.assertIn("Runtime status written", stdout.getvalue())
 
+    def test_runtime_status_change_payload_includes_projection_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_dir = root / ".governance/changes/CHG-RT-PROJ-CHANGE"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": "CHG-RT-PROJ-CHANGE",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit-change-projection-sources",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["RuntimeProjectionSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step7-verified",
+                "current_change_id": "CHG-RT-PROJ-CHANGE",
+                "current_step": 7,
+                "current_change": {
+                    "change_id": "CHG-RT-PROJ-CHANGE",
+                    "status": "step7-verified",
+                    "current_step": 7,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": "CHG-RT-PROJ-CHANGE",
+                "path": ".governance/changes/CHG-RT-PROJ-CHANGE",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-verified",
+                "current_change_active": "step7-verified",
+                "current_change_id": "CHG-RT-PROJ-CHANGE",
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-PROJ-CHANGE"])
+
+            self.assertEqual(exit_code, 0)
+            payload = load_yaml(root / ".governance/runtime/status/change-status.yaml")
+            self.assertEqual(
+                payload["projection_sources"]["current_status"]["source_ref"],
+                ".governance/changes/CHG-RT-PROJ-CHANGE/manifest.yaml",
+            )
+            self.assertEqual(payload["projection_sources"]["current_status"]["source_field"], "status")
+            self.assertEqual(payload["projection_sources"]["phase"]["derivation"], "phase_label_for_step")
+
+    def test_runtime_status_steps_payload_includes_projection_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_dir = root / ".governance/changes/CHG-RT-PROJ-STEPS"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": "CHG-RT-PROJ-STEPS",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit-steps-projection-sources",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["RuntimeProjectionSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step7-verified",
+                "current_change_id": "CHG-RT-PROJ-STEPS",
+                "current_step": 7,
+                "current_change": {
+                    "change_id": "CHG-RT-PROJ-STEPS",
+                    "status": "step7-verified",
+                    "current_step": 7,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": "CHG-RT-PROJ-STEPS",
+                "path": ".governance/changes/CHG-RT-PROJ-STEPS",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-verified",
+                "current_change_active": "step7-verified",
+                "current_change_id": "CHG-RT-PROJ-STEPS",
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-PROJ-STEPS"])
+
+            self.assertEqual(exit_code, 0)
+            payload = load_yaml(root / ".governance/runtime/status/steps-status.yaml")
+            self.assertEqual(payload["projection_sources"]["current_step"]["source_field"], "current_step")
+            self.assertEqual(payload["projection_sources"]["next_step"]["derivation"], "next_step")
+            self.assertEqual(
+                payload["projection_sources"]["steps[].owner"]["source_ref"],
+                ".governance/changes/CHG-RT-PROJ-STEPS/bindings.yaml",
+            )
+
+    def test_runtime_status_participants_payload_includes_projection_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_dir = root / ".governance/changes/CHG-RT-PROJ-PART"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": "CHG-RT-PROJ-PART",
+                "status": "step7-verified",
+                "current_step": 7,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "emit-participant-projection-sources",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["RuntimeProjectionSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "step7-verified",
+                "current_change_id": "CHG-RT-PROJ-PART",
+                "current_step": 7,
+                "current_change": {
+                    "change_id": "CHG-RT-PROJ-PART",
+                    "status": "step7-verified",
+                    "current_step": 7,
+                },
+            })
+            upsert_change_entry(root, {
+                "change_id": "CHG-RT-PROJ-PART",
+                "path": ".governance/changes/CHG-RT-PROJ-PART",
+                "status": "step7-verified",
+                "current_step": 7,
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-verified",
+                "current_change_active": "step7-verified",
+                "current_change_id": "CHG-RT-PROJ-PART",
+                "last_archived_change": None,
+                "last_archive_at": None,
+                "residual_followups": [],
+            })
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-PROJ-PART"])
+
+            self.assertEqual(exit_code, 0)
+            payload = load_yaml(root / ".governance/runtime/status/participants-status.yaml")
+            self.assertEqual(
+                payload["projection_sources"]["participants[].actor_id"]["source_ref"],
+                ".governance/changes/CHG-RT-PROJ-PART/bindings.yaml",
+            )
+            self.assertEqual(
+                payload["projection_sources"]["participants[].status"]["source_ref"],
+                ".governance/runtime/status/steps-status.yaml",
+            )
+
     def test_timeline_writes_current_month_event_log(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -483,6 +716,54 @@ class RuntimeStatusTests(unittest.TestCase):
             payload = load_yaml(month_file)
             verify_event = next(event for event in payload["events"] if event["change_id"] == "CHG-RT-4" and event["event_type"] == "verify_completed")
             self.assertTrue(verify_event["timestamp"].startswith("2026-04-24T11:12:13"))
+
+    def test_timeline_event_includes_projection_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_dir = root / ".governance/changes/CHG-RT-TL-PROJ"
+            change_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(change_dir / "manifest.yaml", {
+                "change_id": "CHG-RT-TL-PROJ",
+                "status": "review-approved",
+                "current_step": 8,
+                "roles": {
+                    "executor": "executor-agent",
+                    "verifier": "verifier-agent",
+                    "reviewer": "reviewer-agent",
+                },
+            })
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": "CHG-RT-TL-PROJ",
+                "summary": {"status": "pass", "blocker_count": 0},
+                "checks": [],
+                "issues": [],
+            })
+            write_yaml(change_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": "CHG-RT-TL-PROJ",
+                "reviewers": [{"role": "reviewer", "id": "reviewer-agent"}],
+                "decision": {"status": "approve", "rationale": "timeline ready"},
+                "conditions": {"must_before_next_step": [], "followups": []},
+                "trace": {"evidence_refs": [], "verify_refs": ["verify.yaml"]},
+            })
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(["--root", str(root), "timeline", "--change-id", "CHG-RT-TL-PROJ"])
+
+            self.assertEqual(exit_code, 0)
+            month_file = root / f".governance/runtime/timeline/events-{datetime.utcnow().strftime('%Y%m')}.yaml"
+            payload = load_yaml(month_file)
+            verify_event = next(event for event in payload["events"] if event["change_id"] == "CHG-RT-TL-PROJ" and event["event_type"] == "verify_completed")
+            self.assertEqual(
+                verify_event["projection_sources"]["to_status"]["source_ref"],
+                ".governance/changes/CHG-RT-TL-PROJ/verify.yaml",
+            )
+            self.assertEqual(
+                verify_event["projection_sources"]["timestamp"]["source_field"],
+                "file_mtime",
+            )
 
 
 if __name__ == "__main__":

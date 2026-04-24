@@ -74,6 +74,7 @@ def _build_change_status(paths: GovernancePaths, change_id: str) -> dict:
             "changes_index": str(paths.changes_index_file().relative_to(paths.root)),
             "maintenance_status": str(paths.maintenance_status_file().relative_to(paths.root)),
         },
+        "projection_sources": _change_status_projection_sources(paths, change_id),
         "generated_at": _now_utc(),
         "active_change_matches_current": (current.get("current_change_id") == change_id),
     }
@@ -107,6 +108,7 @@ def _build_steps_status(paths: GovernancePaths, change_id: str) -> dict:
         "completed_steps": completed_steps,
         "blocked_steps": blocked_steps,
         "steps": steps,
+        "projection_sources": _steps_status_projection_sources(paths, change_id),
         "generated_at": _now_utc(),
     }
 
@@ -132,6 +134,7 @@ def _build_participants_status(paths: GovernancePaths, change_id: str, steps_sta
         "schema": "runtime-participants-status/v1",
         "change_id": change_id,
         "participants": participants,
+        "projection_sources": _participants_status_projection_sources(paths, change_id),
         "generated_at": _now_utc(),
     }
 
@@ -224,6 +227,7 @@ def _event(
         "actor_id": actor_id or "governance",
         "timestamp": _event_timestamp(source_path),
         "refs": {"files": refs},
+        "projection_sources": _timeline_event_projection_sources(refs[0] if refs else None, source_path),
     }
 
 
@@ -241,6 +245,92 @@ def _completed_steps(current_step: int | str, current_status: str | None) -> lis
         if current_step not in completed:
             completed.append(current_step)
     return completed
+
+
+def _change_status_projection_sources(paths: GovernancePaths, change_id: str) -> dict:
+    manifest_ref = str(paths.change_file(change_id, "manifest.yaml").relative_to(paths.root))
+    current_change_ref = str(paths.current_change_file().relative_to(paths.root))
+    return {
+        "current_status": {
+            "source_ref": manifest_ref,
+            "source_field": "status",
+        },
+        "current_step": {
+            "source_ref": manifest_ref,
+            "source_field": "current_step",
+        },
+        "phase": {
+            "source_ref": current_change_ref,
+            "source_field": "current_change.current_step|current_step",
+            "derivation": "phase_label_for_step",
+        },
+        "gate_posture.waiting_on": {
+            "source_ref": manifest_ref,
+            "source_field": "current_step|status",
+            "derivation": "render_status_snapshot.waiting_on",
+        },
+        "gate_posture.next_decision": {
+            "source_ref": manifest_ref,
+            "source_field": "current_step|status",
+            "derivation": "render_status_snapshot.next_decision",
+        },
+    }
+
+
+def _steps_status_projection_sources(paths: GovernancePaths, change_id: str) -> dict:
+    manifest_ref = str(paths.change_file(change_id, "manifest.yaml").relative_to(paths.root))
+    bindings_ref = str(paths.change_file(change_id, "bindings.yaml").relative_to(paths.root))
+    return {
+        "current_step": {
+            "source_ref": manifest_ref,
+            "source_field": "current_step",
+        },
+        "next_step": {
+            "source_ref": manifest_ref,
+            "source_field": "current_step",
+            "derivation": "next_step",
+        },
+        "steps[].owner": {
+            "source_ref": bindings_ref,
+            "source_field": "steps.<n>.owner|manifest.roles",
+        },
+        "steps[].status": {
+            "source_ref": manifest_ref,
+            "source_field": "current_step|status",
+            "derivation": "step_status",
+        },
+    }
+
+
+def _participants_status_projection_sources(paths: GovernancePaths, change_id: str) -> dict:
+    bindings_ref = str(paths.change_file(change_id, "bindings.yaml").relative_to(paths.root))
+    steps_ref = str(paths.runtime_steps_status_file().relative_to(paths.root))
+    return {
+        "participants[].actor_id": {
+            "source_ref": bindings_ref,
+            "source_field": "steps.<n>.owner|manifest.roles",
+        },
+        "participants[].status": {
+            "source_ref": steps_ref,
+            "source_field": "steps[].status",
+            "derivation": "participant_status",
+        },
+    }
+
+
+def _timeline_event_projection_sources(ref: str | None, source_path: Path | None) -> dict:
+    source_ref = ref
+    return {
+        "to_status": {
+            "source_ref": source_ref,
+            "source_field": "summary.status|decision.status|manifest.status",
+            "derivation": "event_status_mapping",
+        },
+        "timestamp": {
+            "source_ref": source_ref,
+            "source_field": "file_mtime" if source_path else "generated_at",
+        },
+    }
 
 
 def _step_status(step: int, current_step: int | str, current_status: str) -> str:
