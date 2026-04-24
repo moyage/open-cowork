@@ -81,6 +81,8 @@
 - `plans/41-milestone2-digest-projection-schema-implementation-plan.md`
 - `plans/44-milestone2-digest-recent-runtime-events-design.md`
 - `plans/45-milestone2-digest-recent-runtime-events-implementation-plan.md`
+- `plans/46-milestone2-sync-history-grouped-summary-design.md`
+- `plans/47-milestone2-sync-history-grouped-summary-implementation-plan.md`
 
 ## 报告与实践材料
 

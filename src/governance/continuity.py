@@ -736,6 +736,7 @@ def read_sync_history(
     change_id: str | None = None,
     source_kind: str | None = None,
     sync_kind: str | None = None,
+    summary_by: str | None = None,
 ) -> dict:
     paths = GovernancePaths(Path(root))
     target = paths.sync_history_month_file(month)
@@ -751,7 +752,7 @@ def read_sync_history(
         and (source_kind is None or event.get("source_kind") == source_kind)
         and (sync_kind is None or event.get("sync_kind") == sync_kind)
     ]
-    return {
+    payload = {
         "schema": "sync-history-query/v1",
         "month": month,
         "filters": {
@@ -765,6 +766,9 @@ def read_sync_history(
         },
         "events": filtered,
     }
+    if summary_by is not None:
+        payload["grouped_summary"] = _group_sync_history_events(filtered, summary_by)
+    return payload
 
 
 def list_sync_history_months(root: str | Path) -> list[str]:
@@ -785,6 +789,7 @@ def read_sync_history_across_months(
     change_id: str | None = None,
     source_kind: str | None = None,
     sync_kind: str | None = None,
+    summary_by: str | None = None,
 ) -> dict:
     paths = GovernancePaths(Path(root))
     months = list_sync_history_months(root)
@@ -803,7 +808,7 @@ def read_sync_history_across_months(
         and (sync_kind is None or event.get("sync_kind") == sync_kind)
     ]
     filtered.sort(key=lambda item: str(item.get("recorded_at") or ""))
-    return {
+    payload = {
         "schema": "sync-history-query/v1",
         "month": "all",
         "months": months,
@@ -817,6 +822,36 @@ def read_sync_history_across_months(
             "matched_events": len(filtered),
         },
         "events": filtered,
+    }
+    if summary_by is not None:
+        payload["grouped_summary"] = _group_sync_history_events(filtered, summary_by)
+    return payload
+
+
+def _group_sync_history_events(events: list[dict], group_by: str) -> dict:
+    groups: dict[str, dict] = {}
+    for event in events:
+        key = str(event.get(group_by) or "unknown")
+        existing = groups.get(key)
+        if existing is None:
+            groups[key] = {
+                "group_key": key,
+                "event_count": 1,
+                "latest_recorded_at": event.get("recorded_at"),
+                "latest_headline": event.get("headline"),
+            }
+            continue
+        existing["event_count"] += 1
+        if str(event.get("recorded_at") or "") >= str(existing.get("latest_recorded_at") or ""):
+            existing["latest_recorded_at"] = event.get("recorded_at")
+            existing["latest_headline"] = event.get("headline")
+    ordered = sorted(
+        groups.values(),
+        key=lambda item: (-int(item.get("event_count") or 0), str(item.get("group_key") or "")),
+    )
+    return {
+        "group_by": group_by,
+        "groups": ordered,
     }
 
 

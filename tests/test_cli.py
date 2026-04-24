@@ -1004,6 +1004,56 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["summary"]["total_events"], 2)
             self.assertEqual(payload["summary"]["matched_events"], 2)
 
+    def test_continuity_sync_history_query_command_supports_grouped_summary_text_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [
+                    {
+                        "event_id": "evt-1",
+                        "change_id": "CHG-CLI-SUMMARY",
+                        "recorded_at": "2026-04-24T12:00:00Z",
+                        "sync_kind": "escalation",
+                        "source_kind": "closeout",
+                        "target_layer": "sponsor",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/archive/CHG-CLI-SUMMARY/sync-packet.yaml",
+                        "headline": "首次同步",
+                    },
+                    {
+                        "event_id": "evt-2",
+                        "change_id": "CHG-CLI-SUMMARY",
+                        "recorded_at": "2026-04-24T13:00:00Z",
+                        "sync_kind": "routine-sync",
+                        "source_kind": "increment",
+                        "target_layer": "ops",
+                        "target_scope": "project-level",
+                        "packet_ref": ".governance/changes/CHG-CLI-SUMMARY/sync-packet.yaml",
+                        "headline": "二次同步",
+                    },
+                ],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "sync-history-query",
+                    "--month", "202604",
+                    "--summary-by", "change_id",
+                    "--format", "text",
+                ])
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("grouped summary by: change_id", output)
+            self.assertIn("CHG-CLI-SUMMARY", output)
+            self.assertIn("events=2", output)
+
     def test_continuity_digest_command_supports_json_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
