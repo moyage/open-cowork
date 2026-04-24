@@ -930,6 +930,80 @@ class CliTests(unittest.TestCase):
             self.assertIn("matched events: 1", output)
             self.assertIn("CHG-CLI-HIST-TEXT", output)
 
+    def test_continuity_sync_history_months_command_supports_json_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202605.yaml", {"schema": "sync-history/v1", "month": "202605", "events": []})
+            write_yaml(history_dir / "events-202604.yaml", {"schema": "sync-history/v1", "month": "202604", "events": []})
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "sync-history-months",
+                    "--format", "json",
+                ])
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["schema"], "sync-history-months/v1")
+            self.assertEqual(payload["months"], ["202604", "202605"])
+
+    def test_continuity_sync_history_query_command_supports_all_months_json_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [{
+                    "event_id": "evt-1",
+                    "change_id": "CHG-CLI-HIST-ALL",
+                    "recorded_at": "2026-04-24T12:00:00Z",
+                    "sync_kind": "escalation",
+                    "source_kind": "closeout",
+                    "target_layer": "sponsor",
+                    "target_scope": "project-level",
+                    "packet_ref": ".governance/archive/CHG-CLI-HIST-ALL/sync-packet.yaml",
+                    "headline": "A",
+                }],
+            })
+            write_yaml(history_dir / "events-202605.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202605",
+                "events": [{
+                    "event_id": "evt-2",
+                    "change_id": "CHG-CLI-HIST-ALL",
+                    "recorded_at": "2026-05-01T12:00:00Z",
+                    "sync_kind": "routine-sync",
+                    "source_kind": "increment",
+                    "target_layer": "sponsor",
+                    "target_scope": "project-level",
+                    "packet_ref": ".governance/changes/CHG-CLI-HIST-ALL/sync-packet.yaml",
+                    "headline": "B",
+                }],
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "sync-history-query",
+                    "--all-months",
+                    "--change-id", "CHG-CLI-HIST-ALL",
+                    "--format", "json",
+                ])
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["schema"], "sync-history-query/v1")
+            self.assertEqual(payload["month"], "all")
+            self.assertEqual(payload["summary"]["total_events"], 2)
+            self.assertEqual(payload["summary"]["matched_events"], 2)
+
     def test_continuity_export_sync_packet_command_materializes_external_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

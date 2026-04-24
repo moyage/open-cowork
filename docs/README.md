@@ -71,6 +71,8 @@
 - `plans/31-milestone2-archive-receipt-and-archived-refs-consistency-implementation-plan.md`
 - `plans/32-milestone2-sync-history-query-design.md`
 - `plans/33-milestone2-sync-history-query-implementation-plan.md`
+- `plans/34-milestone2-sync-history-month-list-and-aggregate-query-design.md`
+- `plans/35-milestone2-sync-history-month-list-and-aggregate-query-implementation-plan.md`
 
 ## 报告与实践材料
 

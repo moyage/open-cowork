@@ -766,6 +766,59 @@ def read_sync_history(
     }
 
 
+def list_sync_history_months(root: str | Path) -> list[str]:
+    paths = GovernancePaths(Path(root))
+    if not paths.sync_history_dir.exists():
+        return []
+    months = []
+    for path in paths.sync_history_dir.glob("events-*.yaml"):
+        name = path.stem
+        if name.startswith("events-"):
+            months.append(name.removeprefix("events-"))
+    return sorted(set(months))
+
+
+def read_sync_history_across_months(
+    root: str | Path,
+    *,
+    change_id: str | None = None,
+    source_kind: str | None = None,
+    sync_kind: str | None = None,
+) -> dict:
+    paths = GovernancePaths(Path(root))
+    months = list_sync_history_months(root)
+    events = []
+    total_events = 0
+    for month in months:
+        target = paths.sync_history_month_file(month)
+        current = load_yaml(target) if target.exists() else {"events": []}
+        month_events = list(current.get("events", []))
+        total_events += len(month_events)
+        events.extend(month_events)
+    filtered = [
+        event for event in events
+        if (change_id is None or event.get("change_id") == change_id)
+        and (source_kind is None or event.get("source_kind") == source_kind)
+        and (sync_kind is None or event.get("sync_kind") == sync_kind)
+    ]
+    filtered.sort(key=lambda item: str(item.get("recorded_at") or ""))
+    return {
+        "schema": "sync-history-query/v1",
+        "month": "all",
+        "months": months,
+        "filters": {
+            "change_id": change_id,
+            "source_kind": source_kind,
+            "sync_kind": sync_kind,
+        },
+        "summary": {
+            "total_events": total_events,
+            "matched_events": len(filtered),
+        },
+        "events": filtered,
+    }
+
+
 def export_sync_packet(root: str | Path, *, change_id: str, source_kind: str, output_dir: str | Path) -> str:
     paths = GovernancePaths(Path(root))
     packet_path = paths.sync_packet_file(change_id, source_kind=source_kind)

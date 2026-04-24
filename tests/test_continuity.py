@@ -10,12 +10,14 @@ from governance.continuity import (
     accept_owner_transfer_continuity,
     append_sync_history,
     export_sync_packet,
+    list_sync_history_months,
     materialize_increment_package,
     materialize_continuity_launch_input,
     materialize_handoff_package,
     materialize_round_entry_input_summary,
     prepare_owner_transfer_continuity,
     read_sync_history,
+    read_sync_history_across_months,
     resolve_increment_package,
     resolve_continuity_launch_input,
     resolve_handoff_package,
@@ -26,6 +28,65 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class ContinuityTests(unittest.TestCase):
+    def test_list_sync_history_months_returns_sorted_month_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202605.yaml", {"schema": "sync-history/v1", "month": "202605", "events": []})
+            write_yaml(history_dir / "events-202604.yaml", {"schema": "sync-history/v1", "month": "202604", "events": []})
+
+            months = list_sync_history_months(root)
+
+            self.assertEqual(months, ["202604", "202605"])
+
+    def test_read_sync_history_across_all_months_applies_filters(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            history_dir = root / ".governance/runtime/sync-history"
+            history_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(history_dir / "events-202604.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202604",
+                "events": [{
+                    "event_id": "evt-1",
+                    "change_id": "CHG-X",
+                    "recorded_at": "2026-04-24T12:00:00Z",
+                    "sync_kind": "escalation",
+                    "source_kind": "closeout",
+                    "target_layer": "sponsor",
+                    "target_scope": "project-level",
+                    "packet_ref": ".governance/archive/CHG-X/sync-packet.yaml",
+                    "headline": "A",
+                }],
+            })
+            write_yaml(history_dir / "events-202605.yaml", {
+                "schema": "sync-history/v1",
+                "month": "202605",
+                "events": [{
+                    "event_id": "evt-2",
+                    "change_id": "CHG-X",
+                    "recorded_at": "2026-05-01T09:00:00Z",
+                    "sync_kind": "routine-sync",
+                    "source_kind": "increment",
+                    "target_layer": "sponsor",
+                    "target_scope": "project-level",
+                    "packet_ref": ".governance/changes/CHG-X/sync-packet.yaml",
+                    "headline": "B",
+                }],
+            })
+
+            payload = read_sync_history_across_months(root, change_id="CHG-X", source_kind="closeout")
+
+            self.assertEqual(payload["schema"], "sync-history-query/v1")
+            self.assertEqual(payload["month"], "all")
+            self.assertEqual(payload["months"], ["202604", "202605"])
+            self.assertEqual(payload["summary"]["total_events"], 2)
+            self.assertEqual(payload["summary"]["matched_events"], 1)
+            self.assertEqual(payload["events"][0]["source_kind"], "closeout")
+
     def test_read_sync_history_returns_empty_payload_when_month_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -374,15 +374,23 @@ def cmd_continuity_sync_history(args):
 
 
 def cmd_continuity_sync_history_query(args):
-    from governance.continuity import read_sync_history
+    from governance.continuity import read_sync_history, read_sync_history_across_months
 
-    payload = read_sync_history(
-        args.root,
-        month=args.month,
-        change_id=args.change_id,
-        source_kind=args.source_kind,
-        sync_kind=args.sync_kind,
-    )
+    if args.all_months:
+        payload = read_sync_history_across_months(
+            args.root,
+            change_id=args.change_id,
+            source_kind=args.source_kind,
+            sync_kind=args.sync_kind,
+        )
+    else:
+        payload = read_sync_history(
+            args.root,
+            month=args.month,
+            change_id=args.change_id,
+            source_kind=args.source_kind,
+            sync_kind=args.sync_kind,
+        )
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -401,6 +409,27 @@ def cmd_continuity_sync_history_query(args):
             f"- {event.get('recorded_at')} {event.get('change_id')} "
             f"[{event.get('source_kind')}/{event.get('sync_kind')}] {event.get('headline')}"
         )
+    return 0
+
+
+def cmd_continuity_sync_history_months(args):
+    from governance.continuity import list_sync_history_months
+
+    months = list_sync_history_months(args.root)
+    payload = {
+        "schema": "sync-history-months/v1",
+        "months": months,
+    }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    joined = ", ".join(months) if months else "(empty)"
+    print(f"Sync history months: {joined}")
     return 0
 
 
@@ -613,8 +642,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_sync_history = p_continuity_sub.add_parser("sync-history", help="Append sync packet to project history")
     p_continuity_sync_history.add_argument("--change-id", required=True, help="Target change id")
     p_continuity_sync_history.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
+    p_continuity_sync_history_months = p_continuity_sub.add_parser("sync-history-months", help="List available sync history months")
+    p_continuity_sync_history_months.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_continuity_sync_history_query = p_continuity_sub.add_parser("sync-history-query", help="Read sync history with optional filters")
-    p_continuity_sync_history_query.add_argument("--month", required=True, help="Month key in YYYYMM")
+    month_group = p_continuity_sync_history_query.add_mutually_exclusive_group(required=True)
+    month_group.add_argument("--month", help="Month key in YYYYMM")
+    month_group.add_argument("--all-months", action="store_true", help="Query across all months")
     p_continuity_sync_history_query.add_argument("--change-id", default=None, help="Optional change id filter")
     p_continuity_sync_history_query.add_argument("--source-kind", choices=["closeout", "increment"], default=None, help="Optional source kind filter")
     p_continuity_sync_history_query.add_argument("--sync-kind", choices=["routine-sync", "escalation"], default=None, help="Optional sync kind filter")
@@ -681,6 +714,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_sync_packet(args)
     elif args.command == "continuity" and args.subcmd == "sync-history":
         return cmd_continuity_sync_history(args)
+    elif args.command == "continuity" and args.subcmd == "sync-history-months":
+        return cmd_continuity_sync_history_months(args)
     elif args.command == "continuity" and args.subcmd == "sync-history-query":
         return cmd_continuity_sync_history_query(args)
     elif args.command == "continuity" and args.subcmd == "export-sync-packet":
