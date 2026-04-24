@@ -446,6 +446,29 @@ def cmd_continuity_export_sync_packet(args):
     return 0
 
 
+def cmd_continuity_digest(args):
+    from governance.continuity import resolve_continuity_digest
+
+    payload = resolve_continuity_digest(args.root, args.change_id)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+
+    print(f"Continuity digest: {payload['change_id']} ({payload['digest_kind']})")
+    print(f"selected by: {payload['selected_by']}")
+    print(f"headline: {payload['summary'].get('headline')}")
+    print(f"status: {payload['summary'].get('status')} / {payload['summary'].get('phase')}")
+    print(f"recommended reading: {payload['recommended_reading'].get('primary_ref')}")
+    for ref in payload["recommended_reading"].get("secondary_refs", []):
+        print(f"- {ref}")
+    return 0
+
+
 def cmd_runtime_status(args):
     from governance.runtime_status import materialize_runtime_status
 
@@ -656,6 +679,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_continuity_export.add_argument("--change-id", required=True, help="Target change id")
     p_continuity_export.add_argument("--source-kind", choices=["closeout", "increment"], required=True, help="Source anchor kind")
     p_continuity_export.add_argument("--output-dir", required=True, help="External export root directory")
+    p_continuity_digest = p_continuity_sub.add_parser("digest", help="Read continuity and sync digest")
+    p_continuity_digest.add_argument("--change-id", default=None, help="Optional explicit change id")
+    p_continuity_digest.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
@@ -720,6 +746,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_continuity_sync_history_query(args)
     elif args.command == "continuity" and args.subcmd == "export-sync-packet":
         return cmd_continuity_export_sync_packet(args)
+    elif args.command == "continuity" and args.subcmd == "digest":
+        return cmd_continuity_digest(args)
     elif args.command in {"diagnose-session", "diagnose-hermes"}:
         cmd_diagnose_session(args)
     elif args.command in {"session-recovery-packet", "hermes-recovery-packet"}:

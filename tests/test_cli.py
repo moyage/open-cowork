@@ -1004,6 +1004,133 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["summary"]["total_events"], 2)
             self.assertEqual(payload["summary"]["matched_events"], 2)
 
+    def test_continuity_digest_command_supports_json_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-DIGEST-JSON"
+            change_dir = root / f".governance/changes/{change_id}"
+            change_dir.mkdir(parents=True, exist_ok=True)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root", str(root),
+                    "change", "create", change_id,
+                    "--title", "Digest Json",
+                ])
+
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "digest json",
+                "scope_in": [".governance/**"],
+                "scope_out": ["docs/**"],
+                "allowed_actions": ["edit-governance-runtime"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": ["DigestSchema"],
+                "verification": {"checks": ["state-consistency"], "commands": ["python3 -m unittest"]},
+                "evidence_expectations": {"required": ["STEP_MATRIX_VIEW.md"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "auto-pass"},
+                    "7": {"owner": "verifier-agent", "gate": "review-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "approval-required"},
+                },
+            })
+            (change_dir / "tasks.md").write_text("# Tasks\n\nDigest json.\n", encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "continuity", "handoff-package", "--change-id", change_id])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "digest",
+                    "--format", "json",
+                ])
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["schema"], "continuity-digest/v1")
+            self.assertEqual(payload["change_id"], change_id)
+
+    def test_continuity_digest_command_supports_text_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+            change_id = "CHG-CLI-DIGEST-TEXT"
+            archive_dir = root / f".governance/archive/{change_id}"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+                "last_archive_at": "2026-04-24T12:00:00Z",
+                "residual_followups": [],
+            })
+            write_yaml(root / ".governance/index/archive-map.yaml", {
+                "schema": "archive-map/v1",
+                "archives": [{
+                    "change_id": change_id,
+                    "archive_path": f".governance/archive/{change_id}/",
+                    "archived_at": "2026-04-24T12:00:00Z",
+                    "receipt": f".governance/archive/{change_id}/archive-receipt.yaml",
+                }],
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "archived_at": "2026-04-24T12:00:00Z",
+            })
+            write_yaml(archive_dir / "manifest.yaml", {
+                "change_id": change_id,
+                "title": "Digest Text",
+                "status": "archived",
+                "current_step": 9,
+            })
+            write_yaml(archive_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "summary": {"status": "pass", "blocker_count": 0},
+            })
+            write_yaml(archive_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+            })
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root", str(root),
+                    "continuity", "closeout-packet",
+                    "--change-id", change_id,
+                    "--closeout-statement", "本轮已完成归档",
+                    "--delivered-scope", "closeout-packet",
+                    "--key-outcome", "done",
+                    "--next-direction", "sync",
+                    "--operator-summary", "digest text operator",
+                    "--sponsor-summary", "digest text sponsor",
+                ])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root", str(root),
+                    "continuity", "digest",
+                    "--format", "text",
+                ])
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Continuity digest:", output)
+            self.assertIn(change_id, output)
+            self.assertIn("recommended reading:", output)
+
     def test_continuity_export_sync_packet_command_materializes_external_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

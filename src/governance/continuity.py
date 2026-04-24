@@ -19,6 +19,7 @@ CLOSEOUT_PACKET_SCHEMA = "closeout-packet/v1"
 SYNC_PACKET_SCHEMA = "sync-packet/v1"
 SYNC_HISTORY_SCHEMA = "sync-history/v1"
 SYNC_EXPORT_MANIFEST_SCHEMA = "sync-export-manifest/v1"
+CONTINUITY_DIGEST_SCHEMA = "continuity-digest/v1"
 
 
 def resolve_continuity_launch_input(root: str | Path, change_id: str | None = None) -> dict:
@@ -846,10 +847,160 @@ def export_sync_packet(root: str | Path, *, change_id: str, source_kind: str, ou
     return str(export_target)
 
 
+def resolve_continuity_digest(root: str | Path, change_id: str | None = None) -> dict:
+    paths = GovernancePaths(Path(root))
+    resolved_change_id, selected_by, digest_kind = _select_digest_change(paths, change_id)
+    if digest_kind == "active":
+        return _resolve_active_continuity_digest(paths, resolved_change_id, selected_by)
+    return _resolve_archived_continuity_digest(paths, resolved_change_id, selected_by)
+
+
 def _path_ref(paths: GovernancePaths, change_id: str, name: str) -> dict:
     return {
         "path": str(paths.change_file(change_id, name).relative_to(paths.root)),
         "role": name,
+    }
+
+
+def _select_digest_change(paths: GovernancePaths, change_id: str | None) -> tuple[str, str, str]:
+    if change_id:
+        if paths.change_file(change_id, "manifest.yaml").exists():
+            return str(change_id), "explicit-change-id", "active"
+        if paths.archived_change_file(change_id, "manifest.yaml").exists():
+            return str(change_id), "explicit-change-id", "archived"
+        raise ValueError(f"change '{change_id}' does not exist in active or archived space")
+
+    current_payload = read_current_change(paths.root)
+    current_change_id = _extract_current_change_id(current_payload)
+    if current_change_id and paths.change_file(str(current_change_id), "manifest.yaml").exists():
+        return str(current_change_id), "current-change", "active"
+
+    maintenance = _load_optional_yaml(paths.maintenance_status_file())
+    last_archived_change = maintenance.get("last_archived_change")
+    if last_archived_change and paths.archived_change_file(str(last_archived_change), "manifest.yaml").exists():
+        return str(last_archived_change), "last-archived-change", "archived"
+
+    raise ValueError("no active change or archived baseline available for continuity digest")
+
+
+def _resolve_active_continuity_digest(paths: GovernancePaths, change_id: str, selected_by: str) -> dict:
+    runtime_payload = _ensure_runtime_status_payload(paths, change_id)
+    manifest = _load_change_manifest(paths, change_id)
+    handoff_ref = _ref_path_if_exists(paths.root, str(paths.handoff_package_file(change_id).relative_to(paths.root)))
+    increment_ref = _ref_path_if_exists(paths.root, str(paths.increment_package_file(change_id).relative_to(paths.root)))
+    owner_transfer_ref = _ref_path_if_exists(
+        paths.root,
+        str(paths.owner_transfer_continuity_file(change_id).relative_to(paths.root)),
+    )
+    sync_ref = _ref_path_if_exists(
+        paths.root,
+        str(paths.sync_packet_file(change_id, source_kind="increment").relative_to(paths.root)),
+    )
+
+    refs = {}
+    _append_resolved_payload_ref(refs, "handoff_package", handoff_ref, paths.root)
+    _append_resolved_payload_ref(refs, "increment_package", increment_ref, paths.root)
+    _append_resolved_payload_ref(refs, "owner_transfer", owner_transfer_ref, paths.root)
+    _append_resolved_payload_ref(refs, "sync_packet", sync_ref, paths.root)
+    refs["runtime_change_status"] = str(paths.runtime_change_status_file().relative_to(paths.root))
+    refs["runtime_steps_status"] = str(paths.runtime_steps_status_file().relative_to(paths.root))
+
+    primary_ref = refs.get("handoff_package") or refs["runtime_change_status"]
+    secondary_refs = [
+        ref for ref in [
+            refs.get("increment_package"),
+            refs.get("owner_transfer"),
+            refs.get("sync_packet"),
+            refs.get("runtime_steps_status"),
+        ]
+        if ref
+    ]
+
+    change_status = runtime_payload.get("change_status", {})
+    gate_posture = change_status.get("gate_posture", {}) or {}
+    return {
+        "schema": CONTINUITY_DIGEST_SCHEMA,
+        "change_id": change_id,
+        "digest_kind": "active",
+        "selected_by": selected_by,
+        "generated_at": _now_utc(),
+        "summary": {
+            "title": manifest.get("title"),
+            "status": change_status.get("current_status"),
+            "phase": change_status.get("phase"),
+            "step": change_status.get("current_step"),
+            "headline": manifest.get("title") or change_id,
+            "next_attention": gate_posture.get("waiting_on") or gate_posture.get("next_decision"),
+            "human_intervention_required": gate_posture.get("human_intervention_required"),
+        },
+        "recommended_reading": {
+            "primary_ref": primary_ref,
+            "secondary_refs": secondary_refs,
+        },
+        "refs": refs,
+        "sync_view": {
+            "available": bool(refs.get("sync_packet")),
+            "sync_packet_ref": refs.get("sync_packet"),
+        },
+    }
+
+
+def _resolve_archived_continuity_digest(paths: GovernancePaths, change_id: str, selected_by: str) -> dict:
+    closeout_ref = _ref_path_if_exists(paths.root, str(paths.closeout_packet_file(change_id).relative_to(paths.root)))
+    review_ref = _ref_path_if_exists(paths.root, str(paths.archived_change_file(change_id, "review.yaml").relative_to(paths.root)))
+    manifest_ref = _ref_path_if_exists(paths.root, str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root)))
+    sync_ref = _ref_path_if_exists(
+        paths.root,
+        str(paths.sync_packet_file(change_id, source_kind="closeout").relative_to(paths.root)),
+    )
+
+    manifest = _load_optional_yaml(paths.archived_change_file(change_id, "manifest.yaml"))
+    review = _load_optional_yaml(paths.archived_change_file(change_id, "review.yaml"))
+    closeout = _load_optional_yaml(paths.closeout_packet_file(change_id))
+
+    refs = {}
+    _append_resolved_payload_ref(refs, "closeout_packet", closeout_ref, paths.root)
+    _append_resolved_payload_ref(refs, "archived_review", review_ref, paths.root)
+    _append_resolved_payload_ref(refs, "archived_manifest", manifest_ref, paths.root)
+    _append_resolved_payload_ref(refs, "sync_packet", sync_ref, paths.root)
+
+    primary_ref = refs.get("closeout_packet") or refs.get("archived_review") or refs.get("archived_manifest")
+    secondary_refs = [
+        ref for ref in [
+            refs.get("archived_review"),
+            refs.get("archived_manifest"),
+            refs.get("sync_packet"),
+        ]
+        if ref and ref != primary_ref
+    ]
+
+    closure_summary = closeout.get("closure_summary", {}) or {}
+    human_reading_entry = closeout.get("human_reading_entry", {}) or {}
+    return {
+        "schema": CONTINUITY_DIGEST_SCHEMA,
+        "change_id": change_id,
+        "digest_kind": "archived",
+        "selected_by": selected_by,
+        "generated_at": _now_utc(),
+        "summary": {
+            "title": manifest.get("title"),
+            "status": closure_summary.get("final_status") or manifest.get("status"),
+            "phase": closure_summary.get("final_phase") or _phase_label_for_step(manifest.get("current_step")),
+            "step": closure_summary.get("final_step") or manifest.get("current_step"),
+            "headline": human_reading_entry.get("operator_summary") or closure_summary.get("closeout_statement") or manifest.get("title") or change_id,
+            "next_attention": closeout.get("continuity_bridge", {}).get("next_round_default_direction"),
+            "human_intervention_required": False,
+        },
+        "recommended_reading": {
+            "primary_ref": primary_ref,
+            "secondary_refs": secondary_refs,
+        },
+        "refs": refs,
+        "sync_view": {
+            "available": bool(refs.get("sync_packet")),
+            "sync_packet_ref": refs.get("sync_packet"),
+            "review_status": review.get("decision", {}).get("status"),
+        },
     }
 
 
