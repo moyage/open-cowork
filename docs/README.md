@@ -66,6 +66,13 @@
 
 这些文件保留项目演进证据，但不再作为默认阅读入口。新用户不要从这里开始。
 
+近期 dogfood 反馈和候选输入：
+
+- `archive/reports/2026-04-25-v026-external-dogfood-feedback.md`
+- `archive/reports/2026-04-25-v027-external-dogfood-feedback.md`
+- `archive/plans/61-v0.2.7-human-visible-collaboration-gates-candidate-input.md`
+- `archive/plans/62-v0.2.8-enforceable-human-gates-candidate-input.md`
+
 ## 说明
 
 - 文档真相源优先级：`README.md` / `AGENTS.md` / `getting-started.md` / `agent-adoption.md` / `agent-playbook.md` / `specs/` 高于 `archive/`。
