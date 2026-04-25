@@ -85,4 +85,7 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         last_archived_change=change_id,
         last_archive_at=archived_at,
     )
+    from .current_state import sync_current_state
+
+    sync_current_state(root)
     return receipt

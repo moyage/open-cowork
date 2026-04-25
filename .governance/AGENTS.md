@@ -6,10 +6,10 @@
 
 1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。
 2. `.governance/agent-playbook.md`：Agent 操作规则。
-3. `.governance/index/current-change.yaml`：当前 active change 指针。
-4. `.governance/index/maintenance-status.yaml`：最近归档与维护状态。
+3. `.governance/changes/v0.2.7-human-control-baseline/contract.yaml`：执行边界。
+4. `.governance/changes/v0.2.7-human-control-baseline/bindings.yaml`：owner 和角色绑定。
 
-如果当前状态是 `idle`，不要读取旧 active change 的完整运行态包。需要追溯时，优先读取 `.governance/archive/<change-id>/archive-receipt.yaml` 和对应 review/manifest。
+只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。
 
 ## 操作规则
 

@@ -1,0 +1,127 @@
+schema: participants-profile/v1
+profile: personal
+participants:
+  - id: human-sponsor
+    type: human
+    strengths:
+      - final-decision
+      - intent-confirmation
+  - id: orchestrator-agent
+    type: agent
+    strengths:
+      - coordination
+      - change-package
+  - id: analyst-agent
+    type: agent
+    strengths:
+      - requirements
+      - scope-analysis
+  - id: architect-agent
+    type: agent
+    strengths:
+      - design
+      - risk-analysis
+  - id: executor-agent
+    type: agent
+    strengths:
+      - implementation
+      - evidence
+  - id: verifier-agent
+    type: agent
+    strengths:
+      - tests
+      - acceptance
+  - id: independent-reviewer
+    type: agent
+    strengths:
+      - review
+      - decision-check
+  - id: maintainer-agent
+    type: agent
+    strengths:
+      - archive
+      - continuity
+step_owner_matrix:
+  - step: 1
+    label: Clarify the goal
+    primary_owner: human-sponsor
+    assistants:
+      - analyst-agent
+      - orchestrator-agent
+    reviewer: human-sponsor
+    human_gate: true
+    final_decision_owner: human-sponsor
+    gate: human-confirmation
+  - step: 2
+    label: Lock the scope
+    primary_owner: analyst-agent
+    assistants:
+      - orchestrator-agent
+    reviewer: human-sponsor
+    human_gate: true
+    final_decision_owner: human-sponsor
+    gate: human-confirmation
+  - step: 3
+    label: Shape the approach
+    primary_owner: architect-agent
+    assistants:
+      - analyst-agent
+    reviewer: human-sponsor
+    human_gate: true
+    final_decision_owner: human-sponsor
+    gate: human-confirmation
+  - step: 4
+    label: Assemble the change
+    primary_owner: orchestrator-agent
+    assistants:
+      - architect-agent
+    reviewer: human-sponsor
+    human_gate: false
+    final_decision_owner: human-sponsor
+    gate: role-confirmation
+  - step: 5
+    label: Approve the start
+    primary_owner: human-sponsor
+    assistants:
+      - orchestrator-agent
+    reviewer: human-sponsor
+    human_gate: true
+    final_decision_owner: human-sponsor
+    gate: human-confirmation
+  - step: 6
+    label: Execute the change
+    primary_owner: executor-agent
+    assistants:
+      []
+    reviewer: verifier-agent
+    human_gate: false
+    final_decision_owner: human-sponsor
+    gate: role-confirmation
+  - step: 7
+    label: Verify the result
+    primary_owner: verifier-agent
+    assistants:
+      []
+    reviewer: independent-reviewer
+    human_gate: false
+    final_decision_owner: human-sponsor
+    gate: role-confirmation
+  - step: 8
+    label: Review and decide
+    primary_owner: independent-reviewer
+    assistants:
+      - human-sponsor
+    reviewer: independent-reviewer
+    human_gate: true
+    final_decision_owner: human-sponsor
+    gate: human-confirmation
+  - step: 9
+    label: Archive and carry forward
+    primary_owner: maintainer-agent
+    assistants:
+      - orchestrator-agent
+    reviewer: human-sponsor
+    human_gate: true
+    final_decision_owner: human-sponsor
+    gate: human-confirmation
+generated_at: '2026-04-25T00:04:24.768504+00:00'

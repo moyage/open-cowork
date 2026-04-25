@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7
+
+- Added `ocw participants setup` to create a personal-domain participant profile and 9-step owner / assistant / reviewer / human-gate matrix
+- Added `ocw intent capture` and `ocw intent confirm` to make requirements, optimizations, bugs, scope, risks, acceptance criteria, and human confirmation visible before execution
+- Added `ocw step report` to materialize human-readable step reports with owner, inputs, outputs, done criteria, next-entry criteria, blockers, and human decisions
+- Added archive-time `.governance/current-state.md` synchronization and `ocw status --sync-current-state`
+- Extended `ocw hygiene` / `ocw doctor` with human-readable and machine-readable state consistency diagnostics
+
 ## 0.2.6
 
 - Added `ocw adopt --dry-run` for Agent-first adoption planning from natural-language goals, source docs, and personal-domain agent inventory

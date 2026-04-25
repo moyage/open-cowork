@@ -45,6 +45,11 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
         readiness = manifest.get("readiness", {})
         if not readiness.get("step6_entry_ready"):
             raise ValueError(f"change '{request.change_id}' is not ready for Step 6 execution (step6_entry_ready is not True)")
+        if manifest.get("current_step") not in {5, 6}:
+            raise ValueError(
+                f"change '{request.change_id}' cannot run from step {manifest.get('current_step')} "
+                f"with status '{manifest.get('status')}'"
+            )
 
         bindings_path = paths.change_file(request.change_id, "bindings.yaml")
         if bindings_path.exists():

@@ -216,6 +216,161 @@ class CliTests(unittest.TestCase):
             self.assertIn("58-v0.2.6", (change_dir / "requirements.md").read_text(encoding="utf-8"))
             self.assertIn("v025-agent-first-dogfood", (change_dir / "intent.md").read_text(encoding="utf-8"))
 
+    def test_participants_setup_writes_personal_profile_and_updates_bindings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-PARTICIPANTS", "--title", "Participants"])
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "CHG-PARTICIPANTS",
+                    "--goal",
+                    "Configure human-visible personal-domain participants",
+                ])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root",
+                    str(root),
+                    "participants",
+                    "setup",
+                    "--profile",
+                    "personal",
+                    "--participant",
+                    "codex-agent:executor,implementation",
+                    "--participant",
+                    "human-sponsor:final-decision",
+                    "--change-id",
+                    "CHG-PARTICIPANTS",
+                ])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("9-step owner matrix", stdout.getvalue())
+            profile = load_yaml(root / ".governance/participants.yaml")
+            bindings = load_yaml(root / ".governance/changes/CHG-PARTICIPANTS/bindings.yaml")
+            self.assertEqual(profile["schema"], "participants-profile/v1")
+            self.assertEqual(len(profile["step_owner_matrix"]), 9)
+            self.assertEqual(profile["step_owner_matrix"][0]["primary_owner"], "human-sponsor")
+            self.assertEqual(bindings["participants_profile_ref"], ".governance/participants.yaml")
+            self.assertEqual(bindings["steps"][1]["owner"], "human-sponsor")
+            self.assertTrue(bindings["steps"][5]["human_gate"])
+            self.assertEqual(bindings["steps"][8]["reviewer"], "independent-reviewer")
+
+    def test_intent_capture_and_confirm_records_human_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-INTENT", "--title", "Intent"])
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "CHG-INTENT",
+                    "--goal",
+                    "Clarify real project intent before execution",
+                    "--scope-in",
+                    "src/**",
+                    "--scope-out",
+                    "docs/archive/**",
+                ])
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                capture_exit = main([
+                    "--root",
+                    str(root),
+                    "intent",
+                    "capture",
+                    "--change-id",
+                    "CHG-INTENT",
+                    "--project-intent",
+                    "Ship a human-visible control baseline",
+                    "--requirement",
+                    "Participants matrix is visible",
+                    "--optimization",
+                    "Reduce CLI-first burden",
+                    "--bug",
+                    "current-state can become stale after archive",
+                    "--acceptance",
+                    "Human can confirm scope before execution",
+                    "--risk",
+                    "Over-scoping v0.2.7",
+                    "--open-question",
+                    "Should gates be hard or advisory first?",
+                ])
+            self.assertEqual(capture_exit, 0)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                confirm_exit = main([
+                    "--root",
+                    str(root),
+                    "intent",
+                    "confirm",
+                    "--change-id",
+                    "CHG-INTENT",
+                    "--confirmed-by",
+                    "human-sponsor",
+                    "--note",
+                    "Scope accepted for v0.2.7 baseline",
+                ])
+
+            self.assertEqual(confirm_exit, 0)
+            self.assertIn("Intent confirmed", stdout.getvalue())
+            payload = load_yaml(root / ".governance/changes/CHG-INTENT/intent-confirmation.yaml")
+            manifest = load_yaml(root / ".governance/changes/CHG-INTENT/manifest.yaml")
+            self.assertEqual(payload["status"], "confirmed")
+            self.assertEqual(payload["human_confirmation"]["confirmed_by"], "human-sponsor")
+            self.assertIn("Participants matrix is visible", payload["requirements"])
+            self.assertEqual(manifest["intent_confirmation"]["status"], "confirmed")
+            self.assertTrue((root / ".governance/changes/CHG-INTENT/INTENT_CONFIRMATION.md").exists())
+
+    def test_step_report_materializes_human_visible_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-STEP", "--title", "Step report"])
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "CHG-STEP",
+                    "--goal",
+                    "Show a human-visible step report",
+                ])
+                main(["--root", str(root), "participants", "setup", "--change-id", "CHG-STEP"])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main([
+                    "--root",
+                    str(root),
+                    "step",
+                    "report",
+                    "--change-id",
+                    "CHG-STEP",
+                    "--step",
+                    "5",
+                ])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Step report written", stdout.getvalue())
+            report = load_yaml(root / ".governance/changes/CHG-STEP/step-reports/step-5.yaml")
+            report_text = (root / ".governance/changes/CHG-STEP/step-reports/step-5.md").read_text(encoding="utf-8")
+            self.assertEqual(report["schema"], "step-report/v1")
+            self.assertEqual(report["owner"], "human-sponsor")
+            self.assertTrue(report["human_gate"])
+            self.assertIn("Confirm project intent", " ".join(report["human_decisions_required"]))
+            self.assertIn("Human decisions required", report_text)
+
     def test_adopt_dry_run_outputs_agent_first_plan_without_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -506,6 +661,9 @@ class CliTests(unittest.TestCase):
             self.assertIsNone(current_change["current_change_id"])
             self.assertEqual(changes_index["changes"][0]["status"], "archived")
             self.assertEqual(maintenance["last_archived_change"], "CHG-CLI-2")
+            current_state = (root / ".governance/current-state.md").read_text(encoding="utf-8")
+            self.assertIn("Lifecycle: idle", current_state)
+            self.assertIn("Last archived change: CHG-CLI-2", current_state)
 
             month_file = root / ".governance/runtime/timeline" / f"events-{__import__('datetime').datetime.utcnow().strftime('%Y%m')}.yaml"
             payload = load_yaml(month_file)
@@ -603,6 +761,87 @@ class CliTests(unittest.TestCase):
             self.assertEqual(verify_exit, 1)
             self.assertIn("Verify failed", stdout.getvalue())
 
+    def test_verify_can_retry_from_step7_blocked_after_consistency_fix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_governance_index(root)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "change", "create", "CHG-VERIFY-RETRY", "--title", "Verify retry"])
+
+            change_dir = root / ".governance/changes/CHG-VERIFY-RETRY"
+            validation_objects = [
+                ".governance/changes/CHG-VERIFY-RETRY/contract.yaml",
+                ".governance/changes/CHG-VERIFY-RETRY/bindings.yaml",
+                "src/**",
+            ]
+            write_yaml(change_dir / "contract.yaml", {
+                "objective": "retry verify after a blocker is fixed",
+                "scope_in": ["src/**", ".governance/changes/CHG-VERIFY-RETRY/evidence/**"],
+                "scope_out": [".governance/index/**", ".governance/runtime/**", ".governance/archive/**"],
+                "allowed_actions": ["edit_files", "write_evidence"],
+                "forbidden_actions": [
+                    "no_truth_source_pollution",
+                    "no_executor_reviewer_merge",
+                    "no_executor_stable_write_authority",
+                    "no_step6_before_step5_ready",
+                ],
+                "validation_objects": validation_objects,
+                "verification": {"commands": ["python3 -m unittest"], "checks": ["state consistency"]},
+                "evidence_expectations": {"required": ["command_output", "test_output", "changed_files_manifest"]},
+            })
+            write_yaml(change_dir / "bindings.yaml", {
+                "steps": {
+                    "6": {"owner": "executor-agent", "gate": "contract-required"},
+                    "7": {"owner": "verifier-agent", "gate": "evidence-required"},
+                    "8": {"owner": "reviewer-agent", "gate": "independent-review-required"},
+                },
+            })
+            manifest = load_yaml(change_dir / "manifest.yaml")
+            manifest["status"] = "step7-blocked"
+            manifest["current_step"] = 7
+            manifest["target_validation_objects"] = validation_objects
+            write_yaml(change_dir / "manifest.yaml", manifest)
+            (change_dir / "evidence").mkdir(exist_ok=True)
+            write_yaml(change_dir / "evidence/execution-summary.yaml", {
+                "status": "success",
+                "command_output": "ok",
+                "test_output": "ok",
+                "artifacts": {"created": ["src/example.py"], "modified": []},
+            })
+            entry = {
+                "change_id": "CHG-VERIFY-RETRY",
+                "path": ".governance/changes/CHG-VERIFY-RETRY",
+                "status": "step7-blocked",
+                "current_step": 7,
+            }
+            set_current_change(root, entry)
+            upsert_change_entry(root, entry)
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "step7-blocked",
+                "current_change_active": "step7-blocked",
+                "current_change_id": "CHG-VERIFY-RETRY",
+                "last_archived_change": None,
+                "last_archive_at": None,
+            })
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                verify_exit = main(["--root", str(root), "verify", "--change-id", "CHG-VERIFY-RETRY"])
+
+            self.assertEqual(verify_exit, 0)
+            self.assertIn("Verify recorded", stdout.getvalue())
+            self.assertEqual(load_yaml(change_dir / "verify.yaml")["summary"]["status"], "pass")
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                verify_exit = main(["--root", str(root), "verify", "--change-id", "CHG-VERIFY-RETRY"])
+
+            self.assertEqual(verify_exit, 0)
+            self.assertIn("Verify recorded", stdout.getvalue())
+            self.assertEqual(load_yaml(change_dir / "verify.yaml")["summary"]["status"], "pass")
+
     def test_review_requires_step7_verified_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -650,6 +889,48 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(review_exit, 1)
             self.assertIn("Review failed", stdout.getvalue())
+
+    def test_run_rejects_execution_after_step7_without_mutating_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "change", "create", "CHG-RUN-LATE", "--title", "Late run"])
+                main([
+                    "--root",
+                    str(root),
+                    "change",
+                    "prepare",
+                    "CHG-RUN-LATE",
+                    "--goal",
+                    "Prevent late run mutation",
+                ])
+
+            change_dir = root / ".governance/changes/CHG-RUN-LATE"
+            manifest = load_yaml(change_dir / "manifest.yaml")
+            manifest["status"] = "step7-blocked"
+            manifest["current_step"] = 7
+            write_yaml(change_dir / "manifest.yaml", manifest)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                run_exit = main([
+                    "--root",
+                    str(root),
+                    "run",
+                    "--change-id",
+                    "CHG-RUN-LATE",
+                    "--command-output",
+                    "late",
+                    "--test-output",
+                    "late",
+                    "--created",
+                    "src/late.py",
+                ])
+
+            self.assertEqual(run_exit, 1)
+            self.assertIn("cannot run from step 7", stdout.getvalue())
+            self.assertEqual(load_yaml(change_dir / "manifest.yaml")["status"], "step7-blocked")
 
     def test_archive_requires_approved_review(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -960,6 +1241,36 @@ class CliTests(unittest.TestCase):
             self.assertEqual(alias_exit, 0)
             self.assertIn("open-cowork hygiene", stdout.getvalue())
 
+    def test_hygiene_reports_current_state_consistency(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+            (root / ".governance/current-state.md").write_text(
+                "# open-cowork Current State\n\nLifecycle: idle\nLast archived change: None\n",
+                encoding="utf-8",
+            )
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "hygiene", "--format", "json"])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["state_consistency"]["status"], "pass")
+
+            (root / ".governance/current-state.md").write_text(
+                "# open-cowork Current State\n\nActive change: stale-change\n",
+                encoding="utf-8",
+            )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "doctor", "--format", "json"])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["state_consistency"]["status"], "blocker")
+
     def test_change_prepare_blocks_silent_active_change_switch_without_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1018,7 +1329,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.2.6", output)
+        self.assertIn("open-cowork 0.2.7", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)

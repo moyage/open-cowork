@@ -6,7 +6,7 @@
 
 ## 1. 默认入口：在 Agent 中说一句话
 
-`open-cowork` 从 v0.2.5 开始把 Agent-first 作为默认使用方式；v0.2.6 起默认先生成 adoption plan。人不应该先去记命令，而应该先表达意图：
+`open-cowork` 从 v0.2.5 开始把 Agent-first 作为默认使用方式；v0.2.6 起默认先生成 adoption plan；v0.2.7 起优先建立人的控制基线：参与者、意图确认和 step report。人不应该先去记命令，而应该先表达意图：
 
 ```text
 安装 open-cowork，并在当前项目中实施这套协同治理框架。
@@ -96,7 +96,37 @@ ocw --root /path/to/your-project adopt \
 
 adoption plan 应输出 bounded recommended read set。Agent 不应默认全文扫描 `docs/archive/plans/**`。
 
-## 6. 让 Agent 准备一个可执行 change
+## 6. 建立人的控制基线
+
+v0.2.7 推荐 Agent 在进入执行前补齐参与者矩阵、意图确认和当前步骤报告。它们仍然是 Agent 的内部工具；人看到的应该是“谁负责、做什么、是否确认、下一步能否推进”。
+
+```bash
+ocw --root /path/to/your-project participants setup \
+  --profile personal \
+  --change-id current-iteration
+
+ocw --root /path/to/your-project intent capture \
+  --change-id current-iteration \
+  --project-intent "本轮真实迭代意图" \
+  --requirement "需求项" \
+  --acceptance "验收标准"
+
+ocw --root /path/to/your-project intent confirm \
+  --change-id current-iteration \
+  --confirmed-by human-sponsor
+
+ocw --root /path/to/your-project step report \
+  --change-id current-iteration \
+  --step 5
+```
+
+推荐在 Step 6 执行前至少确认：
+
+- 9 步 owner / assistant / reviewer / human gate 是否符合当前个人域 Agent 组合；
+- 本轮需求、优化、Bug、范围、非目标和验收标准是否清楚；
+- 当前 step report 是否说明 owner、输入、输出、完成标准和需要人的决策。
+
+## 7. 让 Agent 准备一个可执行 change
 
 如果需要准备一个完整的个人域试用 change，Agent 可以使用 `pilot` 或 `change prepare`。这些命令是 Agent 的内部工具，不是人的默认任务清单。
 
@@ -135,7 +165,7 @@ ocw --root /path/to/your-project change prepare current-iteration \
 - `.governance/agent-playbook.md`
 - `.governance/current-state.md`
 
-## 6. 升级和干净重装
+## 8. 升级和干净重装
 
 如果你已经安装过 V0.2.4 或更早版本，先在 `open-cowork` 仓库根目录执行：
 

@@ -71,6 +71,12 @@ def _format_agent_handoff(change_id: str) -> str:
         f"- .governance/changes/{change_id}/contract.yaml",
         f"- .governance/changes/{change_id}/bindings.yaml",
         "",
+        "Human control baseline before Step 6:",
+        f"- ocw --root . participants setup --profile personal --change-id {change_id}",
+        f"- ocw --root . intent capture --change-id {change_id} --project-intent \"Describe the real iteration intent\"",
+        f"- ocw --root . intent confirm --change-id {change_id} --confirmed-by human-sponsor",
+        f"- ocw --root . step report --change-id {change_id} --step 5",
+        "",
         "Report project progress, owner, blocker, next action, and human decisions needed.",
         "Do not make the human copy long command prompts or memorize ocw commands.",
     ])
@@ -232,7 +238,22 @@ def cmd_run(args):
         artifacts={"created": list(args.created or []), "modified": list(args.modified or [])},
         evidence_refs=list(args.evidence_ref or []),
     )
-    response = run_change(args.root, request)
+    try:
+        response = run_change(args.root, request)
+    except Exception as exc:
+        append_runtime_event(
+            args.root,
+            change_id=package.change_id,
+            event_type="gate_blocked",
+            step=6,
+            from_status=previous_status,
+            to_status="blocked",
+            actor_id=package.manifest.get("roles", {}).get("executor") or "executor",
+            event_suffix="step6",
+            extra={"reason": str(exc)},
+        )
+        print(f"Run failed: {exc}")
+        return 1
     manifest = update_manifest(args.root, package.change_id, status="step6-executed-pre-step7", current_step=6)
     current = read_current_change(args.root).get("current_change") or {}
     set_current_change(args.root, {
@@ -331,6 +352,105 @@ def cmd_hygiene(args):
     print("Recommendations:")
     for item in payload["recommendations"]:
         print(f"- {item}")
+    state_consistency = payload.get("state_consistency")
+    if state_consistency:
+        print("")
+        print("State consistency:")
+        print(f"- status: {state_consistency.get('status')}")
+        for issue in state_consistency.get("issues", []):
+            print(f"- {issue}")
+    return 0
+
+
+def cmd_participants_setup(args):
+    from governance.participants import setup_participants_profile
+
+    payload = setup_participants_profile(
+        args.root,
+        profile=args.profile,
+        participant_specs=list(args.participant or []),
+        change_id=args.change_id,
+    )
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print("open-cowork participants profile")
+    print("")
+    print(f"- profile: {payload['profile']}")
+    print("- participants_profile_ref: .governance/participants.yaml")
+    if args.change_id:
+        print(f"- bindings updated: .governance/changes/{args.change_id}/bindings.yaml")
+    print("")
+    print("9-step owner matrix:")
+    for item in payload["step_owner_matrix"]:
+        print(
+            f"- Step {item['step']}: owner={item['primary_owner']} "
+            f"reviewer={item['reviewer']} human_gate={str(item['human_gate']).lower()}"
+        )
+    return 0
+
+
+def cmd_intent_capture(args):
+    from governance.intent import capture_intent
+
+    payload = capture_intent(
+        args.root,
+        change_id=args.change_id,
+        project_intent=args.project_intent,
+        requirements=list(args.requirement or []),
+        optimizations=list(args.optimization or []),
+        bugs=list(args.bug or []),
+        scope_in=list(args.scope_in or []),
+        scope_out=list(args.scope_out or []),
+        acceptance=list(args.acceptance or []),
+        risks=list(args.risk or []),
+        open_questions=list(args.open_question or []),
+        confirmed_by=args.confirmed_by,
+        note=args.note or "",
+    )
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print(f"Intent {payload['status']}: {payload['change_id']}")
+    print(f"- ref: .governance/changes/{args.change_id}/intent-confirmation.yaml")
+    print(f"- project_intent: {payload['project_intent']}")
+    return 0
+
+
+def cmd_intent_confirm(args):
+    from governance.intent import confirm_intent
+
+    payload = confirm_intent(args.root, change_id=args.change_id, confirmed_by=args.confirmed_by, note=args.note or "")
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print(f"Intent confirmed: {payload['change_id']}")
+    print(f"- confirmed_by: {payload['human_confirmation']['confirmed_by']}")
+    print(f"- ref: .governance/changes/{args.change_id}/intent-confirmation.yaml")
+    return 0
+
+
+def cmd_step_report(args):
+    from governance.step_report import materialize_step_report
+
+    payload = materialize_step_report(args.root, change_id=args.change_id, step=args.step)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(f"Step report written: .governance/changes/{args.change_id}/step-reports/step-{payload['step']}.md")
+    print(f"- owner: {payload['owner']}")
+    print(f"- human_gate: {str(payload['human_gate']).lower()}")
+    print(f"- recommended_next_action: {payload['recommended_next_action']}")
     return 0
 
 
@@ -527,6 +647,7 @@ def _format_onboard_next_steps(target: Path, mode: str, created_demo_change: boo
         "",
         "Agent next action:",
         "- Use ocw adopt to build an Agent-first adoption plan before mutating governance state.",
+        "- After a change exists, use participants setup, intent confirm, and step report before Step 6.",
     ]
     if not created_demo_change:
         lines.append(f"- ocw --root \"{target}\" adopt --target \"{target}\" --goal \"Describe the project iteration to govern\" --dry-run")
@@ -565,6 +686,12 @@ def cmd_status(args):
     from governance.step_matrix import format_status_snapshot_view, write_status_snapshot
 
     try:
+        if getattr(args, "sync_current_state", False):
+            from governance.current_state import sync_current_state
+
+            path = sync_current_state(args.root)
+            print(f"Current state synced: {path}")
+            return
         current = read_current_change(args.root)
         nested_current = current.get("current_change", {})
         has_active_change = bool(current.get("current_change_id"))
@@ -1068,6 +1195,44 @@ def build_parser() -> argparse.ArgumentParser:
     for command_name in ("hygiene", "doctor"):
         p_hygiene = subparsers.add_parser(command_name, help="Classify governance artifacts and repository hygiene")
         p_hygiene.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+        p_hygiene.add_argument("--state-consistency", action="store_true", help="Include human-readable state consistency checks")
+
+    p_participants = subparsers.add_parser("participants", help="Configure human and Agent participants")
+    p_participants_sub = p_participants.add_subparsers(dest="subcmd")
+    p_participants_setup = p_participants_sub.add_parser("setup", help="Write a participants profile and 9-step owner matrix")
+    p_participants_setup.add_argument("--profile", choices=["personal", "team"], default="personal", help="Participants profile")
+    p_participants_setup.add_argument("--participant", action="append", default=[], help="Participant spec, e.g. codex:executor,verifier")
+    p_participants_setup.add_argument("--change-id", default=None, help="Optional change id whose bindings.yaml should be updated")
+    p_participants_setup.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_intent = subparsers.add_parser("intent", help="Capture and confirm project intent")
+    p_intent_sub = p_intent.add_subparsers(dest="subcmd")
+    p_intent_capture = p_intent_sub.add_parser("capture", help="Write human-visible intent confirmation materials")
+    p_intent_capture.add_argument("--change-id", required=True, help="Target change id")
+    p_intent_capture.add_argument("--project-intent", default=None, help="Project intent summary")
+    p_intent_capture.add_argument("--requirement", action="append", default=[], help="Requirement item")
+    p_intent_capture.add_argument("--optimization", action="append", default=[], help="Optimization item")
+    p_intent_capture.add_argument("--bug", action="append", default=[], help="Bug fix item")
+    p_intent_capture.add_argument("--scope-in", action="append", default=[], help="Scope-in item")
+    p_intent_capture.add_argument("--scope-out", action="append", default=[], help="Scope-out item")
+    p_intent_capture.add_argument("--acceptance", action="append", default=[], help="Acceptance criterion")
+    p_intent_capture.add_argument("--risk", action="append", default=[], help="Risk item")
+    p_intent_capture.add_argument("--open-question", action="append", default=[], help="Open question")
+    p_intent_capture.add_argument("--confirmed-by", default=None, help="Actor confirming the captured intent")
+    p_intent_capture.add_argument("--note", default="", help="Confirmation note")
+    p_intent_capture.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    p_intent_confirm = p_intent_sub.add_parser("confirm", help="Confirm existing intent materials")
+    p_intent_confirm.add_argument("--change-id", required=True, help="Target change id")
+    p_intent_confirm.add_argument("--confirmed-by", required=True, help="Human or sponsor confirming the intent")
+    p_intent_confirm.add_argument("--note", default="", help="Confirmation note")
+    p_intent_confirm.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    p_step = subparsers.add_parser("step", help="Create human-visible step reports")
+    p_step_sub = p_step.add_subparsers(dest="subcmd")
+    p_step_report = p_step_sub.add_parser("report", help="Write a report for a 9-step workflow step")
+    p_step_report.add_argument("--change-id", required=True, help="Target change id")
+    p_step_report.add_argument("--step", type=int, default=None, help="Step number, defaults to current step")
+    p_step_report.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     p_change = subparsers.add_parser("change", help="Change package management")
     p_change.add_argument("subcmd", choices=["create", "prepare"], help="Create or prepare change package")
@@ -1108,7 +1273,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")
-    subparsers.add_parser("status", help="Show current step, gate status, and blockers")
+    p_status = subparsers.add_parser("status", help="Show current step, gate status, and blockers")
+    p_status.add_argument("--sync-current-state", action="store_true", help="Refresh .governance/current-state.md from current index/runtime state")
     p_runtime_status = subparsers.add_parser("runtime-status", help="Write machine-readable runtime status snapshot")
     p_runtime_status.add_argument("--change-id", required=True, help="Target change id")
     p_runtime_status.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
@@ -1226,6 +1392,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_adopt(args)
     elif args.command in {"hygiene", "doctor"}:
         return cmd_hygiene(args)
+    elif args.command == "participants" and args.subcmd == "setup":
+        return cmd_participants_setup(args)
+    elif args.command == "intent" and args.subcmd == "capture":
+        return cmd_intent_capture(args)
+    elif args.command == "intent" and args.subcmd == "confirm":
+        return cmd_intent_confirm(args)
+    elif args.command == "step" and args.subcmd == "report":
+        return cmd_step_report(args)
     elif args.command == "change" and args.subcmd == "create":
         cmd_change_create(args)
     elif args.command == "change" and args.subcmd == "prepare":
