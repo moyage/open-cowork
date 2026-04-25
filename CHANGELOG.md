@@ -7,6 +7,7 @@
 - Added `ocw step report` to materialize human-readable step reports with owner, inputs, outputs, done criteria, next-entry criteria, blockers, and human decisions
 - Added archive-time `.governance/current-state.md` synchronization and `ocw status --sync-current-state`
 - Extended `ocw hygiene` / `ocw doctor` with human-readable and machine-readable state consistency diagnostics
+- Updated bootstrap, quickstart, and smoke-test release checks for the v0.2.7 human-control flow
 
 ## 0.2.6
 

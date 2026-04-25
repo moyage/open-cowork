@@ -42,3 +42,11 @@ echo "Agent-first adoption plan preview:"
   --target "$TARGET_ROOT" \
   --goal "Apply open-cowork governance to this project iteration" \
   --dry-run
+
+cat <<NEXT
+
+Human control baseline after a change exists:
+- participants setup: confirm the 9-step owner / assistant / reviewer / human gate matrix
+- intent capture / confirm: make requirements, scope, risks, and acceptance visible before Step 6
+- step report: show owner, inputs, outputs, blockers, and human decisions for the current step
+NEXT
