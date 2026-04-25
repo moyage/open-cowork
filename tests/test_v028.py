@@ -232,6 +232,10 @@ class V028HumanGatesTests(unittest.TestCase):
                     "--modified", "src/governance/archive.py",
                 ])
                 main(["--root", str(root), "verify", "--change-id", "CHG-ARCHIVE"])
+                main([
+                    "--root", str(root), "step", "approve",
+                    "--change-id", "CHG-ARCHIVE", "--step", "8", "--approved-by", "human-sponsor",
+                ])
 
             review_stdout = io.StringIO()
             with contextlib.redirect_stdout(review_stdout):
@@ -241,11 +245,16 @@ class V028HumanGatesTests(unittest.TestCase):
                     "--decision", "approve",
                     "--reviewer", "review-agent",
                     "--rationale", "Approved with external reviewer",
+                    "--allow-reviewer-mismatch",
                 ])
             self.assertEqual(review_exit, 0)
             self.assertIn("reviewer does not match Step 8 binding", review_stdout.getvalue())
 
             with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root", str(root), "step", "approve",
+                    "--change-id", "CHG-ARCHIVE", "--step", "9", "--approved-by", "human-sponsor",
+                ])
                 archive_exit = main(["--root", str(root), "archive", "--change-id", "CHG-ARCHIVE"])
             self.assertEqual(archive_exit, 0)
             archive_dir = root / ".governance/archive/CHG-ARCHIVE"

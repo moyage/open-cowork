@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.9
+
+- Enforced Step 8 human approval before `ocw review` and Step 9 human approval before `ocw archive`
+- Turned reviewer mismatch from a warning into a blocking review error unless an explicit audited bypass is requested
+- Added approval provenance fields for `recorded_by` and `evidence_ref`
+- Finalized archive traceability by recording the archived Step 9 report in `archive-receipt.yaml`
+- Expanded human-readable `ocw step report` text output with inputs, outputs, done criteria, and participant responsibilities
+- Added a 9-step `ocw status` progress table with approval state for human-gated steps
+- Updated smoke and regression coverage for v0.2.9 review/archive gate closure
+- Updated Agent-first docs for the v0.2.9 release and next external dogfood round
+
 ## 0.2.8
 
 - Added explicit step participant mapping for `ocw participants setup` with `--step-owner`, `--step-assistant`, and `--step-reviewer`

@@ -126,7 +126,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 
 ## 当前版本完成度
 
-当前 `v0.2.8` 是“Default-visible and Enforceable Human Gates”。重点是在 v0.2.7 人的控制基线之上，把参与者映射、意图确认、步骤报告和 human gate 从“可记录”推进到“默认可见、默认接入命令流、默认不可静默绕过”。
+当前 `v0.2.9` 是“Review/archive Gate Closure and Human-facing Status”。重点是在 v0.2.8 已验证的 Step 5 execution gate 之上，闭合 Step 8 review gate、Step 9 archive gate、reviewer identity enforcement、approval provenance 和默认人类状态摘要。
 
 已经具备：
 
@@ -142,9 +142,11 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw participants setup` 生成个人域参与者 profile 和 9 步 owner / assistant / reviewer / human gate 矩阵。
 - `ocw intent capture` / `ocw intent confirm` 捕获并确认需求、优化、Bug、范围、风险和验收标准。
 - `ocw step report` 为 4 阶段 9 步生成可读阶段报告。
-- `ocw step approve` 记录 human gate approval；Step 5 approval 会被 `ocw run` 消费。
+- `ocw step approve` 记录 human gate approval；Step 5 / Step 8 / Step 9 approval 分别会被 `ocw run` / `ocw review` / `ocw archive` 消费。
 - `ocw contract validate` 检查 confirmed intent 与 contract scope 是否漂移。
-- `ocw archive` 生成最终状态一致性快照，便于归档审计。
+- `ocw review` 默认阻止 reviewer mismatch；只有显式 bypass 才会写入审计记录。
+- `ocw status` 输出 9-step progress table，显示每一步 report 和 human-gate approval 状态。
+- `ocw archive` 生成最终状态一致性快照和 Step 9 report traceability，便于归档审计。
 - `ocw pilot` 完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent handoff pack。
 - 目标项目 `.governance/AGENTS.md`：给后续接手 Agent 的项目内入口。
 - 目标项目 `.governance/agent-playbook.md`：给后续接手 Agent 的操作规则。

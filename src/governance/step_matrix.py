@@ -98,6 +98,9 @@ def render_step_matrix(root: str | Path, change_id: str | None = None) -> dict:
 
 def render_status_snapshot(root: str | Path, change_id: str | None = None) -> dict:
     matrix = render_step_matrix(root, change_id)
+    paths = GovernancePaths(Path(root))
+    gates = _load_human_gates(paths, matrix["change_id"])
+    bindings = _load_bindings(paths, matrix["change_id"])
     current_step = matrix["current_step"]
     current_phase_index = _phase_index_for_step(current_step)
     next_decision_step = _next_human_decision_step(current_step)
@@ -116,6 +119,7 @@ def render_status_snapshot(root: str | Path, change_id: str | None = None) -> di
         "project_summary": matrix["goal_summary"],
         "current_status": matrix["current_status"],
         "blockers": blockers,
+        "step_progress": _step_progress(paths, matrix["change_id"], current_step, gates, bindings),
     }
 
 
@@ -135,6 +139,12 @@ def format_status_snapshot_view(snapshot: dict) -> str:
     lines.extend(["", "## Progress"])
     lines.append(f"- completed_steps: {', '.join(str(step) for step in snapshot['completed_steps']) or 'none'}")
     lines.append(f"- remaining_steps: {', '.join(str(step) for step in snapshot['remaining_steps']) or 'none'}")
+    lines.extend(["", "## 9-step progress"])
+    for item in snapshot.get("step_progress", []):
+        lines.append(
+            f"- Step {item['step']}: {item['label']} | status={item['status']} "
+            f"| approval={item['approval']} | report={item['report']}"
+        )
     lines.extend(["", "## Blockers"])
     if snapshot["blockers"]:
         for blocker in snapshot["blockers"]:
@@ -366,3 +376,34 @@ def _current_step_requires_human(current_step: int | str, points: list[dict]) ->
     if not isinstance(current_step, int):
         return False
     return any(point["step"] == current_step for point in points)
+
+
+def _load_human_gates(paths: GovernancePaths, change_id: str) -> dict:
+    path = paths.change_file(change_id, "human-gates.yaml")
+    return load_yaml(path) if path.exists() else {}
+
+
+def _step_progress(paths: GovernancePaths, change_id: str, current_step: int | str, gates: dict, bindings: dict) -> list[dict]:
+    approvals = gates.get("approvals") or {}
+    items = []
+    for step in range(1, STEP_MATRIX_TOTAL_STEPS + 1):
+        approval = approvals.get(step) or approvals.get(str(step)) or {}
+        binding = _step_binding(bindings, step)
+        items.append({
+            "step": step,
+            "label": STEP_LABELS[step],
+            "status": _progress_status(step, current_step),
+            "approval": approval.get("status") or ("pending" if binding.get("human_gate") else "not-required"),
+            "report": f".governance/changes/{change_id}/step-reports/step-{step}.md",
+        })
+    return items
+
+
+def _progress_status(step: int, current_step: int | str) -> str:
+    if not isinstance(current_step, int):
+        return "pending"
+    if step < current_step:
+        return "completed"
+    if step == current_step:
+        return "current"
+    return "pending"

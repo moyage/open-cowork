@@ -76,6 +76,7 @@ def _format_agent_handoff(change_id: str) -> str:
         f"- ocw --root . intent capture --change-id {change_id} --project-intent \"Describe the real iteration intent\"",
         f"- ocw --root . intent confirm --change-id {change_id} --confirmed-by human-sponsor",
         f"- ocw --root . step report --change-id {change_id} --step 5",
+        f"- ocw --root . step approve --change-id {change_id} --step 5 --approved-by human-sponsor",
         "",
         "Report project progress, owner, blocker, next action, and human decisions needed.",
         "Do not make the human copy long command prompts or memorize ocw commands.",
@@ -499,6 +500,19 @@ def cmd_step_report(args):
     print(f"- owner: {payload['owner']}")
     print(f"- human_gate: {str(payload['human_gate']).lower()}")
     print(f"- recommended_next_action: {payload['recommended_next_action']}")
+    print("")
+    print("Inputs:")
+    for item in payload["inputs"]:
+        print(f"- {item}")
+    print("Outputs:")
+    for item in payload["outputs"]:
+        print(f"- {item}")
+    print("Done criteria:")
+    for item in payload["done_criteria"]:
+        print(f"- {item}")
+    print("Participant responsibilities:")
+    for item in payload["participant_responsibilities"]:
+        print(f"- {item}")
     return 0
 
 
@@ -511,6 +525,8 @@ def cmd_step_approve(args):
         step=args.step,
         approved_by=args.approved_by,
         note=args.note or "",
+        recorded_by=args.recorded_by or "",
+        evidence_ref=args.evidence_ref or "",
     )
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -559,10 +575,13 @@ def cmd_review(args):
             decision=args.decision,
             reviewer=args.reviewer,
             rationale=args.rationale or "",
+            allow_reviewer_mismatch=args.allow_reviewer_mismatch,
         )
         print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
         for warning in payload.get("warnings", []):
             print(f"- warning: {warning}")
+            if args.allow_reviewer_mismatch:
+                print("- reviewer mismatch allowed; audit bypass recorded in human-gates.yaml")
         from governance.step_report import materialize_step_report
         materialize_step_report(args.root, change_id=args.change_id, step=8)
         print(f"- Step 8 report: .governance/changes/{args.change_id}/step-reports/step-8.md")
@@ -1315,6 +1334,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_step_approve.add_argument("--change-id", required=True, help="Target change id")
     p_step_approve.add_argument("--step", type=int, required=True, help="Step number to approve")
     p_step_approve.add_argument("--approved-by", required=True, help="Human or sponsor approving the step")
+    p_step_approve.add_argument("--recorded-by", default="", help="Agent or participant recording the approval")
+    p_step_approve.add_argument("--evidence-ref", default="", help="Evidence reference for the approval")
     p_step_approve.add_argument("--note", default="", help="Approval note")
     p_step_approve.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
@@ -1354,6 +1375,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--decision", choices=["approve", "reject", "revise"], required=True, help="Review decision")
     p_review.add_argument("--reviewer", required=True, help="Reviewer identifier")
     p_review.add_argument("--rationale", default="", help="Decision rationale")
+    p_review.add_argument("--allow-reviewer-mismatch", action="store_true", help="Allow a reviewer mismatch and record an audit bypass")
 
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")

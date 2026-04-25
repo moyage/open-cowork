@@ -1,21 +1,15 @@
 # open-cowork Current State
 
-Project goal: - [ ] Step 5: Confirm contract.yaml and bindings.yaml are acceptable.
-Active change: v0.2.8-enforceable-human-gates
-Title: v0.2.8 Default-visible and Enforceable Human Gates
-Lifecycle: step7-verified
-Current phase: Phase 3 / 执行与验证
-Current step: Step 7 / step7-verified
-Current owner: verifier-agent
-Waiting on: Verification closure and review entry readiness
-Next decision: Step 8 / Review and decide
-Human intervention required: false
-Intent confirmation: confirmed
+Lifecycle: idle
+Last archived change: v0.2.9-review-archive-gate-closure
+Last archive at: 2026-04-25T02:10:43.940701+00:00
+Current phase: idle / 等待下一轮意图
+Current owner: human-sponsor
+Next recommended action: capture the next project intent, participants, scope, and acceptance before opening execution.
+Need human decision: decide whether to start a new change or keep the project idle.
 
 ## Read next / 下一步读取
 
-- `.governance/changes/v0.2.8-enforceable-human-gates/contract.yaml`
-- `.governance/changes/v0.2.8-enforceable-human-gates/bindings.yaml`
-- `.governance/changes/v0.2.8-enforceable-human-gates/intent-confirmation.yaml`
-- `.governance/changes/v0.2.8-enforceable-human-gates/step-reports/`
+- `.governance/AGENTS.md`
 - `.governance/agent-playbook.md`
+- `.governance/index/maintenance-status.yaml`

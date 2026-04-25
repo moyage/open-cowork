@@ -8,8 +8,8 @@
 
 1. 行动前先理解项目目标。
 2. 保持 `.governance/current-state.md` 与 active change 对齐。
-3. 使用 `.governance/changes/v0.2.8-enforceable-human-gates/contract.yaml` 作为执行边界。
-4. 使用 `.governance/changes/v0.2.8-enforceable-human-gates/bindings.yaml` 作为 owner 映射。
+3. 使用 `.governance/changes/v0.2.9-review-archive-gate-closure/contract.yaml` 作为执行边界。
+4. 使用 `.governance/changes/v0.2.9-review-archive-gate-closure/bindings.yaml` 作为 owner 映射。
 5. Step 6 前先确认 participants profile、intent confirmation 和当前 step report。
 6. verify、review 或 archive 前先记录客观 evidence。
 7. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。

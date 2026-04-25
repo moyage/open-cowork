@@ -25,11 +25,26 @@ def archive_change(root: str | Path, change_id: str) -> dict:
     review_payload = load_yaml(paths.change_file(change_id, "review.yaml"))
     if review_payload.get("decision", {}).get("status") != "approve":
         raise ValueError(f"change '{change_id}' must have an approved review before archive")
+    from .human_gates import require_step_approval
+
+    require_step_approval(root, change_id=change_id, step=9)
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = update_manifest(root, change_id, status="archived", current_step=9)
     from .step_report import materialize_step_report
 
+    set_current_change(root, {
+        "change_id": change_id,
+        "path": str(source_dir.relative_to(paths.root)),
+        "status": "archived",
+        "current_step": 9,
+    })
+    upsert_change_entry(root, {
+        "change_id": change_id,
+        "path": str(source_dir.relative_to(paths.root)),
+        "status": manifest.get("status"),
+        "current_step": manifest.get("current_step"),
+    })
     materialize_step_report(root, change_id=change_id, step=9)
     for child in source_dir.iterdir():
         target = archive_dir / child.name
@@ -47,6 +62,7 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         "traceability": {
             "review": str(paths.archived_change_file(change_id, "review.yaml").relative_to(paths.root)),
             "manifest": str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root)),
+            "final_step_report": str(paths.archived_change_file(change_id, "step-reports/step-9.yaml").relative_to(paths.root)),
             "final_state_consistency": str(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml").relative_to(paths.root)),
         },
         "residual_followups": [],

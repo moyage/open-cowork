@@ -7,7 +7,16 @@ from .change_package import read_change_package
 from .simple_yaml import load_yaml, write_yaml
 
 
-def approve_step(root: str | Path, *, change_id: str, step: int, approved_by: str, note: str = "") -> dict:
+def approve_step(
+    root: str | Path,
+    *,
+    change_id: str,
+    step: int,
+    approved_by: str,
+    note: str = "",
+    recorded_by: str = "",
+    evidence_ref: str = "",
+) -> dict:
     if step < 1 or step > 9:
         raise ValueError("step must be an integer from 1 to 9")
     package = read_change_package(root, change_id)
@@ -20,6 +29,26 @@ def approve_step(root: str | Path, *, change_id: str, step: int, approved_by: st
         "approved_at": _now_utc(),
         "note": note,
     }
+    if recorded_by:
+        approvals[step]["recorded_by"] = recorded_by
+    if evidence_ref:
+        approvals[step]["evidence_ref"] = evidence_ref
+    write_yaml(path, payload)
+    return payload
+
+
+def record_bypass(root: str | Path, *, change_id: str, step: int, reason: str, recorded_by: str, note: str = "") -> dict:
+    package = read_change_package(root, change_id)
+    path = package.path / "human-gates.yaml"
+    payload = load_yaml(path) if path.exists() else {"schema": "human-gates/v1", "change_id": change_id, "approvals": {}}
+    bypasses = payload.setdefault("bypasses", [])
+    bypasses.append({
+        "step": step,
+        "reason": reason,
+        "recorded_by": recorded_by,
+        "recorded_at": _now_utc(),
+        "note": note,
+    })
     write_yaml(path, payload)
     return payload
 

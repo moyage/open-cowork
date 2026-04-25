@@ -71,6 +71,7 @@
 - `archive/reports/2026-04-25-v026-external-dogfood-feedback.md`
 - `archive/reports/2026-04-25-v027-external-dogfood-feedback.md`
 - `archive/reports/2026-04-25-v028-external-dogfood-feedback.md`
+- `archive/reports/2026-04-25-v029-release-and-next-dogfood.md`
 - `archive/plans/61-v0.2.7-human-visible-collaboration-gates-candidate-input.md`
 - `archive/plans/62-v0.2.8-enforceable-human-gates-candidate-input.md`
 - `archive/plans/63-v0.2.9-review-archive-gates-candidate-input.md`

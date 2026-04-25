@@ -16,6 +16,7 @@ def write_review_decision(
     decision: str,
     reviewer: str,
     rationale: str = "",
+    allow_reviewer_mismatch: bool = False,
 ) -> dict:
     paths = GovernancePaths(Path(root))
     require_transition_state(
@@ -29,6 +30,23 @@ def write_review_decision(
     verify_payload = load_yaml(verify_path) if verify_path.exists() else {}
     if verify_payload.get("summary", {}).get("status") != "pass":
         raise ValueError(f"change '{change_id}' must have a passing verify result before review")
+    warnings = _reviewer_warnings(paths, change_id, reviewer)
+    if warnings and not allow_reviewer_mismatch:
+        raise ValueError(warnings[0])
+    from .human_gates import require_step_approval
+
+    require_step_approval(root, change_id=change_id, step=8)
+    if warnings:
+        from .human_gates import record_bypass
+
+        record_bypass(
+            root,
+            change_id=change_id,
+            step=8,
+            reason="reviewer_mismatch",
+            recorded_by=reviewer,
+            note=warnings[0],
+        )
 
     review_path = paths.change_file(change_id, "review.yaml")
     existing = load_yaml(review_path) if review_path.exists() else {}
@@ -41,7 +59,6 @@ def write_review_decision(
         "conditions": existing.get("conditions", {"must_before_next_step": [], "followups": []}),
         "trace": existing.get("trace", {"evidence_refs": [], "verify_refs": ["verify.yaml"]}),
     }
-    warnings = _reviewer_warnings(paths, change_id, reviewer)
     if warnings:
         payload["warnings"] = warnings
     write_yaml(review_path, payload)

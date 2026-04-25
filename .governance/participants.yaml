@@ -41,17 +41,12 @@ participants:
     strengths:
       - archive
       - continuity
-  - id: codex-agent
-    type: agent
-    strengths:
-      - implementation
-      - tests
-      - docs
   - id: hermes-agent
     type: agent
     strengths:
-      - independent-review
-      - local-personal-domain
+      - review
+      - decision-check
+      - independent-analysis
 step_owner_matrix:
   - step: 1
     label: Clarify the goal
@@ -119,10 +114,10 @@ step_owner_matrix:
     gate: role-confirmation
   - step: 8
     label: Review and decide
-    primary_owner: independent-reviewer
+    primary_owner: hermes-agent
     assistants:
       - human-sponsor
-    reviewer: independent-reviewer
+    reviewer: hermes-agent
     human_gate: true
     final_decision_owner: human-sponsor
     gate: human-confirmation
@@ -135,4 +130,6 @@ step_owner_matrix:
     human_gate: true
     final_decision_owner: human-sponsor
     gate: human-confirmation
-generated_at: '2026-04-25T00:45:33.574218+00:00'
+warnings:
+  []
+generated_at: '2026-04-25T01:48:04.254569+00:00'
