@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.8
+
+- Added explicit step participant mapping for `ocw participants setup` with `--step-owner`, `--step-assistant`, and `--step-reviewer`
+- Preserved existing participant bindings when `ocw change prepare` is rerun after participant setup
+- Added `ocw step approve` and Step 5 human-gate enforcement before `ocw run`
+- Generated default Step 1-9 reports through intent, prepare, run, verify, review, and archive flows
+- Added human-readable recovery for draft-contract `ocw step report` calls
+- Added intent/contract scope drift detection during `ocw contract validate`
+- Added reviewer mismatch warnings and final archive state consistency snapshots
+- Updated adoption, bootstrap, quickstart, and smoke-test guidance for the v0.2.8 enforceable human-gates flow
+
 ## 0.2.7
 
 - Added `ocw participants setup` to create a personal-domain participant profile and 9-step owner / assistant / reviewer / human-gate matrix

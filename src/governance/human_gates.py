@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+
+from .change_package import read_change_package
+from .simple_yaml import load_yaml, write_yaml
+
+
+def approve_step(root: str | Path, *, change_id: str, step: int, approved_by: str, note: str = "") -> dict:
+    if step < 1 or step > 9:
+        raise ValueError("step must be an integer from 1 to 9")
+    package = read_change_package(root, change_id)
+    path = package.path / "human-gates.yaml"
+    payload = load_yaml(path) if path.exists() else {"schema": "human-gates/v1", "change_id": change_id, "approvals": {}}
+    approvals = payload.setdefault("approvals", {})
+    approvals[step] = {
+        "status": "approved",
+        "approved_by": approved_by,
+        "approved_at": _now_utc(),
+        "note": note,
+    }
+    write_yaml(path, payload)
+    return payload
+
+
+def require_step_approval(root: str | Path, *, change_id: str, step: int) -> None:
+    package = read_change_package(root, change_id)
+    bindings = _load_yaml(package.path / "bindings.yaml")
+    step_binding = _step_binding(bindings, step)
+    if not step_binding.get("human_gate"):
+        return
+    gates = _load_yaml(package.path / "human-gates.yaml")
+    approval = (gates.get("approvals") or {}).get(step) or (gates.get("approvals") or {}).get(str(step))
+    if not approval or approval.get("status") != "approved":
+        raise ValueError(f"Step {step} human gate approval is required before continuing")
+
+
+def _step_binding(bindings: dict, step: int) -> dict:
+    steps = bindings.get("steps", {}) if isinstance(bindings, dict) else {}
+    return steps.get(step) or steps.get(str(step)) or {}
+
+
+def _load_yaml(path: Path) -> dict:
+    return load_yaml(path) if path.exists() else {}
+
+
+def _now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat()

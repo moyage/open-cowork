@@ -177,11 +177,15 @@ def cmd_contract_validate(args):
     from governance.change_package import read_change_package
     from governance.contract import ContractValidationError, load_contract
     from governance.runtime_events import append_runtime_event
+    from governance.simple_yaml import load_yaml
 
     try:
         contract_path = Path(args.path) if args.path else read_change_package(args.root, args.change_id).path / "contract.yaml"
-        load_contract(contract_path)
+        contract = load_contract(contract_path)
         change_id = args.change_id or contract_path.parent.name
+        drift = _intent_contract_scope_drift(contract_path, contract)
+        if drift:
+            raise ContractValidationError(drift)
         append_runtime_event(
             args.root,
             change_id=change_id,
@@ -215,6 +219,29 @@ def cmd_contract_validate(args):
             )
         print(f"Contract invalid: {exc}")
         return 1
+
+
+def _intent_contract_scope_drift(contract_path: Path, contract: dict) -> str | None:
+    intent_path = contract_path.parent / "intent-confirmation.yaml"
+    if not intent_path.exists():
+        return None
+    from governance.simple_yaml import load_yaml
+
+    intent = load_yaml(intent_path)
+    if intent.get("status") != "confirmed":
+        return None
+    intent_scope = set(intent.get("scope_in", []))
+    if not intent_scope:
+        return None
+    contract_scope = set(contract.get("scope_in", []))
+    evidence_scope = f".governance/changes/{contract.get('change_id')}/evidence/**"
+    contract_scope.discard(evidence_scope)
+    if intent_scope != contract_scope:
+        return (
+            "intent scope differs from contract scope: "
+            f"intent scope_in={sorted(intent_scope)} contract scope_in={sorted(contract_scope)}"
+        )
+    return None
 
 
 def cmd_run(args):
@@ -255,6 +282,8 @@ def cmd_run(args):
         print(f"Run failed: {exc}")
         return 1
     manifest = update_manifest(args.root, package.change_id, status="step6-executed-pre-step7", current_step=6)
+    from governance.step_report import materialize_step_report
+    materialize_step_report(args.root, change_id=package.change_id, step=6)
     current = read_current_change(args.root).get("current_change") or {}
     set_current_change(args.root, {
         **current,
@@ -288,6 +317,7 @@ def cmd_run(args):
         source_path=execution_summary_path if execution_summary_path.exists() else package.path / "manifest.yaml",
     )
     print(f"Run completed: {package.change_id} ({response.run_id})")
+    print(f"- Step 6 report: .governance/changes/{package.change_id}/step-reports/step-6.md")
     return 0
 
 
@@ -319,6 +349,10 @@ def cmd_adopt(args):
     print("")
     print("Recommended read set:")
     for item in payload["recommended_read_set"]:
+        print(f"- {item}")
+    print("")
+    print("Human control baseline next actions:")
+    for item in payload.get("human_control_baseline_next_actions", []):
         print(f"- {item}")
     return 0
 
@@ -369,6 +403,9 @@ def cmd_participants_setup(args):
         args.root,
         profile=args.profile,
         participant_specs=list(args.participant or []),
+        step_owner_specs=list(args.step_owner or []),
+        step_assistant_specs=list(args.step_assistant or []),
+        step_reviewer_specs=list(args.step_reviewer or []),
         change_id=args.change_id,
     )
     if args.format == "json":
@@ -392,6 +429,8 @@ def cmd_participants_setup(args):
             f"- Step {item['step']}: owner={item['primary_owner']} "
             f"reviewer={item['reviewer']} human_gate={str(item['human_gate']).lower()}"
         )
+    for warning in payload.get("warnings", []):
+        print(f"- warning: {warning}")
     return 0
 
 
@@ -419,6 +458,8 @@ def cmd_intent_capture(args):
     print(f"Intent {payload['status']}: {payload['change_id']}")
     print(f"- ref: .governance/changes/{args.change_id}/intent-confirmation.yaml")
     print(f"- project_intent: {payload['project_intent']}")
+    print(f"- Step 1 report: .governance/changes/{args.change_id}/step-reports/step-1.md")
+    print(f"- Step 2 report: .governance/changes/{args.change_id}/step-reports/step-2.md")
     return 0
 
 
@@ -436,9 +477,16 @@ def cmd_intent_confirm(args):
 
 
 def cmd_step_report(args):
+    from governance.contract import ContractValidationError
     from governance.step_report import materialize_step_report
 
-    payload = materialize_step_report(args.root, change_id=args.change_id, step=args.step)
+    try:
+        payload = materialize_step_report(args.root, change_id=args.change_id, step=args.step)
+    except ContractValidationError as exc:
+        print(f"Step report failed: contract is not ready for change '{args.change_id}'.")
+        print("Next action: run 'ocw change prepare' or complete contract.yaml before requesting a step report.")
+        print(f"Detail: {exc}")
+        return 1
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -454,13 +502,35 @@ def cmd_step_report(args):
     return 0
 
 
+def cmd_step_approve(args):
+    from governance.human_gates import approve_step
+
+    payload = approve_step(
+        args.root,
+        change_id=args.change_id,
+        step=args.step,
+        approved_by=args.approved_by,
+        note=args.note or "",
+    )
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print(f"Step {args.step} approved: {args.change_id}")
+    print(f"- approved_by: {payload['approvals'][args.step]['approved_by']}")
+    print(f"- ref: .governance/changes/{args.change_id}/human-gates.yaml")
+    return 0
+
+
 def cmd_verify(args):
     from governance.verify import write_verify_result
     from governance.runtime_events import append_runtime_event
 
     try:
         payload = write_verify_result(args.root, args.change_id)
+        from governance.step_report import materialize_step_report
+        materialize_step_report(args.root, change_id=args.change_id, step=7)
         print(f"Verify recorded: {payload['change_id']} -> {payload['summary']['status']}")
+        print(f"- Step 7 report: .governance/changes/{args.change_id}/step-reports/step-7.md")
         return 0
     except Exception as exc:
         append_runtime_event(
@@ -491,6 +561,11 @@ def cmd_review(args):
             rationale=args.rationale or "",
         )
         print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
+        for warning in payload.get("warnings", []):
+            print(f"- warning: {warning}")
+        from governance.step_report import materialize_step_report
+        materialize_step_report(args.root, change_id=args.change_id, step=8)
+        print(f"- Step 8 report: .governance/changes/{args.change_id}/step-reports/step-8.md")
         return 0
     except Exception as exc:
         append_runtime_event(
@@ -1202,6 +1277,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_participants_setup = p_participants_sub.add_parser("setup", help="Write a participants profile and 9-step owner matrix")
     p_participants_setup.add_argument("--profile", choices=["personal", "team"], default="personal", help="Participants profile")
     p_participants_setup.add_argument("--participant", action="append", default=[], help="Participant spec, e.g. codex:executor,verifier")
+    p_participants_setup.add_argument("--step-owner", action="append", default=[], help="Map a step owner, e.g. 6=coding-agent")
+    p_participants_setup.add_argument("--step-assistant", action="append", default=[], help="Map a step assistant, e.g. 6=helper-agent")
+    p_participants_setup.add_argument("--step-reviewer", action="append", default=[], help="Map a step reviewer, e.g. 8=review-agent")
     p_participants_setup.add_argument("--change-id", default=None, help="Optional change id whose bindings.yaml should be updated")
     p_participants_setup.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
@@ -1233,6 +1311,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_step_report.add_argument("--change-id", required=True, help="Target change id")
     p_step_report.add_argument("--step", type=int, default=None, help="Step number, defaults to current step")
     p_step_report.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_step_approve = p_step_sub.add_parser("approve", help="Record human approval for a gated step")
+    p_step_approve.add_argument("--change-id", required=True, help="Target change id")
+    p_step_approve.add_argument("--step", type=int, required=True, help="Step number to approve")
+    p_step_approve.add_argument("--approved-by", required=True, help="Human or sponsor approving the step")
+    p_step_approve.add_argument("--note", default="", help="Approval note")
+    p_step_approve.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     p_change = subparsers.add_parser("change", help="Change package management")
     p_change.add_argument("subcmd", choices=["create", "prepare"], help="Create or prepare change package")
@@ -1400,6 +1484,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_intent_confirm(args)
     elif args.command == "step" and args.subcmd == "report":
         return cmd_step_report(args)
+    elif args.command == "step" and args.subcmd == "approve":
+        return cmd_step_approve(args)
     elif args.command == "change" and args.subcmd == "create":
         cmd_change_create(args)
     elif args.command == "change" and args.subcmd == "prepare":

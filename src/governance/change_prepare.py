@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .change_package import read_change_package, update_manifest
 from .index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
-from .simple_yaml import write_yaml
+from .simple_yaml import load_yaml, write_yaml
 from .agent_adoption import write_agent_adoption_pack
 
 REQUIRED_FORBIDDEN_ACTIONS = [
@@ -44,7 +44,8 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
     source_docs = list(request.source_docs or [])
     _write_markdown_files(package.path, request.change_id, title, request.goal, scope_in, scope_out, verify_commands, source_docs)
     contract = _build_contract(request.change_id, title, request.goal, scope_in, scope_out, verify_commands, request.profile)
-    bindings = _build_bindings(request.change_id, request.profile)
+    existing_bindings = load_yaml(package.path / "bindings.yaml") if (package.path / "bindings.yaml").exists() else {}
+    bindings = _preserve_participant_bindings(existing_bindings, _build_bindings(request.change_id, request.profile))
     write_yaml(package.path / "contract.yaml", contract)
     write_yaml(package.path / "bindings.yaml", bindings)
     write_agent_adoption_pack(
@@ -66,6 +67,7 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         target_validation_objects=contract["validation_objects"],
         readiness={"step6_entry_ready": True, "missing_items": []},
     )
+    _materialize_prepare_step_reports(request.root, request.change_id)
     current = read_current_change(request.root).get("current_change") or {}
     entry = {
         **current,
@@ -84,6 +86,23 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         current_change_id=request.change_id,
     )
     return {"change_id": request.change_id, "path": str(package.path), "contract": contract, "bindings": bindings}
+
+
+def _preserve_participant_bindings(existing: dict, generated: dict) -> dict:
+    if not existing.get("participants_profile_ref"):
+        return generated
+    preserved = {**generated}
+    preserved["profile"] = existing.get("profile", generated.get("profile"))
+    preserved["participants_profile_ref"] = existing.get("participants_profile_ref")
+    preserved["steps"] = existing.get("steps", generated.get("steps", {}))
+    return preserved
+
+
+def _materialize_prepare_step_reports(root: str | Path, change_id: str) -> None:
+    from .step_report import materialize_step_report
+
+    for step in (3, 4, 5):
+        materialize_step_report(root, change_id=change_id, step=step)
 
 
 def _write_markdown_files(

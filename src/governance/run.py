@@ -41,10 +41,12 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
     manifest_path = paths.change_file(request.change_id, "manifest.yaml")
     if manifest_path.exists():
         from .simple_yaml import load_yaml
+        from .human_gates import require_step_approval
         manifest = load_yaml(manifest_path)
         readiness = manifest.get("readiness", {})
         if not readiness.get("step6_entry_ready"):
             raise ValueError(f"change '{request.change_id}' is not ready for Step 6 execution (step6_entry_ready is not True)")
+        require_step_approval(root, change_id=request.change_id, step=5)
         if manifest.get("current_step") not in {5, 6}:
             raise ValueError(
                 f"change '{request.change_id}' cannot run from step {manifest.get('current_step')} "

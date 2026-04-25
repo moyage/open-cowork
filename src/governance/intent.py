@@ -44,6 +44,7 @@ def capture_intent(
     }
     _write_intent_files(package.path, payload)
     _update_manifest(root, change_id, payload)
+    _materialize_intent_step_reports(root, change_id)
     return payload
 
 
@@ -58,6 +59,7 @@ def confirm_intent(root: str | Path, *, change_id: str, confirmed_by: str, note:
     payload["human_confirmation"] = _confirmation(confirmed_by, note)
     _write_intent_files(package.path, payload)
     _update_manifest(root, change_id, payload)
+    _materialize_intent_step_reports(root, change_id)
     return payload
 
 
@@ -77,6 +79,7 @@ def _write_intent_files(change_dir: Path, payload: dict) -> None:
 
 
 def _update_manifest(root: str | Path, change_id: str, payload: dict) -> None:
+    confirmed = payload.get("status") == "confirmed"
     update_manifest(
         root,
         change_id,
@@ -85,7 +88,19 @@ def _update_manifest(root: str | Path, change_id: str, payload: dict) -> None:
             "ref": f".governance/changes/{change_id}/intent-confirmation.yaml",
             "confirmed_by": (payload.get("human_confirmation") or {}).get("confirmed_by"),
         },
+        readiness={"step6_entry_ready": confirmed, "missing_items": [] if confirmed else ["intent_confirmation"]},
     )
+
+
+def _materialize_intent_step_reports(root: str | Path, change_id: str) -> None:
+    from .contract import ContractValidationError
+    from .step_report import materialize_step_report
+
+    for step in (1, 2):
+        try:
+            materialize_step_report(root, change_id=change_id, step=step)
+        except ContractValidationError:
+            continue
 
 
 def _confirmation(confirmed_by: str, note: str) -> dict:

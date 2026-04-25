@@ -61,6 +61,12 @@ def build_adoption_plan(
             "allowed_policies": ["continue", "supersede", "abandon", "archive-first", "force"] if requires_lifecycle_decision else ["prepare"],
         },
         "recommended_read_set": recommended_read_set,
+        "human_control_baseline_next_actions": [
+            "Configure participants and explicit step owner/reviewer mappings.",
+            "Capture and confirm project intent before Step 6.",
+            "Generate Step 1-5 reports before execution.",
+            "Record Step 5 approval with step approve before run.",
+        ],
         "role_suggestions": _suggest_roles(agent_inventory),
         "human_decisions_needed": _human_decisions_needed(requires_lifecycle_decision, bool(agent_inventory)),
         "mutation": "none",

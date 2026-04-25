@@ -101,4 +101,5 @@ echo "  ocw --root . participants setup --profile personal --change-id <change-i
 echo "  ocw --root . intent capture --change-id <change-id> --project-intent \"Describe the real iteration intent\""
 echo "  ocw --root . intent confirm --change-id <change-id> --confirmed-by human-sponsor"
 echo "  ocw --root . step report --change-id <change-id> --step 5"
+echo "  ocw --root . step approve --change-id <change-id> --step 5 --approved-by human-sponsor"
 echo "  ocw --root . hygiene"

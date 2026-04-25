@@ -28,6 +28,7 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         "assistants": step_binding.get("assistants", []),
         "reviewer": step_binding.get("reviewer"),
         "human_gate": bool(step_binding.get("human_gate")),
+        "participant_responsibilities": _participant_responsibilities(step_binding),
         "objective": ACTION_PURPOSES[selected_step],
         "inputs": _inputs_for_step(selected_step, change_id),
         "outputs": _outputs_for_step(selected_step, change_id),
@@ -153,6 +154,9 @@ def _format_report(payload: dict) -> str:
         f"- reviewer: {payload.get('reviewer') or 'none'}",
         f"- human_gate: {str(payload['human_gate']).lower()}",
         "",
+        "## Participant responsibilities",
+        *_bullets(payload["participant_responsibilities"]),
+        "",
         "## Objective",
         payload["objective"],
         "",
@@ -182,6 +186,20 @@ def _format_report(payload: dict) -> str:
 
 def _bullets(items: list[str]) -> list[str]:
     return [f"- {item}" for item in items]
+
+
+def _participant_responsibilities(binding: dict) -> list[str]:
+    owner = binding.get("owner") or "current owner"
+    reviewer = binding.get("reviewer") or "reviewer"
+    assistants = binding.get("assistants", [])
+    responsibilities = [f"{owner}: produce the step outputs and report blockers before advancing."]
+    if assistants:
+        responsibilities.append(f"{', '.join(assistants)}: support the owner without taking final decision authority.")
+    if reviewer:
+        responsibilities.append(f"{reviewer}: check the step output against done criteria and gate expectations.")
+    if binding.get("human_gate"):
+        responsibilities.append("human gate owner: confirm the decision point before the next execution step proceeds.")
+    return responsibilities
 
 
 def _now_utc() -> str:

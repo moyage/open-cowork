@@ -41,6 +41,17 @@ participants:
     strengths:
       - archive
       - continuity
+  - id: codex-agent
+    type: agent
+    strengths:
+      - implementation
+      - tests
+      - docs
+  - id: hermes-agent
+    type: agent
+    strengths:
+      - independent-review
+      - local-personal-domain
 step_owner_matrix:
   - step: 1
     label: Clarify the goal
@@ -124,4 +135,4 @@ step_owner_matrix:
     human_gate: true
     final_decision_owner: human-sponsor
     gate: human-confirmation
-generated_at: '2026-04-25T00:04:24.768504+00:00'
+generated_at: '2026-04-25T00:45:33.574218+00:00'

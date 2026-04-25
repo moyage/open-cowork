@@ -43,16 +43,17 @@ ocw --root . adopt --target . --goal "当前项目迭代目标" --dry-run
 
 如果有需求基线、dogfood 报告或审计报告，Agent 应通过 `--source-doc` 绑定来源，而不是把归档历史全文读进上下文。
 
-v0.2.7 起，Agent 应优先建立人的控制基线：
+v0.2.8 起，Agent 应优先建立人的控制基线，并让 Step 5 approval 成为进入执行的明确记录：
 
 ```bash
 ocw --root . participants setup --profile personal --change-id <change-id>
 ocw --root . intent capture --change-id <change-id> --project-intent "本轮真实迭代意图"
 ocw --root . intent confirm --change-id <change-id> --confirmed-by human-sponsor
 ocw --root . step report --change-id <change-id> --step 5
+ocw --root . step approve --change-id <change-id> --step 5 --approved-by human-sponsor
 ```
 
-这些命令仍然是 Agent 的内部工具。对人的汇报应聚焦“谁负责、要做什么、是否确认、当前步骤能否推进”。
+这些命令仍然是 Agent 的内部工具。对人的汇报应聚焦“谁负责、要做什么、是否确认、当前步骤能否推进”，并明确说明 human gate 是否已批准。
 
 ## 不应该怎么做
 

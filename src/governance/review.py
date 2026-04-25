@@ -41,6 +41,9 @@ def write_review_decision(
         "conditions": existing.get("conditions", {"must_before_next_step": [], "followups": []}),
         "trace": existing.get("trace", {"evidence_refs": [], "verify_refs": ["verify.yaml"]}),
     }
+    warnings = _reviewer_warnings(paths, change_id, reviewer)
+    if warnings:
+        payload["warnings"] = warnings
     write_yaml(review_path, payload)
 
     next_status = _status_for_decision(decision)
@@ -69,3 +72,16 @@ def _status_for_decision(decision: str) -> str:
     if decision == "reject":
         return "review-rejected"
     return "review-revise"
+
+
+def _reviewer_warnings(paths: GovernancePaths, change_id: str, reviewer: str) -> list[str]:
+    bindings_path = paths.change_file(change_id, "bindings.yaml")
+    if not bindings_path.exists():
+        return []
+    bindings = load_yaml(bindings_path)
+    steps = bindings.get("steps", {}) if isinstance(bindings, dict) else {}
+    step8 = steps.get(8) or steps.get("8") or steps.get("'8'") or {}
+    expected = step8.get("reviewer") or step8.get("owner")
+    if expected and expected != reviewer:
+        return [f"reviewer does not match Step 8 binding: expected {expected}, got {reviewer}"]
+    return []

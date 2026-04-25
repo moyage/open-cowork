@@ -11,6 +11,8 @@ Profile: personal
 - verifier-agent (agent): tests, acceptance
 - independent-reviewer (agent): review, decision-check
 - maintainer-agent (agent): archive, continuity
+- codex-agent (agent): implementation, tests, docs
+- hermes-agent (agent): independent-review, local-personal-domain
 
 ## 9-step owner matrix
 

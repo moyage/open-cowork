@@ -6,8 +6,8 @@
 
 1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。
 2. `.governance/agent-playbook.md`：Agent 操作规则。
-3. `.governance/changes/v0.2.7-human-control-baseline/contract.yaml`：执行边界。
-4. `.governance/changes/v0.2.7-human-control-baseline/bindings.yaml`：owner 和角色绑定。
+3. `.governance/changes/v0.2.8-enforceable-human-gates/contract.yaml`：执行边界。
+4. `.governance/changes/v0.2.8-enforceable-human-gates/bindings.yaml`：owner 和角色绑定。
 
 只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。
 

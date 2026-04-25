@@ -8,11 +8,12 @@
 
 1. 行动前先理解项目目标。
 2. 保持 `.governance/current-state.md` 与 active change 对齐。
-3. 使用 `.governance/changes/v0.2.7-human-control-baseline/contract.yaml` 作为执行边界。
-4. 使用 `.governance/changes/v0.2.7-human-control-baseline/bindings.yaml` 作为 owner 映射。
-5. verify、review 或 archive 前先记录客观 evidence。
-6. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
-7. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。
+3. 使用 `.governance/changes/v0.2.8-enforceable-human-gates/contract.yaml` 作为执行边界。
+4. 使用 `.governance/changes/v0.2.8-enforceable-human-gates/bindings.yaml` 作为 owner 映射。
+5. Step 6 前先确认 participants profile、intent confirmation 和当前 step report。
+6. verify、review 或 archive 前先记录客观 evidence。
+7. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
+8. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。
 
 ## Human update template
 

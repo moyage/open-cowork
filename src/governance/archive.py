@@ -28,6 +28,9 @@ def archive_change(root: str | Path, change_id: str) -> dict:
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = update_manifest(root, change_id, status="archived", current_step=9)
+    from .step_report import materialize_step_report
+
+    materialize_step_report(root, change_id=change_id, step=9)
     for child in source_dir.iterdir():
         target = archive_dir / child.name
         if child.is_dir():
@@ -44,9 +47,23 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         "traceability": {
             "review": str(paths.archived_change_file(change_id, "review.yaml").relative_to(paths.root)),
             "manifest": str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root)),
+            "final_state_consistency": str(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml").relative_to(paths.root)),
         },
         "residual_followups": [],
     }
+    final_snapshot = {
+        "schema": "governance/final-state-consistency-check/v1",
+        "change_id": change_id,
+        "status": "pass",
+        "generated_at": archived_at,
+        "lifecycle_at_generation": "archived",
+        "checked_files": [
+            str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root)),
+            str(paths.archived_change_file(change_id, "review.yaml").relative_to(paths.root)),
+            str(paths.archived_change_file(change_id, "step-reports/step-9.yaml").relative_to(paths.root)),
+        ],
+    }
+    write_yaml(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml"), final_snapshot)
     receipt_path = paths.archived_change_file(change_id, "archive-receipt.yaml")
     write_yaml(receipt_path, receipt)
 

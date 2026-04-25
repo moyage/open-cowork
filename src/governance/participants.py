@@ -99,6 +99,9 @@ def setup_participants_profile(
     *,
     profile: str = "personal",
     participant_specs: list[str] | None = None,
+    step_owner_specs: list[str] | None = None,
+    step_assistant_specs: list[str] | None = None,
+    step_reviewer_specs: list[str] | None = None,
     change_id: str | None = None,
 ) -> dict:
     root_path = Path(root)
@@ -106,12 +109,20 @@ def setup_participants_profile(
     governance_dir.mkdir(parents=True, exist_ok=True)
 
     participants = _merge_participants(DEFAULT_PERSONAL_PARTICIPANTS, _participants_from_specs(participant_specs or []))
-    matrix = _build_step_matrix()
+    matrix = _build_step_matrix(
+        step_owner_specs=step_owner_specs or [],
+        step_assistant_specs=step_assistant_specs or [],
+        step_reviewer_specs=step_reviewer_specs or [],
+    )
+    assigned = _assigned_participants(matrix)
+    custom_participants = {item["id"] for item in _participants_from_specs(participant_specs or [])}
+    unassigned = sorted(custom_participants - assigned)
     payload = {
         "schema": "participants-profile/v1",
         "profile": profile,
         "participants": participants,
         "step_owner_matrix": matrix,
+        "warnings": [f"unassigned participant: {item}" for item in unassigned],
         "generated_at": _now_utc(),
     }
     write_yaml(governance_dir / "participants.yaml", payload)
@@ -146,11 +157,54 @@ def _merge_participants(defaults: list[dict], overrides: list[dict]) -> list[dic
     return list(merged.values())
 
 
-def _build_step_matrix() -> list[dict]:
-    return [
-        {"step": step, **payload, "gate": "human-confirmation" if payload["human_gate"] else "role-confirmation"}
-        for step, payload in STEP_OWNER_MATRIX.items()
-    ]
+def _build_step_matrix(
+    *,
+    step_owner_specs: list[str],
+    step_assistant_specs: list[str],
+    step_reviewer_specs: list[str],
+) -> list[dict]:
+    matrix = []
+    owners = _parse_step_assignments(step_owner_specs)
+    assistants = _parse_step_assignments(step_assistant_specs, multi=True)
+    reviewers = _parse_step_assignments(step_reviewer_specs)
+    for step, payload in STEP_OWNER_MATRIX.items():
+        item = dict(payload)
+        if step in owners:
+            item["primary_owner"] = owners[step]
+        if step in assistants:
+            item["assistants"] = assistants[step]
+        if step in reviewers:
+            item["reviewer"] = reviewers[step]
+        matrix.append({"step": step, **item, "gate": "human-confirmation" if item["human_gate"] else "role-confirmation"})
+    return matrix
+
+
+def _parse_step_assignments(specs: list[str], *, multi: bool = False) -> dict[int, str] | dict[int, list[str]]:
+    parsed = {}
+    for spec in specs:
+        left, sep, right = spec.partition("=")
+        if not sep or not left.strip().isdigit() or not right.strip():
+            raise ValueError(f"step assignment must look like 6=agent-id: {spec}")
+        step = int(left.strip())
+        if step < 1 or step > 9:
+            raise ValueError(f"step assignment step must be 1..9: {spec}")
+        actor = right.strip()
+        if multi:
+            parsed.setdefault(step, []).append(actor)
+        else:
+            parsed[step] = actor
+    return parsed
+
+
+def _assigned_participants(matrix: list[dict]) -> set[str]:
+    assigned = set()
+    for item in matrix:
+        assigned.add(item.get("primary_owner"))
+        assigned.add(item.get("reviewer"))
+        assigned.add(item.get("final_decision_owner"))
+        assigned.update(item.get("assistants", []))
+    assigned.discard(None)
+    return assigned
 
 
 def _merge_bindings(root: Path, change_id: str, profile: dict) -> None:

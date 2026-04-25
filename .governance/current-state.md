@@ -1,21 +1,21 @@
 # open-cowork Current State
 
 Project goal: - [ ] Step 5: Confirm contract.yaml and bindings.yaml are acceptable.
-Active change: v0.2.7-human-control-baseline
-Title: V0.2.7 Human Control Baseline
-Lifecycle: step5-prepared
-Current phase: Phase 2 / 方案与准备
-Current step: Step 5 / step5-prepared
-Current owner: human-sponsor
-Waiting on: Manifest target_validation_objects must align with contract validation_objects for the active change.
+Active change: v0.2.8-enforceable-human-gates
+Title: v0.2.8 Default-visible and Enforceable Human Gates
+Lifecycle: step7-verified
+Current phase: Phase 3 / 执行与验证
+Current step: Step 7 / step7-verified
+Current owner: verifier-agent
+Waiting on: Verification closure and review entry readiness
 Next decision: Step 8 / Review and decide
-Human intervention required: true
+Human intervention required: false
 Intent confirmation: confirmed
 
 ## Read next / 下一步读取
 
-- `.governance/changes/v0.2.7-human-control-baseline/contract.yaml`
-- `.governance/changes/v0.2.7-human-control-baseline/bindings.yaml`
-- `.governance/changes/v0.2.7-human-control-baseline/intent-confirmation.yaml`
-- `.governance/changes/v0.2.7-human-control-baseline/step-reports/`
+- `.governance/changes/v0.2.8-enforceable-human-gates/contract.yaml`
+- `.governance/changes/v0.2.8-enforceable-human-gates/bindings.yaml`
+- `.governance/changes/v0.2.8-enforceable-human-gates/intent-confirmation.yaml`
+- `.governance/changes/v0.2.8-enforceable-human-gates/step-reports/`
 - `.governance/agent-playbook.md`
