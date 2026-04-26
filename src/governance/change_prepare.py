@@ -61,11 +61,11 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         request.root,
         request.change_id,
         title=title,
-        status="step5-prepared",
-        current_step=5,
+        status="step1-ready",
+        current_step=1,
         source_docs=source_docs,
         target_validation_objects=contract["validation_objects"],
-        readiness={"step6_entry_ready": True, "missing_items": []},
+        readiness={"step1_entry_ready": True, "step6_entry_ready": False, "missing_items": ["intent_confirmation", "step1_confirmation"]},
     )
     _materialize_prepare_step_reports(request.root, request.change_id)
     current = read_current_change(request.root).get("current_change") or {}
@@ -101,7 +101,7 @@ def _preserve_participant_bindings(existing: dict, generated: dict) -> dict:
 def _materialize_prepare_step_reports(root: str | Path, change_id: str) -> None:
     from .step_report import materialize_step_report
 
-    for step in (3, 4, 5):
+    for step in (1, 2, 3, 4, 5):
         materialize_step_report(root, change_id=change_id, step=step)
 
 
@@ -241,10 +241,14 @@ def _build_bindings(change_id: str, profile: str) -> dict:
             "default_maintainer": "maintainer-agent",
         },
         "steps": {
-            "'5'": {"owner": "orchestrator", "gate": "human-or-agent-confirmation"},
-            "'6'": {"owner": "executor", "gate": "contract-required", "isolation": "project-local"},
-            "'7'": {"owner": "verifier", "gate": "evidence-required"},
-            "'8'": {"owner": "reviewer", "gate": "independent-review-required"},
-            "'9'": {"owner": "maintainer", "gate": "approved-review-required"},
+            "'1'": {"owner": "human-sponsor", "gate": "review-required", "human_gate": True},
+            "'2'": {"owner": "analyst-agent", "gate": "approval-required", "human_gate": True},
+            "'3'": {"owner": "architect-agent", "gate": "review-required", "human_gate": True},
+            "'4'": {"owner": "orchestrator-agent", "gate": "review-required", "human_gate": False},
+            "'5'": {"owner": "human-sponsor", "gate": "approval-required", "human_gate": True},
+            "'6'": {"owner": "executor-agent", "gate": "auto-pass-to-step7", "human_gate": False, "isolation": "project-local"},
+            "'7'": {"owner": "verifier-agent", "gate": "review-required", "human_gate": False},
+            "'8'": {"owner": "independent-reviewer", "gate": "approval-required", "human_gate": True},
+            "'9'": {"owner": "maintainer-agent", "gate": "approval-required", "human_gate": True},
         },
     }

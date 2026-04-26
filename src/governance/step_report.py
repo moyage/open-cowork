@@ -5,7 +5,15 @@ from pathlib import Path
 
 from .change_package import read_change_package
 from .simple_yaml import load_yaml, write_yaml
-from .step_matrix import ACTION_PURPOSES, PHASE_LABELS, STEP_LABELS, render_step_matrix
+from .step_matrix import (
+    ACTION_PURPOSES,
+    PHASE_LABELS,
+    STEP_LABELS,
+    _approval_state_for_step,
+    _gate_state_for_step,
+    _gate_type_for_step,
+    render_step_matrix,
+)
 
 
 def materialize_step_report(root: str | Path, *, change_id: str, step: int | None = None) -> dict:
@@ -16,11 +24,18 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         raise ValueError("step must be an integer from 1 to 9")
     bindings = _load_optional_yaml(package.path / "bindings.yaml")
     intent = _load_optional_yaml(package.path / "intent-confirmation.yaml")
+    human_gates = _load_optional_yaml(package.path / "human-gates.yaml")
     step_binding = _step_binding(bindings, selected_step)
+    approval = _approval_for_step(human_gates, selected_step)
+    gate_type = _gate_type_for_step(selected_step, step_binding)
+    gate_state = _gate_state_for_step(selected_step, matrix["current_step"], gate_type, approval)
+    approval_state = _approval_state_for_step(gate_type, approval)
     payload = {
         "schema": "step-report/v1",
         "change_id": change_id,
         "step": selected_step,
+        "standard_step": f"Step {selected_step} / {STEP_LABELS[selected_step]}",
+        "traditional_mapping": PHASE_LABELS[_phase_index(selected_step)],
         "phase": PHASE_LABELS[_phase_index(selected_step)],
         "label": STEP_LABELS[selected_step],
         "status": _status_for_step(selected_step, matrix),
@@ -28,6 +43,9 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         "assistants": step_binding.get("assistants", []),
         "reviewer": step_binding.get("reviewer"),
         "human_gate": bool(step_binding.get("human_gate")),
+        "gate_type": gate_type,
+        "gate_state": gate_state,
+        "approval_state": approval_state,
         "participant_responsibilities": _participant_responsibilities(step_binding),
         "objective": ACTION_PURPOSES[selected_step],
         "inputs": _inputs_for_step(selected_step, change_id),
@@ -35,7 +53,11 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         "done_criteria": _done_criteria(selected_step, intent),
         "next_entry_criteria": _next_entry_criteria(selected_step),
         "blockers": matrix.get("blockers", []),
+        "framework_controls": _framework_controls(selected_step, gate_type),
+        "agent_actions_done": _agent_actions_done(selected_step),
+        "agent_actions_expected": _agent_actions_expected(selected_step, step_binding),
         "human_decisions_required": _human_decisions(selected_step, step_binding, intent),
+        "human_confirmation_options": _human_confirmation_options(step_binding),
         "recommended_next_action": _recommended_next_action(selected_step, step_binding, intent),
         "generated_at": _now_utc(),
     }
@@ -55,6 +77,13 @@ def _load_optional_yaml(path: Path) -> dict:
 def _step_binding(bindings: dict, step: int) -> dict:
     steps = bindings.get("steps", {}) if isinstance(bindings, dict) else {}
     return steps.get(step) or steps.get(str(step)) or steps.get(f"'{step}'") or {}
+
+
+def _approval_for_step(human_gates: dict, step: int) -> dict:
+    approvals = human_gates.get("approvals", {}) if isinstance(human_gates, dict) else {}
+    if not isinstance(approvals, dict):
+        return {}
+    return approvals.get(step) or approvals.get(str(step)) or approvals.get(f"'{step}'") or {}
 
 
 def _phase_index(step: int) -> int:
@@ -132,6 +161,41 @@ def _human_decisions(step: int, binding: dict, intent: dict) -> list[str]:
     return decisions or ["No human decision required by the current report."]
 
 
+def _human_confirmation_options(binding: dict) -> list[dict]:
+    if not binding.get("human_gate"):
+        return []
+    return [
+        {"action": "approve", "label": "确认通过，进入下一步。"},
+        {"action": "revise", "label": "需要修订，暂不进入下一步。"},
+        {"action": "reject", "label": "拒绝通过，停止或重定向。"},
+    ]
+
+
+def _framework_controls(step: int, gate_type: str) -> list[str]:
+    controls = [
+        f"standard_step=Step {step}",
+        f"gate_type={gate_type}",
+        "Evidence and report facts must stay in the active change package.",
+    ]
+    if step == 5:
+        controls.append("Step 6 must not start before Step 5 approval is recorded.")
+    if step in {8, 9}:
+        controls.append("Executor must not self-approve review or archive decisions.")
+    return controls
+
+
+def _agent_actions_done(step: int) -> list[str]:
+    return [f"Generated Step {step} report from the active change package."]
+
+
+def _agent_actions_expected(step: int, binding: dict) -> list[str]:
+    if binding.get("human_gate"):
+        return ["Wait for a human approve / revise / reject action before advancing."]
+    if step < 9:
+        return [f"Prepare Step {step + 1} after current step outputs are complete."]
+    return ["Carry forward archive followups into the next active change."]
+
+
 def _recommended_next_action(step: int, binding: dict, intent: dict) -> str:
     if step <= 5 and intent.get("status") != "confirmed":
         return "Capture and confirm intent before allowing execution."
@@ -148,11 +212,16 @@ def _format_report(payload: dict) -> str:
         "",
         f"- change_id: {payload['change_id']}",
         f"- phase: {payload['phase']}",
+        f"- standard_step: {payload['standard_step']}",
+        f"- traditional_mapping: {payload['traditional_mapping']}",
         f"- status: {payload['status']}",
         f"- owner: {payload['owner']}",
         f"- assistants: {', '.join(payload['assistants']) or 'none'}",
         f"- reviewer: {payload.get('reviewer') or 'none'}",
         f"- human_gate: {str(payload['human_gate']).lower()}",
+        f"- gate_type: {payload['gate_type']}",
+        f"- gate_state: {payload['gate_state']}",
+        f"- approval_state: {payload['approval_state']}",
         "",
         "## Participant responsibilities",
         *_bullets(payload["participant_responsibilities"]),
@@ -175,8 +244,20 @@ def _format_report(payload: dict) -> str:
         "## Blockers",
         *_bullets(payload["blockers"] or ["none"]),
         "",
+        "## Framework controls",
+        *_bullets(payload["framework_controls"]),
+        "",
+        "## Agent actions done",
+        *_bullets(payload["agent_actions_done"]),
+        "",
+        "## Agent actions expected",
+        *_bullets(payload["agent_actions_expected"]),
+        "",
         "## Human decisions required",
         *_bullets(payload["human_decisions_required"]),
+        "",
+        "## Human confirmation options",
+        *_format_confirmation_options(payload["human_confirmation_options"]),
         "",
         "## Recommended next action",
         payload["recommended_next_action"],
@@ -186,6 +267,12 @@ def _format_report(payload: dict) -> str:
 
 def _bullets(items: list[str]) -> list[str]:
     return [f"- {item}" for item in items]
+
+
+def _format_confirmation_options(items: list[dict]) -> list[str]:
+    if not items:
+        return ["- none"]
+    return [f"- {item['action']}: {item['label']}" for item in items]
 
 
 def _participant_responsibilities(binding: dict) -> list[str]:

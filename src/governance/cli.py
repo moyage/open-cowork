@@ -73,10 +73,12 @@ def _format_agent_handoff(change_id: str) -> str:
         "",
         "Human control baseline before Step 6:",
         f"- ocw --root . participants setup --profile personal --change-id {change_id}",
+        f"- ocw --root . step report --change-id {change_id} --step 1 --format human",
         f"- ocw --root . intent capture --change-id {change_id} --project-intent \"Describe the real iteration intent\"",
         f"- ocw --root . intent confirm --change-id {change_id} --confirmed-by human-sponsor",
-        f"- ocw --root . step report --change-id {change_id} --step 5",
-        f"- ocw --root . step approve --change-id {change_id} --step 5 --approved-by human-sponsor",
+        f"- Step 5 approval is required before Step 6 execution.",
+        f"- Step 8 review decision and approval trace are required before archive.",
+        f"- Step 9 human approval is required before archive is finalized.",
         "",
         "Report project progress, owner, blocker, next action, and human decisions needed.",
         "Do not make the human copy long command prompts or memorize ocw commands.",
@@ -496,6 +498,49 @@ def cmd_step_report(args):
 
         print(dump_yaml(payload), end="")
         return 0
+    if args.format == "human":
+        print(f"# {payload['standard_step']}")
+        print("")
+        print(f"- traditional_mapping: {payload['traditional_mapping']}")
+        print(f"- owner: {payload['owner']}")
+        print(f"- reviewer: {payload.get('reviewer') or 'none'}")
+        print(f"- gate_type: {payload['gate_type']}")
+        print(f"- gate_state: {payload['gate_state']}")
+        print(f"- approval_state: {payload['approval_state']}")
+        print("")
+        print("## Inputs")
+        for item in payload["inputs"]:
+            print(f"- {item}")
+        print("")
+        print("## Outputs")
+        for item in payload["outputs"]:
+            print(f"- {item}")
+        print("")
+        print("## Done criteria")
+        for item in payload["done_criteria"]:
+            print(f"- {item}")
+        print("")
+        print("## framework_controls")
+        for item in payload["framework_controls"]:
+            print(f"- {item}")
+        print("")
+        print("## agent_actions_done")
+        for item in payload["agent_actions_done"]:
+            print(f"- {item}")
+        print("")
+        print("## agent_actions_expected")
+        for item in payload["agent_actions_expected"]:
+            print(f"- {item}")
+        print("")
+        print("## Human confirmation options")
+        if payload["human_confirmation_options"]:
+            for item in payload["human_confirmation_options"]:
+                print(f"- {item['action']}: {item['label']}")
+        else:
+            print("- none")
+        print("")
+        print(f"Recommended next action: {payload['recommended_next_action']}")
+        return 0
     print(f"Step report written: .governance/changes/{args.change_id}/step-reports/step-{payload['step']}.md")
     print(f"- owner: {payload['owner']}")
     print(f"- human_gate: {str(payload['human_gate']).lower()}")
@@ -528,6 +573,8 @@ def cmd_step_approve(args):
         recorded_by=args.recorded_by or "",
         evidence_ref=args.evidence_ref or "",
     )
+    if args.step == 5:
+        _mark_step5_approved_for_step6(args.root, args.change_id)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -535,6 +582,29 @@ def cmd_step_approve(args):
     print(f"- approved_by: {payload['approvals'][args.step]['approved_by']}")
     print(f"- ref: .governance/changes/{args.change_id}/human-gates.yaml")
     return 0
+
+
+def _mark_step5_approved_for_step6(root: str | Path, change_id: str) -> None:
+    from governance.change_package import read_change_package, update_manifest
+    from governance.index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
+
+    package = read_change_package(root, change_id)
+    readiness = dict(package.manifest.get("readiness") or {})
+    readiness["step6_entry_ready"] = True
+    readiness["missing_items"] = [item for item in readiness.get("missing_items", []) if item not in {"step5_approval"}]
+    manifest = update_manifest(root, change_id, status="step6-in-progress", current_step=6, readiness=readiness)
+    current = read_current_change(root).get("current_change") or {}
+    entry = {
+        **current,
+        "change_id": change_id,
+        "path": str(package.path.relative_to(Path(root))),
+        "status": manifest.get("status"),
+        "current_step": manifest.get("current_step"),
+        "title": manifest.get("title"),
+    }
+    set_current_change(root, entry)
+    upsert_change_entry(root, entry)
+    set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
 
 
 def cmd_verify(args):
@@ -576,6 +646,9 @@ def cmd_review(args):
             reviewer=args.reviewer,
             rationale=args.rationale or "",
             allow_reviewer_mismatch=args.allow_reviewer_mismatch,
+            bypass_reason=args.bypass_reason or "",
+            bypass_recorded_by=args.bypass_recorded_by or "",
+            bypass_evidence_ref=args.bypass_evidence_ref or "",
         )
         print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
         for warning in payload.get("warnings", []):
@@ -741,7 +814,10 @@ def _format_onboard_next_steps(target: Path, mode: str, created_demo_change: boo
         "",
         "Agent next action:",
         "- Use ocw adopt to build an Agent-first adoption plan before mutating governance state.",
-        "- After a change exists, use participants setup, intent confirm, and step report before Step 6.",
+        "- After a change exists, start with Step 1 input framing; do not treat prepare as Step 5 completion.",
+        "- Step 5 approval is required before Step 6 execution.",
+        "- Step 8 review decision and approval trace are required before archive.",
+        "- Step 9 human approval is required before archive is finalized.",
     ]
     if not created_demo_change:
         lines.append(f"- ocw --root \"{target}\" adopt --target \"{target}\" --goal \"Describe the project iteration to govern\" --dry-run")
@@ -1329,7 +1405,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_step_report = p_step_sub.add_parser("report", help="Write a report for a 9-step workflow step")
     p_step_report.add_argument("--change-id", required=True, help="Target change id")
     p_step_report.add_argument("--step", type=int, default=None, help="Step number, defaults to current step")
-    p_step_report.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_step_report.add_argument("--format", choices=["text", "yaml", "json", "human"], default="text", help="Output format")
     p_step_approve = p_step_sub.add_parser("approve", help="Record human approval for a gated step")
     p_step_approve.add_argument("--change-id", required=True, help="Target change id")
     p_step_approve.add_argument("--step", type=int, required=True, help="Step number to approve")
@@ -1376,6 +1452,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--reviewer", required=True, help="Reviewer identifier")
     p_review.add_argument("--rationale", default="", help="Decision rationale")
     p_review.add_argument("--allow-reviewer-mismatch", action="store_true", help="Allow a reviewer mismatch and record an audit bypass")
+    p_review.add_argument("--bypass-reason", default="", help="Human-readable reviewer mismatch bypass reason")
+    p_review.add_argument("--bypass-recorded-by", default="", help="Actor recording reviewer mismatch risk acceptance")
+    p_review.add_argument("--bypass-evidence-ref", default="", help="Evidence reference for reviewer mismatch risk acceptance")
 
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")

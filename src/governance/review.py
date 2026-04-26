@@ -17,6 +17,9 @@ def write_review_decision(
     reviewer: str,
     rationale: str = "",
     allow_reviewer_mismatch: bool = False,
+    bypass_reason: str = "",
+    bypass_recorded_by: str = "",
+    bypass_evidence_ref: str = "",
 ) -> dict:
     paths = GovernancePaths(Path(root))
     require_transition_state(
@@ -36,6 +39,18 @@ def write_review_decision(
     from .human_gates import require_step_approval
 
     require_step_approval(root, change_id=change_id, step=8)
+    if warnings and allow_reviewer_mismatch:
+        missing = []
+        if not bypass_reason.strip():
+            missing.append("bypass reason")
+        if not bypass_recorded_by.strip():
+            missing.append("bypass recorded_by")
+        if not bypass_evidence_ref.strip():
+            missing.append("bypass evidence_ref")
+        if missing:
+            raise ValueError(
+                "reviewer mismatch bypass requires " + ", ".join(missing)
+            )
     if warnings:
         from .human_gates import record_bypass
 
@@ -43,8 +58,9 @@ def write_review_decision(
             root,
             change_id=change_id,
             step=8,
-            reason="reviewer_mismatch",
-            recorded_by=reviewer,
+            reason=bypass_reason,
+            recorded_by=bypass_recorded_by,
+            evidence_ref=bypass_evidence_ref,
             note=warnings[0],
         )
 
@@ -57,10 +73,18 @@ def write_review_decision(
         "reviewers": [{"role": "reviewer", "id": reviewer}],
         "decision": {"status": decision, "rationale": rationale},
         "conditions": existing.get("conditions", {"must_before_next_step": [], "followups": []}),
-        "trace": existing.get("trace", {"evidence_refs": [], "verify_refs": ["verify.yaml"]}),
+        "trace": {
+            **existing.get("trace", {"evidence_refs": [], "verify_refs": ["verify.yaml"]}),
+            "step8_approval_ref": f".governance/changes/{change_id}/human-gates.yaml#approvals.8",
+        },
     }
     if warnings:
         payload["warnings"] = warnings
+        payload["reviewer_mismatch_bypass"] = {
+            "reason": bypass_reason,
+            "recorded_by": bypass_recorded_by,
+            "evidence_ref": bypass_evidence_ref,
+        }
     write_yaml(review_path, payload)
 
     next_status = _status_for_decision(decision)

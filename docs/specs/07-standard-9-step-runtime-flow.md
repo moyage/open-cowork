@@ -4,6 +4,7 @@
 - 9 步是固定骨架，不得删除。
 - 复杂度决定每步强度，不决定是否存在该步。
 - 每步都支持 gate。
+- 运行状态必须同时表达 `gate_type`、`gate_state` 和 `approval_state`，避免把 review、approval、not-required 混成一个 `approval` 字段。
 - Step 8 必须产出明确 decision。
 - Step 9 不可跳过。
 
@@ -19,6 +20,34 @@
 | 7 | 验证与纠偏 | 检查结果并回流修正 | 产物、evidence | verify result、issues | Verifier | review-required |
 | 8 | 审查与决策 | 独立决定是否通过 | verify、evidence、change package | review decision | Reviewer / Sponsor | approval-required |
 | 9 | 归档与维护状态更新 | 归档、更新 stable、刷新维护上下文 | approved outputs | archive、stable updates、index refresh | Maintainer / Governance | approval-required |
+
+## 2.1 Gate 状态语义
+
+`gate_type` 表示该步骤需要哪类控制：
+
+- `review-required`：需要 review/确认步骤产物，但不等同于 approval gate。
+- `approval-required`：必须有人类或授权 sponsor 明确 approve/revise/reject。
+- `auto-pass-to-step7`：Step 6 执行完成后进入 Step 7 验证，但仍必须保留 execution evidence。
+
+`gate_state` 表示 gate 当前推进状态：
+
+- `not-started`
+- `waiting-review`
+- `reviewed`
+- `waiting-approval`
+- `approved`
+- `bypassed`
+- `blocked`
+- `not-required`
+
+`approval_state` 只用于 `approval-required`：
+
+- `not-required`
+- `required-pending`
+- `approved`
+- `bypassed`
+
+兼容旧输出时可以继续显示 `approval`，但它只能作为简化 alias；人类可读 status/report 必须优先显示三层语义。
 
 ## 3. 分步细则
 ### Step 1 输入接入与问题定界
@@ -45,6 +74,7 @@
 输入：change package 初稿。
 输出：bindings、gate policy、isolation strategy、final contract。
 禁止：无明确角色边界就进入 Step 6。
+人类确认应提供短选项，例如 `approve` / `revise` / `reject`，不应要求人记忆长篇固定审批句。
 
 ### Step 6 隔离执行
 输入：contract、bindings。
@@ -92,5 +122,8 @@
 ## 6. 核心审计点
 - 是否出现 Step 2/3 直接跳 Step 6 的偷跑。
 - 是否缺失任一步的输入/输出/gate。
+- `change prepare` 是否只生成准备材料，而不是把 Step 1-5 标记为完成。
+- Step 5 / Step 8 / Step 9 是否分别保留 human gate trace。
 - Step 8 是否有明确 decision。
+- reviewer mismatch bypass 是否记录 reason、recorded_by、evidence_ref。
 - Step 9 是否真实更新维护状态。

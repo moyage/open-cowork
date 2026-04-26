@@ -67,12 +67,14 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         },
         "residual_followups": [],
     }
+    gates = load_yaml(paths.change_file(change_id, "human-gates.yaml"))
     final_snapshot = {
         "schema": "governance/final-state-consistency-check/v1",
         "change_id": change_id,
         "status": "pass",
         "generated_at": archived_at,
         "lifecycle_at_generation": "archived",
+        "human_gate_summary": _human_gate_summary(gates),
         "checked_files": [
             str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root)),
             str(paths.archived_change_file(change_id, "review.yaml").relative_to(paths.root)),
@@ -122,3 +124,25 @@ def archive_change(root: str | Path, change_id: str) -> dict:
 
     sync_current_state(root)
     return receipt
+
+
+def _human_gate_summary(gates: dict) -> dict:
+    approvals = gates.get("approvals") or {}
+    summary = {}
+    for step in (5, 8, 9):
+        approval = approvals.get(step) or approvals.get(str(step)) or {}
+        summary[step] = {
+            "status": approval.get("status", "missing"),
+            "approved_by": approval.get("approved_by"),
+            "recorded_by": approval.get("recorded_by"),
+            "evidence_ref": approval.get("evidence_ref"),
+        }
+    bypasses = gates.get("bypasses") or []
+    for bypass in bypasses:
+        step = bypass.get("step")
+        if step in summary:
+            summary[step]["bypass_status"] = "recorded"
+            summary[step]["bypass_reason"] = bypass.get("reason")
+            summary[step]["bypass_recorded_by"] = bypass.get("recorded_by")
+            summary[step]["bypass_evidence_ref"] = bypass.get("evidence_ref")
+    return summary

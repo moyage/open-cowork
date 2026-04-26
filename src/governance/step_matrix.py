@@ -42,6 +42,8 @@ ACTION_PURPOSES = {
     9: "Archive approved outputs and refresh maintenance state.",
 }
 DEFAULT_HUMAN_INTERVENTION_STEPS = {1, 2, 3, 5, 8, 9}
+APPROVAL_REQUIRED_STEPS = {2, 5, 8, 9}
+REVIEW_REQUIRED_STEPS = {1, 3, 4, 7}
 PHASE_LABELS = {
     1: "Phase 1 / 定义与对齐",
     2: "Phase 2 / 方案与准备",
@@ -103,7 +105,7 @@ def render_status_snapshot(root: str | Path, change_id: str | None = None) -> di
     bindings = _load_bindings(paths, matrix["change_id"])
     current_step = matrix["current_step"]
     current_phase_index = _phase_index_for_step(current_step)
-    next_decision_step = _next_human_decision_step(current_step)
+    next_decision_step = _next_human_decision_step(current_step, gates)
     blockers = matrix["blockers"]
     return {
         "schema": "status-snapshot/v1",
@@ -143,7 +145,9 @@ def format_status_snapshot_view(snapshot: dict) -> str:
     for item in snapshot.get("step_progress", []):
         lines.append(
             f"- Step {item['step']}: {item['label']} | status={item['status']} "
-            f"| approval={item['approval']} | report={item['report']}"
+            f"| gate_type={item.get('gate_type')} | gate_state={item.get('gate_state')} "
+            f"| approval_state={item.get('approval_state')} | approval={item['approval']} "
+            f"| report={item['report']}"
         )
     lines.extend(["", "## Blockers"])
     if snapshot["blockers"]:
@@ -320,12 +324,12 @@ def _step_binding(bindings: dict, step: int | str) -> dict:
 
 
 def _default_gate(step: int) -> str:
-    if step in {5, 8, 9}:
+    if step in APPROVAL_REQUIRED_STEPS:
         return "approval-required"
-    if step in {1, 3, 7}:
+    if step in REVIEW_REQUIRED_STEPS:
         return "review-required"
     if step == 6:
-        return "auto-pass"
+        return "auto-pass-to-step7"
     return "guided"
 
 
@@ -341,11 +345,15 @@ def _phase_index_for_step(current_step: int | str) -> int:
     return 4
 
 
-def _next_human_decision_step(current_step: int | str) -> int | None:
+def _next_human_decision_step(current_step: int | str, gates: dict | None = None) -> int | None:
     if not isinstance(current_step, int):
         return None
-    for step in range(current_step + 1, STEP_MATRIX_TOTAL_STEPS + 1):
-        if step in DEFAULT_HUMAN_INTERVENTION_STEPS:
+    approvals = gates.get("approvals", {}) if isinstance(gates, dict) else {}
+    if not isinstance(approvals, dict):
+        approvals = {}
+    for step in range(current_step, STEP_MATRIX_TOTAL_STEPS + 1):
+        approval = approvals.get(step) or approvals.get(str(step)) or approvals.get(f"'{step}'") or {}
+        if step in APPROVAL_REQUIRED_STEPS and approval.get("status") != "approved":
             return step
     return None
 
@@ -389,14 +397,82 @@ def _step_progress(paths: GovernancePaths, change_id: str, current_step: int | s
     for step in range(1, STEP_MATRIX_TOTAL_STEPS + 1):
         approval = approvals.get(step) or approvals.get(str(step)) or {}
         binding = _step_binding(bindings, step)
+        gate_type = _gate_type_for_step(step, binding)
+        gate_state = _gate_state_for_step(step, current_step, gate_type, approval)
+        approval_state = _approval_state_for_step(gate_type, approval)
         items.append({
             "step": step,
             "label": STEP_LABELS[step],
             "status": _progress_status(step, current_step),
-            "approval": approval.get("status") or ("pending" if binding.get("human_gate") else "not-required"),
+            "gate_type": gate_type,
+            "gate_state": gate_state,
+            "approval_state": approval_state,
+            "approval": _legacy_approval_for_step(gate_type, approval_state),
             "report": f".governance/changes/{change_id}/step-reports/step-{step}.md",
         })
     return items
+
+
+def _legacy_approval_for_step(gate_type: str, approval_state: str) -> str:
+    if gate_type != "approval-required":
+        return "not-required"
+    if approval_state == "required-pending":
+        return "pending"
+    return approval_state
+
+
+def _gate_type_for_step(step: int, binding: dict) -> str:
+    gate = str(binding.get("gate") or _default_gate(step))
+    if gate == "auto-pass":
+        return "auto-pass-to-step7"
+    if gate in {"approval-required", "review-required", "auto-pass-to-step7"}:
+        return gate
+    if step in APPROVAL_REQUIRED_STEPS:
+        return "approval-required"
+    if step in REVIEW_REQUIRED_STEPS:
+        return "review-required"
+    if step == 6:
+        return "auto-pass-to-step7"
+    return "not-required"
+
+
+def _gate_state_for_step(step: int, current_step: int | str, gate_type: str, approval: dict) -> str:
+    if approval.get("status") == "bypassed":
+        return "bypassed"
+    if approval.get("status") == "approved" and gate_type == "review-required":
+        return "reviewed"
+    if approval.get("status") == "approved":
+        return "approved"
+    progress_status = _progress_status(step, current_step)
+    if gate_type == "approval-required":
+        if progress_status == "current":
+            return "waiting-approval"
+        if progress_status == "completed":
+            return "blocked"
+        return "not-started"
+    if gate_type == "review-required":
+        if progress_status == "current":
+            return "waiting-review"
+        if progress_status == "completed":
+            return "reviewed"
+        return "not-started"
+    if gate_type == "auto-pass-to-step7":
+        if progress_status == "completed":
+            return "approved"
+        if progress_status == "current":
+            return "not-required"
+        return "not-started"
+    return "not-required"
+
+
+def _approval_state_for_step(gate_type: str, approval: dict) -> str:
+    if gate_type != "approval-required":
+        return "not-required"
+    if approval.get("status") == "approved":
+        return "approved"
+    if approval.get("status") == "bypassed":
+        return "bypassed"
+    return "required-pending"
 
 
 def _progress_status(step: int, current_step: int | str) -> str:

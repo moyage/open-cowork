@@ -18,7 +18,7 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
 "$OCW_BIN" --root "$SMOKE_ROOT" init >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change create smoke-human-control --title "Smoke human control" >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change prepare smoke-human-control \
-  --goal "Smoke test v0.2.8 enforceable human gates" \
+  --goal "Smoke test v0.3.0 human-visible gates" \
   --scope-in "src/**" \
   --scope-in "tests/**" \
   --verify-command "python3 -m unittest discover -s tests" >/dev/null

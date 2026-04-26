@@ -4,33 +4,28 @@ participants:
   - id: human-sponsor
     type: human
     strengths:
+      - sponsor
       - final-decision
-      - intent-confirmation
   - id: orchestrator-agent
     type: agent
     strengths:
-      - coordination
-      - change-package
+      - orchestrator
   - id: analyst-agent
     type: agent
     strengths:
-      - requirements
-      - scope-analysis
+      - analyst
   - id: architect-agent
     type: agent
     strengths:
-      - design
-      - risk-analysis
+      - architect
   - id: executor-agent
     type: agent
     strengths:
-      - implementation
-      - evidence
+      - executor
   - id: verifier-agent
     type: agent
     strengths:
-      - tests
-      - acceptance
+      - verifier
   - id: independent-reviewer
     type: agent
     strengths:
@@ -39,20 +34,16 @@ participants:
   - id: maintainer-agent
     type: agent
     strengths:
-      - archive
-      - continuity
+      - maintainer
   - id: hermes-agent
     type: agent
     strengths:
-      - review
-      - decision-check
-      - independent-analysis
+      - reviewer
 step_owner_matrix:
   - step: 1
     label: Clarify the goal
     primary_owner: human-sponsor
     assistants:
-      - analyst-agent
       - orchestrator-agent
     reviewer: human-sponsor
     human_gate: true
@@ -62,7 +53,7 @@ step_owner_matrix:
     label: Lock the scope
     primary_owner: analyst-agent
     assistants:
-      - orchestrator-agent
+      - human-sponsor
     reviewer: human-sponsor
     human_gate: true
     final_decision_owner: human-sponsor
@@ -71,7 +62,7 @@ step_owner_matrix:
     label: Shape the approach
     primary_owner: architect-agent
     assistants:
-      - analyst-agent
+      - human-sponsor
     reviewer: human-sponsor
     human_gate: true
     final_decision_owner: human-sponsor
@@ -98,7 +89,7 @@ step_owner_matrix:
     label: Execute the change
     primary_owner: executor-agent
     assistants:
-      []
+      - orchestrator-agent
     reviewer: verifier-agent
     human_gate: false
     final_decision_owner: human-sponsor
@@ -107,8 +98,8 @@ step_owner_matrix:
     label: Verify the result
     primary_owner: verifier-agent
     assistants:
-      []
-    reviewer: independent-reviewer
+      - executor-agent
+    reviewer: hermes-agent
     human_gate: false
     final_decision_owner: human-sponsor
     gate: role-confirmation
@@ -125,11 +116,11 @@ step_owner_matrix:
     label: Archive and carry forward
     primary_owner: maintainer-agent
     assistants:
-      - orchestrator-agent
+      - human-sponsor
     reviewer: human-sponsor
     human_gate: true
     final_decision_owner: human-sponsor
     gate: human-confirmation
 warnings:
   []
-generated_at: '2026-04-25T01:48:04.254569+00:00'
+generated_at: '2026-04-26T12:06:08.915107+00:00'

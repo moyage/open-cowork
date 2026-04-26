@@ -126,7 +126,7 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 
 ## 当前版本完成度
 
-当前 `v0.2.9` 是“Review/archive Gate Closure and Human-facing Status”。重点是在 v0.2.8 已验证的 Step 5 execution gate 之上，闭合 Step 8 review gate、Step 9 archive gate、reviewer identity enforcement、approval provenance 和默认人类状态摘要。
+当前 `v0.3.0` 是“Human Participation and Closeout Readability”。重点是在 v0.2.9 已验证的 Step 5 / Step 8 / Step 9 hard gates 之上，把标准 Step 1-9、人类可读 step report、status approval 语义、review trace、archive closeout 和 Agent handoff 统一为人能理解、Agent 能维护、审计能追踪的协作事实。
 
 已经具备：
 
@@ -142,11 +142,12 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw participants setup` 生成个人域参与者 profile 和 9 步 owner / assistant / reviewer / human gate 矩阵。
 - `ocw intent capture` / `ocw intent confirm` 捕获并确认需求、优化、Bug、范围、风险和验收标准。
 - `ocw step report` 为 4 阶段 9 步生成可读阶段报告。
+- `ocw step report --format human` 输出人类可读步骤报告，包含标准 Step、传统映射、owner、输入、输出、完成标准、下一步进入条件、框架约束、Agent 已做动作、Agent 预期动作和短确认选项。
 - `ocw step approve` 记录 human gate approval；Step 5 / Step 8 / Step 9 approval 分别会被 `ocw run` / `ocw review` / `ocw archive` 消费。
 - `ocw contract validate` 检查 confirmed intent 与 contract scope 是否漂移。
 - `ocw review` 默认阻止 reviewer mismatch；只有显式 bypass 才会写入审计记录。
-- `ocw status` 输出 9-step progress table，显示每一步 report 和 human-gate approval 状态。
-- `ocw archive` 生成最终状态一致性快照和 Step 9 report traceability，便于归档审计。
+- `ocw status` 输出 9-step progress table，显示每一步 report、`gate_type`、`gate_state` 和 `approval_state`。
+- `ocw archive` 生成最终状态一致性快照、Step 9 report traceability，以及 Step 5 / Step 8 / Step 9 human gate summary，便于归档审计。
 - `ocw pilot` 完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent handoff pack。
 - 目标项目 `.governance/AGENTS.md`：给后续接手 Agent 的项目内入口。
 - 目标项目 `.governance/agent-playbook.md`：给后续接手 Agent 的操作规则。
@@ -255,12 +256,12 @@ ocw version
 - 清理文档结构，降低首次理解成本。
 - 补更多个人域和多 Agent 试用样例。
 
-### v0.3：协议执行体验增强
+### v0.3：协议执行体验增强（已发布）
 
-- 提供更友好的 contract / bindings 生成辅助。
-- 增强 change package 模板。
-- 改善 review、verify、archive 的人类可读输出。
-- 提供更稳定的 Agent handoff prompt / packet。
+- 明确 prepare-state 与标准 Step 状态分离。
+- 增强 Step 1-9 的人类可读报告、gate 状态和确认体验。
+- 改善 review、verify、archive 的人类可读输出和审计链。
+- 提供更稳定的 Agent handoff current-state / playbook / status 语义。
 
 ### v0.4：多 Agent / 多人协作适配
 

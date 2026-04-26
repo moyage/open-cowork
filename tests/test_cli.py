@@ -159,9 +159,10 @@ class CliTests(unittest.TestCase):
             self.assertEqual(contract["verification"]["commands"], ["python3 -m unittest discover -s tests"])
             self.assertIn("no_executor_reviewer_merge", contract["forbidden_actions"])
             self.assertEqual(bindings["profile"], "personal")
-            self.assertEqual(bindings["steps"]["6"]["owner"], "executor")
-            self.assertEqual(manifest["status"], "step5-prepared")
-            self.assertTrue(manifest["readiness"]["step6_entry_ready"])
+            self.assertEqual(bindings["steps"]["6"]["owner"], "executor-agent")
+            self.assertEqual(manifest["status"], "step1-ready")
+            self.assertEqual(manifest["current_step"], 1)
+            self.assertFalse(manifest["readiness"]["step6_entry_ready"])
             self.assertEqual(manifest["target_validation_objects"], contract["validation_objects"])
 
             governance_dir = root / ".governance"
@@ -170,8 +171,8 @@ class CliTests(unittest.TestCase):
             current_state = (governance_dir / "current-state.md").read_text(encoding="utf-8")
             self.assertIn("Agent-first open-cowork project", agent_entry)
             self.assertIn("Do not ask the human to memorize ocw commands", agent_entry)
-            self.assertIn("Current phase: Phase 2", current_state)
-            self.assertIn("Current step: Step 5", current_state)
+            self.assertIn("Current phase: Phase 1", current_state)
+            self.assertIn("Current step: Step 1", current_state)
             self.assertIn("Executor: executor-agent", current_state)
             self.assertIn("Project goal: Use open-cowork", current_state)
             self.assertIn("Human update template", agent_playbook)
@@ -474,7 +475,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("Agent-first handoff ready", output)
             self.assertIn(".governance/AGENTS.md", output)
             self.assertNotIn("copy this prompt to your personal-domain Agent", output)
-            self.assertEqual(load_yaml(change_dir / "manifest.yaml")["status"], "step5-prepared")
+            self.assertEqual(load_yaml(change_dir / "manifest.yaml")["status"], "step1-ready")
 
     def test_pilot_default_change_id_is_current_iteration(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -585,6 +586,20 @@ class CliTests(unittest.TestCase):
             self.assertEqual(validate_exit, 0)
             self.assertIn("Contract valid", stdout.getvalue())
 
+            with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root",
+                    str(root),
+                    "step",
+                    "approve",
+                    "--change-id",
+                    "CHG-CLI-2",
+                    "--step",
+                    "5",
+                    "--approved-by",
+                    "human-sponsor",
+                ])
+
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 run_exit = main([
@@ -662,8 +677,9 @@ class CliTests(unittest.TestCase):
             self.assertEqual(changes_index["changes"][0]["status"], "archived")
             self.assertEqual(maintenance["last_archived_change"], "CHG-CLI-2")
             current_state = (root / ".governance/current-state.md").read_text(encoding="utf-8")
-            self.assertIn("Lifecycle: idle", current_state)
-            self.assertIn("Last archived change: CHG-CLI-2", current_state)
+            self.assertIn("当前状态：idle", current_state)
+            self.assertIn("lifecycle: idle", current_state)
+            self.assertIn("最近归档变更：CHG-CLI-2", current_state)
 
             month_file = root / ".governance/runtime/timeline" / f"events-{__import__('datetime').datetime.utcnow().strftime('%Y%m')}.yaml"
             payload = load_yaml(month_file)
@@ -1329,7 +1345,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.2.9", output)
+        self.assertIn("open-cowork 0.3.0", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)

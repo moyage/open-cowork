@@ -37,7 +37,16 @@ def approve_step(
     return payload
 
 
-def record_bypass(root: str | Path, *, change_id: str, step: int, reason: str, recorded_by: str, note: str = "") -> dict:
+def record_bypass(
+    root: str | Path,
+    *,
+    change_id: str,
+    step: int,
+    reason: str,
+    recorded_by: str,
+    note: str = "",
+    evidence_ref: str = "",
+) -> dict:
     package = read_change_package(root, change_id)
     path = package.path / "human-gates.yaml"
     payload = load_yaml(path) if path.exists() else {"schema": "human-gates/v1", "change_id": change_id, "approvals": {}}
@@ -49,6 +58,8 @@ def record_bypass(root: str | Path, *, change_id: str, step: int, reason: str, r
         "recorded_at": _now_utc(),
         "note": note,
     })
+    if evidence_ref:
+        bypasses[-1]["evidence_ref"] = evidence_ref
     write_yaml(path, payload)
     return payload
 
@@ -67,7 +78,7 @@ def require_step_approval(root: str | Path, *, change_id: str, step: int) -> Non
 
 def _step_binding(bindings: dict, step: int) -> dict:
     steps = bindings.get("steps", {}) if isinstance(bindings, dict) else {}
-    return steps.get(step) or steps.get(str(step)) or {}
+    return steps.get(step) or steps.get(str(step)) or steps.get(f"'{step}'") or {}
 
 
 def _load_yaml(path: Path) -> dict:

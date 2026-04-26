@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Promoted the standard 9-step runtime flow into human-visible Step 1-9 reports, while keeping the 4 traditional human phases as explanatory mapping only
+- Separated `change prepare` from Step 1-5 completion so preparation cannot imply hidden human approval or skipped steps
+- Added `gate_type`, `gate_state`, and `approval_state` across status snapshots and step progress, removing misleading approval-pending semantics from review-only steps
+- Added human-facing step reports with `framework_controls`, `agent_actions_done`, `agent_actions_expected`, clear inputs/outputs, done criteria, next-entry criteria, and short approve/revise/reject confirmation options
+- Strengthened Step 5, Step 8, and Step 9 human-gate traceability, including Step 8 review approval references and final Step 5/8/9 gate summaries in archive consistency checks
+- Hardened reviewer mismatch bypass auditing with required human-readable reason, recorder, and evidence reference
+- Updated Agent-first adoption, onboarding, current-state, and playbook docs for human-visible participation and closeout readability
+- Added V0.3 regression coverage for prepare-state semantics, human-gate reports, status approval semantics, review/archive traceability, and idle current-state consistency
+
 ## 0.2.9
 
 - Enforced Step 8 human approval before `ocw review` and Step 9 human approval before `ocw archive`

@@ -27,7 +27,7 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
                     "--goal", "Show complete human gate handoff",
                 ])
             self.assertEqual(prepare_exit, 0)
-            self.assertIn("step approve --change-id CHG-HANDOFF --step 5", prepare_stdout.getvalue())
+            self.assertIn("Step 5 approval is required before Step 6 execution", prepare_stdout.getvalue())
 
             report_stdout = io.StringIO()
             with contextlib.redirect_stdout(report_stdout):
@@ -77,11 +77,14 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
                     "--reviewer", "wrong-reviewer",
                     "--rationale", "Allowed with explicit audit",
                     "--allow-reviewer-mismatch",
+                    "--bypass-reason", "human accepted reviewer substitution",
+                    "--bypass-recorded-by", "human-sponsor",
+                    "--bypass-evidence-ref", "meeting-notes/reviewer-substitution.md",
                 ])
             self.assertEqual(allowed_exit, 0)
             gates = load_yaml(root / ".governance/changes/CHG-REVIEWER/human-gates.yaml")
             self.assertEqual(gates["bypasses"][0]["step"], 8)
-            self.assertEqual(gates["bypasses"][0]["reason"], "reviewer_mismatch")
+            self.assertEqual(gates["bypasses"][0]["reason"], "human accepted reviewer substitution")
             self.assertIn("reviewer mismatch allowed", allowed.getvalue())
 
     def test_step8_and_step9_approvals_are_required_and_archive_finalizes_step9_report(self):
@@ -154,11 +157,14 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
             step9 = load_yaml(archive_dir / "step-reports/step-9.yaml")
             receipt = load_yaml(archive_dir / "archive-receipt.yaml")
             gates = load_yaml(archive_dir / "human-gates.yaml")
+            final_consistency = load_yaml(archive_dir / "FINAL_STATE_CONSISTENCY_CHECK.yaml")
             self.assertEqual(step9["status"], "archived")
             self.assertEqual(step9["blockers"], [])
             self.assertEqual(receipt["traceability"]["final_step_report"], ".governance/archive/CHG-GATES/step-reports/step-9.yaml")
             self.assertEqual(gates["approvals"][8]["recorded_by"], "orchestrator-agent")
             self.assertEqual(gates["approvals"][9]["evidence_ref"], "meeting-notes/step9.md")
+            self.assertEqual(final_consistency["human_gate_summary"][8]["status"], "approved")
+            self.assertEqual(final_consistency["human_gate_summary"][9]["evidence_ref"], "meeting-notes/step9.md")
 
     def test_status_outputs_9_step_progress_table_with_gate_and_approval_status(self):
         with tempfile.TemporaryDirectory() as tmp:

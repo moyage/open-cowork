@@ -81,7 +81,7 @@ class V028HumanGatesTests(unittest.TestCase):
                     "--modified", "src/governance/run.py",
                 ])
             self.assertEqual(blocked_exit, 1)
-            self.assertIn("Step 5 human gate approval is required", blocked.getvalue())
+            self.assertIn("cannot run from step 1", blocked.getvalue())
 
             approved = io.StringIO()
             with contextlib.redirect_stdout(approved):
@@ -246,6 +246,9 @@ class V028HumanGatesTests(unittest.TestCase):
                     "--reviewer", "review-agent",
                     "--rationale", "Approved with external reviewer",
                     "--allow-reviewer-mismatch",
+                    "--bypass-reason", "human accepted reviewer substitution",
+                    "--bypass-recorded-by", "human-sponsor",
+                    "--bypass-evidence-ref", "meeting-notes/reviewer-substitution.md",
                 ])
             self.assertEqual(review_exit, 0)
             self.assertIn("reviewer does not match Step 8 binding", review_stdout.getvalue())

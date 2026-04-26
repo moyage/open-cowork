@@ -103,6 +103,12 @@ def set_maintenance_status(root: str | Path, **updates) -> dict:
 
 _STATUS_RANKS = {
     "drafting": 10,
+    "step1-ready": 12,
+    "step2-ready": 14,
+    "step3-ready": 16,
+    "step4-in-progress": 18,
+    "step5-prepared": 19,
+    "step6-in-progress": 20,
     "step6-executed-pre-step7": 20,
     "step7-blocked": 30,
     "step7-verified": 40,
@@ -130,6 +136,8 @@ def _ensure_non_regressive_change_state(
     normalized_existing_step = _normalize_step(existing_step)
     normalized_incoming_step = _normalize_step(incoming_step)
     if normalized_existing_step is None or normalized_incoming_step is None:
+        return
+    if str(existing_status) == "drafting" and str(incoming_status) == "step1-ready":
         return
     if normalized_incoming_step < normalized_existing_step:
         raise ValueError(
