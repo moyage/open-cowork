@@ -5,10 +5,10 @@
 - 完成 “Zero-Command Human Onboarding and Multi-Agent Project Activation”：README 和 getting-started 进一步下沉 CLI 细节，普通人不再需要记忆 open-cowork 命令。
 - 增加项目级 `.governance/index/active-changes.yaml`，记录同一项目内多个未归档 change，支持并行需求场景。
 - 增强 `ocw activate --change-id <change-id>`，任意 Agent / 新会话可显式接续指定 change；多个 active changes 时默认要求选择，不再从聊天历史猜测。
-- 增加 `.governance/open-cowork-skill.md` 生成与 `docs/agent-skill.md`，让 Codex、Claude Code、Hermes、OMOC 等进入目标项目后执行同一套激活、读取、汇报和边界规则。
-- README 和快速开始保留三类典型场景：个人域单一 Agent、本地个人域多 Agent、团队多人域协作，并说明项目级 Skill 的触发方式。
+- 增加 `.governance/agent-entry.md` 生成与 `docs/agent-skill.md`，让 Codex、Claude Code、Hermes、OMOC 等进入目标项目后执行同一套激活、读取、汇报和边界规则；平台 Skill 仅作为可选适配层。
+- README 和快速开始保留三类典型场景：个人域单一 Agent、本地个人域多 Agent、团队多人域协作，并说明项目级 Agent Entry 的触发方式。
 - 补齐 human step report 的 `artifact_summary`、`review_gate_vs_decision` 展示，避免只在 Markdown 报告中有决策材料。
-- 增加 v0.3.5 回归覆盖，锁定并行 active changes、显式 activation、Agent skill 生成和人类文档 CLI 降噪。
+- 增加 v0.3.5 回归覆盖，锁定并行 active changes、显式 activation、Agent Entry 生成和人类文档 CLI 降噪。
 
 ## 0.3.4
 

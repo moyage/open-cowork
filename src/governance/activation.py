@@ -107,7 +107,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
                 ".governance/AGENTS.md",
                 ".governance/current-state.md",
                 ".governance/agent-playbook.md",
-                ".governance/open-cowork-skill.md",
+                _agent_entry_path(paths),
                 f".governance/changes/{change_id}/manifest.yaml",
                 f".governance/changes/{change_id}/contract.yaml",
                 f".governance/changes/{change_id}/bindings.yaml",
@@ -124,7 +124,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
         ".governance/AGENTS.md",
         ".governance/current-state.md",
         ".governance/agent-playbook.md",
-        ".governance/open-cowork-skill.md",
+        _agent_entry_path(paths),
         f".governance/changes/{change_id}/contract.yaml",
         f".governance/changes/{change_id}/bindings.yaml",
         f".governance/changes/{change_id}/step-reports/step-{current_step}.md",
@@ -195,6 +195,14 @@ def format_project_activation(payload: dict) -> str:
 def _write_activation(paths: GovernancePaths, payload: dict) -> None:
     paths.governance_dir.mkdir(parents=True, exist_ok=True)
     write_yaml(paths.governance_dir / "PROJECT_ACTIVATION.yaml", payload)
+
+
+def _agent_entry_path(paths: GovernancePaths) -> str:
+    if (paths.governance_dir / "agent-entry.md").exists():
+        return ".governance/agent-entry.md"
+    if (paths.governance_dir / "open-cowork-skill.md").exists():
+        return ".governance/open-cowork-skill.md"
+    return ".governance/agent-entry.md"
 
 
 def _active_changes(paths: GovernancePaths) -> list[dict]:

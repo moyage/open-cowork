@@ -12,7 +12,7 @@ DEFAULT_RECOMMENDED_READ_SET = [
     ".governance/index/active-changes.yaml",
     ".governance/index/current-change.yaml",
     ".governance/agent-playbook.md",
-    ".governance/open-cowork-skill.md",
+    ".governance/agent-entry.md",
 ]
 
 
@@ -89,7 +89,7 @@ def write_agent_adoption_pack(
     governance_dir.mkdir(parents=True, exist_ok=True)
     (governance_dir / "AGENTS.md").write_text(_agent_entry(change_id), encoding="utf-8")
     (governance_dir / "agent-playbook.md").write_text(_agent_playbook(change_id), encoding="utf-8")
-    (governance_dir / "open-cowork-skill.md").write_text(_agent_skill(change_id), encoding="utf-8")
+    (governance_dir / "agent-entry.md").write_text(_agent_runtime_entry(change_id), encoding="utf-8")
     (governance_dir / "current-state.md").write_text(
         _current_state(change_id, title, goal, profile, bindings),
         encoding="utf-8",
@@ -106,7 +106,7 @@ def _agent_entry(change_id: str) -> str:
         "",
         "1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。",
         "2. `.governance/index/active-changes.yaml`：项目级并行 change 列表。",
-        "3. `.governance/open-cowork-skill.md`：任意 Agent 接手时的固定 skill。",
+        "3. `.governance/agent-entry.md`：任意 Agent 接手项目时的固定入口。",
         "4. `.governance/agent-playbook.md`：Agent 操作规则。",
         f"5. `.governance/changes/{change_id}/contract.yaml`：执行边界。",
         f"6. `.governance/changes/{change_id}/bindings.yaml`：owner 和角色绑定。",
@@ -127,11 +127,13 @@ def _agent_entry(change_id: str) -> str:
     ])
 
 
-def _agent_skill(change_id: str) -> str:
+def _agent_runtime_entry(change_id: str) -> str:
     return "\n".join([
-        "# open-cowork Project Skill",
+        "# open-cowork Agent Entry",
         "",
-        "Use this skill whenever a human asks any local Agent to continue, review, verify, or implement work in this project.",
+        "Use this project entry whenever a human asks any local Agent to continue, review, verify, or implement work in this project.",
+        "",
+        "This file is the project-scoped source of truth for Agent handoff. It can be registered as a platform Skill when supported, but it is not tied to any single Agent runtime.",
         "",
         "## Activation rule",
         "",
@@ -244,7 +246,7 @@ def _current_state(change_id: str, title: str, goal: str, profile: str, bindings
         f"- `.governance/changes/{change_id}/intent-confirmation.yaml`",
         f"- `.governance/changes/{change_id}/step-reports/`",
         "- `.governance/index/active-changes.yaml`",
-        "- `.governance/open-cowork-skill.md`",
+        "- `.governance/agent-entry.md`",
         "- `.governance/agent-playbook.md`",
         "",
         "## Context budget / 上下文预算",

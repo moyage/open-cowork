@@ -1,6 +1,8 @@
-# open-cowork Project Skill
+# open-cowork Agent Entry
 
-Use this skill whenever a human asks any local Agent to continue, review, verify, or release work in this repository.
+Use this project entry whenever a human asks any local Agent to continue, review, verify, or release work in this repository.
+
+This file is the project-scoped source of truth for Agent handoff. It can be registered as a platform Skill when supported, but it is not tied to any single Agent runtime.
 
 ## Activation Rule
 

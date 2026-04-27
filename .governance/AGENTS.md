@@ -5,7 +5,7 @@
 ## 优先读取
 
 1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。
-2. `.governance/open-cowork-skill.md`：任意 Agent 接手本项目时的固定 skill。
+2. `.governance/agent-entry.md`：任意 Agent 接手本项目时的固定入口。
 3. `.governance/agent-playbook.md`：Agent 操作规则。
 4. `.governance/index/active-changes.yaml`：项目级并行 change 列表；如果文件不存在，视为没有 active change。
 5. 当前 active change 的 `contract.yaml`：执行边界。

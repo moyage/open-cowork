@@ -38,7 +38,7 @@ Agent 会在内部做项目激活、读取项目事实、确认要接续的 chan
 
 ### 本地个人域多个 Agent 系统调度协同
 
-一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先读取项目级 activation 和 `.governance/open-cowork-skill.md`，再围绕同一个 active change、contract、bindings 和 evidence 协作。需求 1 和需求 2 可以同时存在于 active changes 列表中，但接手时必须显式选择要继续哪个 change。
+一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先读取项目级 activation 和 `.governance/agent-entry.md`，再围绕同一个 active change、contract、bindings 和 evidence 协作。需求 1 和需求 2 可以同时存在于 active changes 列表中，但接手时必须显式选择要继续哪个 change。
 
 ### 团队多人域场景
 
@@ -46,7 +46,7 @@ Agent 会在内部做项目激活、读取项目事实、确认要接续的 chan
 
 ## 项目级接手规则（Skill）怎么用
 
-open-cowork 会在已实施项目中生成 `.governance/open-cowork-skill.md`。它放在 `.governance/` 下，是因为它属于“这个项目的协作事实和接手规则”，需要跟项目一起走；它不是某个 Agent 平台专属的安装型 Skill，也不是给人背命令的教程。
+open-cowork 会在已实施项目中生成 `.governance/agent-entry.md`。它放在 `.governance/` 下，是因为它属于“这个项目的协作事实和接手规则”，需要跟项目一起走；它不是某个 Agent 平台专属的安装型 Skill，也不是给人背命令的教程。
 
 如果某个 Agent 环境支持自定义 Skill，可以把这份文件注册进去；如果不支持，Agent 直接把它当成项目内接手说明读取即可。
 
@@ -122,6 +122,24 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 - `review` / 独立审查：非执行者给出 approve / revise / reject。
 - `archive` / 归档接续：收束本轮工作，留下下一轮可恢复的状态。
 
+## `.governance/` 里放什么
+
+`.governance/` 是目标项目里的协作事实层，不是普通文档目录，也不是所有过程材料的堆放处。它主要保存 Agent 执行与团队审计需要共享的事实：
+
+| 内容 | 典型位置 | 主要消费者 |
+| --- | --- | --- |
+| Agent 接手入口 | `.governance/AGENTS.md`、`.governance/agent-entry.md` | Agent |
+| 当前状态摘要 | `.governance/current-state.md` | 人 + Agent |
+| 项目索引 | `.governance/index/*.yaml` | Agent |
+| 当前变更包 | `.governance/changes/<change-id>/` | Agent + Reviewer |
+| 执行边界与角色绑定 | `contract.yaml`、`bindings.yaml` | Agent + 人 |
+| 阶段报告 | `step-reports/*.md` | 人 + 团队 |
+| 执行证据与验证 | `evidence/**`、`verify.yaml`、`review.yaml` | Agent + Reviewer |
+| 归档与接续 | `.governance/archive/<change-id>/` | Agent + 审计 |
+| 临时运行投影 | `.governance/runtime/**`、`PROJECT_ACTIVATION.yaml` | Agent |
+
+人和团队通常只需要读 `current-state.md`、当前 step report、review 摘要和 archive closeout；Agent 才需要消费 YAML 索引、contract、bindings、evidence 和 runtime 投影。
+
 ## 人类最小操作面
 
 普通使用者只需要做四类决策：
@@ -139,7 +157,7 @@ Agent 负责运行内部命令、维护 `.governance/`、汇报当前步骤、ow
 - `docs/README.md`：文档地图，说明普通读者、Agent、规格读者和历史追溯者各看哪里。
 - `docs/glossary.md`：术语表。
 - `docs/getting-started.md`：上手细节和备用路径。
-- `docs/agent-skill.md`：可复制到目标项目的 Agent skill 说明。
+- `docs/agent-skill.md`：说明项目级 Agent Entry 与平台 Skill 适配关系。
 - `docs/agent-playbook.md`：Agent 实施 open-cowork 时的操作规则。
 - `docs/specs/`：当前有效协议规格。
 - `docs/archive/`：历史证据，不是当前实施入口。

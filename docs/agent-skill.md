@@ -1,8 +1,12 @@
-# open-cowork Agent Skill
+# open-cowork Agent Entry 与平台 Skill
 
-本页说明目标项目中的 `.governance/open-cowork-skill.md`。它放在 `.governance/` 下，是因为它属于项目级协作事实和接手规则，需要跟项目一起走；它不是某个 Agent 平台专属的安装型 Skill，也不是给人背诵的命令手册。
+本页说明目标项目中的 `.governance/agent-entry.md`。它放在 `.governance/` 下，是因为它属于项目级协作事实和接手规则，需要跟项目一起走；它不是某个 Agent 平台专属的安装型 Skill，也不是给人背诵的命令手册。
 
-如果 Agent 环境支持自定义 Skill，可以把这份文件注册进去；如果不支持，Agent 直接把它当成项目内接手说明读取即可。
+如果 Agent 环境支持自定义 Skill，可以把 `.governance/agent-entry.md` 的内容注册进去；如果不支持，Agent 直接把它当成项目内接手说明读取即可。换句话说：
+
+- `.governance/agent-entry.md` 是项目权威入口。
+- 平台 Skill 是可选适配层。
+- 不同 Agent 平台的适配文件不应该取代项目事实层。
 
 ## 触发场景
 

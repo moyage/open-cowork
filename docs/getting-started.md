@@ -25,7 +25,7 @@ Agent 的职责是理解项目目标，安装或定位 open-cowork，初始化 `
 - `.governance/AGENTS.md`
 - `.governance/current-state.md`
 - `.governance/index/active-changes.yaml`
-- `.governance/open-cowork-skill.md`
+- `.governance/agent-entry.md`
 - `.governance/agent-playbook.md`
 - 当前 change 的 `contract.yaml`
 - 当前 change 的 `bindings.yaml`
@@ -152,7 +152,7 @@ open-cowork 在这个场景里的重点是：
 open-cowork 在这个场景里的重点是：
 
 - 项目是协作中心，不是某个 Agent 的私有会话。
-- 所有 Agent 接手前都读取 `.governance/open-cowork-skill.md`。
+- 所有 Agent 接手前都读取 `.governance/agent-entry.md`。
 - 多个需求可以同时存在于 `.governance/index/active-changes.yaml`。
 - Agent 必须显式选择或确认 change_id，不能从聊天历史猜测。
 - Executor、Verifier、Reviewer 可以由不同 Agent 或不同会话承担。
@@ -181,9 +181,9 @@ open-cowork 在这个场景里的重点是：
 请按 open-cowork 的团队协作方式推进这个项目，让不同成员的 Agent 都能从项目事实接续。
 ```
 
-## 9. 项目级 Skill 使用方式
+## 9. 项目级 Agent Entry 使用方式
 
-`.governance/open-cowork-skill.md` 是目标项目里的 Agent 接手说明。它适合以下情况：
+`.governance/agent-entry.md` 是目标项目里的 Agent 接手说明。它适合以下情况：
 
 - 新会话不知道旧会话进度。
 - 另一个 Agent 要接手同一项目。
@@ -204,7 +204,7 @@ open-cowork 在这个场景里的重点是：
 请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续。
 ```
 
-如果 Agent 环境支持自定义 Skill，也可以把该文件内容注册成项目级 Skill；如果不支持，直接作为项目内接手文档读取即可。
+如果 Agent 环境支持自定义 Skill，也可以把该文件内容注册成平台 Skill；如果不支持，直接作为项目内接手文档读取即可。项目权威入口仍然是 `.governance/agent-entry.md`。
 
 ## 10. 上下文压缩或中断恢复
 

@@ -12,6 +12,6 @@ lifecycle: idle
 ## Read next / 下一步读取
 
 - `.governance/AGENTS.md`
-- `.governance/open-cowork-skill.md`
+- `.governance/agent-entry.md`
 - `.governance/agent-playbook.md`
 - `.governance/index/maintenance-status.yaml`

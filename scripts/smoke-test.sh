@@ -23,7 +23,7 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
   --scope-in "tests/**" \
   --verify-command "python3 -m unittest discover -s tests" >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" activate --change-id smoke-human-control >/dev/null
-test -f "$SMOKE_ROOT/.governance/open-cowork-skill.md"
+test -f "$SMOKE_ROOT/.governance/agent-entry.md"
 test -f "$SMOKE_ROOT/.governance/index/active-changes.yaml"
 "$OCW_BIN" --root "$SMOKE_ROOT" participants setup --profile personal --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" participants list --change-id smoke-human-control >/dev/null

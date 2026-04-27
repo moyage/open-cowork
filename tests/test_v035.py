@@ -35,7 +35,7 @@ class V035ProjectActivationTests(unittest.TestCase):
 
             self.assertIn("recommended_mode: continue-active-change", req1)
             self.assertIn("active_change_id: REQ-1", req1)
-            self.assertIn(".governance/open-cowork-skill.md", req1)
+            self.assertIn(".governance/agent-entry.md", req1)
             self.assertEqual(activation["active_change"]["change_id"], "REQ-1")
             self.assertEqual(activation["recommended_mode"], "continue-active-change")
 
@@ -52,22 +52,23 @@ class V035ProjectActivationTests(unittest.TestCase):
             archived = self._run_cli(root, "activate", "--change-id", "REQ-2")
             self.assertIn("recommended_mode: change-not-found", archived)
 
-    def test_agent_skill_pack_is_generated_for_target_project(self):
+    def test_agent_entry_pack_is_generated_for_target_project(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._run_cli(root, "init")
             self._prepare(root, "REQ-SKILL", "Skill adoption")
 
-            skill = root / ".governance/open-cowork-skill.md"
+            agent_entry = root / ".governance/agent-entry.md"
             agents = root / ".governance/AGENTS.md"
             current_state = root / ".governance/current-state.md"
 
-            self.assertTrue(skill.exists())
-            skill_text = skill.read_text(encoding="utf-8")
-            self.assertIn("project-scoped, not Agent-scoped", skill_text)
-            self.assertIn("ocw activate --change-id REQ-SKILL", skill_text)
-            self.assertIn("Do not ask the human to memorize", skill_text)
-            self.assertIn(".governance/open-cowork-skill.md", agents.read_text(encoding="utf-8"))
+            self.assertTrue(agent_entry.exists())
+            agent_entry_text = agent_entry.read_text(encoding="utf-8")
+            self.assertIn("project-scoped, not Agent-scoped", agent_entry_text)
+            self.assertIn("project-scoped source of truth", agent_entry_text)
+            self.assertIn("ocw activate --change-id REQ-SKILL", agent_entry_text)
+            self.assertIn("Do not ask the human to memorize", agent_entry_text)
+            self.assertIn(".governance/agent-entry.md", agents.read_text(encoding="utf-8"))
             self.assertIn(".governance/index/active-changes.yaml", current_state.read_text(encoding="utf-8"))
 
     def test_human_docs_hide_cli_first_burden(self):
@@ -100,7 +101,10 @@ class V035ProjectActivationTests(unittest.TestCase):
         self.assertNotIn("当前 `v0.3.5`", readme)
         self.assertNotIn("active changes，并按 open-cowork skill", readme)
         self.assertIn("三类典型落地场景", getting_started)
-        self.assertIn("项目级 Skill 使用方式", getting_started)
+        self.assertIn("项目级 Agent Entry 使用方式", getting_started)
+        self.assertIn("`.governance/agent-entry.md`", readme)
+        self.assertNotIn("open-cowork-skill.md", readme)
+        self.assertIn("`.governance/` 里放什么", readme)
 
     def test_step_reports_project_authoritative_scope_when_intent_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
