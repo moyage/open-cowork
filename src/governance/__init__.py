@@ -7,7 +7,14 @@ from .continuity import (
 )
 from .contract import ContractValidationError, REQUIRED_CONTRACT_FIELDS, load_contract, validate_contract
 from .evidence import MissingEvidenceError, write_evidence_bundle
-from .index import ensure_governance_index, read_changes_index, read_current_change, set_current_change, upsert_change_entry
+from .index import (
+    ensure_governance_index,
+    read_active_changes,
+    read_changes_index,
+    read_current_change,
+    set_current_change,
+    upsert_change_entry,
+)
 from .hermes_recovery import diagnose_hermes_execution_stall, materialize_hermes_recovery_packet
 from .retrospective import build_post_round_retrospective, materialize_post_round_retrospective
 from .run import AdapterRequest, AdapterResponse, run_change

@@ -18,10 +18,13 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
 "$OCW_BIN" --root "$SMOKE_ROOT" init >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change create smoke-human-control --title "Smoke human control" >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change prepare smoke-human-control \
-  --goal "Smoke test v0.3.1 human participation runtime" \
+  --goal "Smoke test v0.3.5 project activation runtime" \
   --scope-in "src/**" \
   --scope-in "tests/**" \
   --verify-command "python3 -m unittest discover -s tests" >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" activate --change-id smoke-human-control >/dev/null
+test -f "$SMOKE_ROOT/.governance/open-cowork-skill.md"
+test -f "$SMOKE_ROOT/.governance/index/active-changes.yaml"
 "$OCW_BIN" --root "$SMOKE_ROOT" participants setup --profile personal --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" participants list --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" intent capture \

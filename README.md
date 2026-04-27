@@ -16,13 +16,7 @@
 请用 open-cowork 管理当前项目接下来的开发任务。
 ```
 
-如果这个项目已经实施过 open-cowork，新会话或另一个 Agent 应先运行项目激活检查：
-
-```bash
-ocw activate
-```
-
-然后读取项目里的 `.governance/AGENTS.md`、`.governance/current-state.md` 和当前 change 的 contract / bindings / step report，继续当前步骤。open-cowork 的应用对象是项目，不是某个单独 Agent。
+如果这个项目已经实施过 open-cowork，新会话或另一个 Agent 会先做项目激活检查，读取 `.governance/AGENTS.md`、`.governance/current-state.md`、`.governance/open-cowork-skill.md` 和当前 change 的 contract / bindings / step report，然后继续当前步骤。open-cowork 的应用对象是项目，不是某个单独 Agent。
 
 ## 一张图
 
@@ -38,6 +32,8 @@ flowchart TD
     Verify --> Review["Independent review：独立审查"]
     Review --> Archive["Archive：归档接续"]
     State --> NextAgent["新会话 / 另一个 Agent：activate 后接续"]
+    Facts --> Active["active-changes：并行需求列表"]
+    Active --> NextAgent
 ```
 
 ## 9 个步骤的清晰名称
@@ -56,13 +52,13 @@ flowchart TD
 
 ## 当前版本
 
-当前 `v0.3.4` 是 “Human Onboarding and Project Activation”。它在 v0.3.3 strict gates 的基础上，解决真实试用里的心智负担问题：
+当前 `v0.3.5` 是 “Zero-Command Human Onboarding and Multi-Agent Project Activation”。它在 v0.3.4 的基础上，把团队试用反馈彻底收束到项目级接续模型里：
 
-- Step 名称改为人能直接理解的动作名。
-- 新增项目级 activation，让 Codex、Claude Code、Hermes、OMOC 或新会话都从同一项目事实接续。
-- README 只保留人类入口、流程图和最小理解面。
-- `docs/README.md` 明确普通读者、Agent 执行者、规格读者和历史追溯者分别看哪里。
-- `docs/glossary.md` 解释 Contract、Evidence、Bindings、Continuity、变更包、Gate、Closeout、Increment、Digest 等常见概念。
+- 人类 README 不再要求记忆任何 open-cowork 命令。
+- 项目级 activation 支持并行 active changes；Codex、Claude Code、Hermes、OMOC 或新会话都必须从项目事实接续。
+- `.governance/open-cowork-skill.md` 会随项目实施生成，让任意 Agent 进入项目后执行同一套激活和汇报规则。
+- Step 名称、术语表、文档地图、specs 当前/历史边界都保持人类可读。
+- Step report 继续作为决策面，投影 artifact summary、review gate vs decision 和 evidence。
 
 v0.3.3 已经具备 strict single-step gate、可选 sponsor-held approval token、decision-grade Step report、review/rework lifecycle、scope overlap 产品化恢复建议和 Step 9 closeout report。
 
@@ -75,14 +71,7 @@ v0.3.3 已经具备 strict single-step gate、可选 sponsor-held approval token
 3. 选择 review 结论。
 4. 批准归档或要求继续修订。
 
-Agent 负责运行内部命令、维护 `.governance/`、汇报当前步骤、owner、阻断、下一步和需要人决定的事项。
-
-Shell 备用路径只用于安装、排障或帮助 Agent 定位工具：
-
-```bash
-./scripts/bootstrap.sh
-ocw version
-```
+Agent 负责运行内部命令、维护 `.governance/`、汇报当前步骤、owner、阻断、下一步和需要人决定的事项。人类不需要学习 CLI；只有安装或排障时才需要让 Agent 展示少量备用命令。
 
 ## 文档入口
 
@@ -90,6 +79,7 @@ ocw version
 - `docs/README.md`：文档地图，说明普通读者、Agent、规格读者和历史追溯者各看哪里。
 - `docs/glossary.md`：术语表。
 - `docs/getting-started.md`：上手细节和备用路径。
+- `docs/agent-skill.md`：可复制到目标项目的 Agent skill 说明。
 - `docs/agent-playbook.md`：Agent 实施 open-cowork 时的操作规则。
 - `docs/specs/`：当前有效协议规格。
 - `docs/archive/`：历史证据，不是当前实施入口。

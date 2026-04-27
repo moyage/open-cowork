@@ -9,8 +9,10 @@ from .step_matrix import STEP_LABELS
 
 DEFAULT_RECOMMENDED_READ_SET = [
     ".governance/current-state.md",
+    ".governance/index/active-changes.yaml",
     ".governance/index/current-change.yaml",
     ".governance/agent-playbook.md",
+    ".governance/open-cowork-skill.md",
 ]
 
 
@@ -87,6 +89,7 @@ def write_agent_adoption_pack(
     governance_dir.mkdir(parents=True, exist_ok=True)
     (governance_dir / "AGENTS.md").write_text(_agent_entry(change_id), encoding="utf-8")
     (governance_dir / "agent-playbook.md").write_text(_agent_playbook(change_id), encoding="utf-8")
+    (governance_dir / "open-cowork-skill.md").write_text(_agent_skill(change_id), encoding="utf-8")
     (governance_dir / "current-state.md").write_text(
         _current_state(change_id, title, goal, profile, bindings),
         encoding="utf-8",
@@ -102,9 +105,11 @@ def _agent_entry(change_id: str) -> str:
         "## 优先读取",
         "",
         "1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。",
-        "2. `.governance/agent-playbook.md`：Agent 操作规则。",
-        f"3. `.governance/changes/{change_id}/contract.yaml`：执行边界。",
-        f"4. `.governance/changes/{change_id}/bindings.yaml`：owner 和角色绑定。",
+        "2. `.governance/index/active-changes.yaml`：项目级并行 change 列表。",
+        "3. `.governance/open-cowork-skill.md`：任意 Agent 接手时的固定 skill。",
+        "4. `.governance/agent-playbook.md`：Agent 操作规则。",
+        f"5. `.governance/changes/{change_id}/contract.yaml`：执行边界。",
+        f"6. `.governance/changes/{change_id}/bindings.yaml`：owner 和角色绑定。",
         "",
         "只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。",
         "",
@@ -122,6 +127,53 @@ def _agent_entry(change_id: str) -> str:
     ])
 
 
+def _agent_skill(change_id: str) -> str:
+    return "\n".join([
+        "# open-cowork Project Skill",
+        "",
+        "Use this skill whenever a human asks any local Agent to continue, review, verify, or implement work in this project.",
+        "",
+        "## Activation rule",
+        "",
+        "1. Treat open-cowork as project-scoped, not Agent-scoped.",
+        "2. Run project activation internally before acting.",
+        "3. If multiple active changes exist, select the explicit change requested by the human; otherwise ask for the change_id before execution.",
+        "4. Read only the recommended read set from activation.",
+        "5. Never reconstruct project state from chat history when `.governance/` facts exist.",
+        "",
+        "## Default internal activation",
+        "",
+        f"- Continue this packaged change with `ocw activate --change-id {change_id}` when the human refers to it.",
+        "- Use `ocw activate` only to discover whether the project has one active change, multiple active changes, or no active change.",
+        "",
+        "## Human-facing report",
+        "",
+        "Report in this shape, without exposing command lists:",
+        "",
+        "```text",
+        "当前项目推进状态",
+        "",
+        "- 项目目标：",
+        "- 当前 change：",
+        "- 当前步骤：",
+        "- 当前 Owner：",
+        "- 已完成：",
+        "- 当前阻断：",
+        "- 下一步建议：",
+        "- 需要你决策：",
+        "- Agent 后续动作：",
+        "```",
+        "",
+        "## Hard boundaries",
+        "",
+        "- Do not execute outside the active contract scope.",
+        "- Do not let the executor approve its own final review.",
+        "- Do not archive before review approval and Step 9 human approval.",
+        "- Do not ask the human to memorize open-cowork CLI commands.",
+        "",
+    ])
+
+
 def _agent_playbook(change_id: str) -> str:
     return "\n".join([
         "# open-cowork Agent Playbook",
@@ -133,13 +185,14 @@ def _agent_playbook(change_id: str) -> str:
         "## Agent 职责",
         "",
         "1. 行动前先理解项目目标。",
-        "2. 保持 `.governance/current-state.md` 与 active change 对齐。",
-        f"3. 使用 `.governance/changes/{change_id}/contract.yaml` 作为执行边界。",
-        f"4. 使用 `.governance/changes/{change_id}/bindings.yaml` 作为 owner 映射。",
-        "5. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。",
-        "6. verify、review 或 archive 前先记录客观 evidence。",
-        "7. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。",
-        "8. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。",
+        "2. 先做项目级 activation；多 active change 时必须显式选择 change_id。",
+        "3. 保持 `.governance/current-state.md` 与 active change 对齐。",
+        f"4. 使用 `.governance/changes/{change_id}/contract.yaml` 作为执行边界。",
+        f"5. 使用 `.governance/changes/{change_id}/bindings.yaml` 作为 owner 映射。",
+        "6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。",
+        "7. verify、review 或 archive 前先记录客观 evidence。",
+        "8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。",
+        "9. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。",
         "",
         "## Human update template",
         "",
@@ -190,6 +243,8 @@ def _current_state(change_id: str, title: str, goal: str, profile: str, bindings
         f"- `.governance/changes/{change_id}/bindings.yaml`",
         f"- `.governance/changes/{change_id}/intent-confirmation.yaml`",
         f"- `.governance/changes/{change_id}/step-reports/`",
+        "- `.governance/index/active-changes.yaml`",
+        "- `.governance/open-cowork-skill.md`",
         "- `.governance/agent-playbook.md`",
         "",
         "## Context budget / 上下文预算",

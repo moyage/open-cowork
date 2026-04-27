@@ -405,7 +405,7 @@ def cmd_adopt(args):
 def cmd_activate(args):
     from governance.activation import build_project_activation, format_project_activation
 
-    payload = build_project_activation(args.root)
+    payload = build_project_activation(args.root, change_id=args.change_id)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -637,6 +637,12 @@ def cmd_step_report(args):
         print("")
         print("## Intent summary")
         _print_mapping(payload.get("intent_summary", {}))
+        print("")
+        print("## Artifact summary")
+        _print_mapping(payload.get("artifact_summary", {}))
+        print("")
+        print("## Review gate vs decision")
+        _print_mapping(payload.get("review_gate_vs_decision", {}))
         print("")
         print("## Evidence")
         _print_evidence(payload.get("evidence", []))
@@ -1590,6 +1596,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("propose", help="Create an intent draft")
     subparsers.add_parser("version", help="Show open-cowork version and command paths")
     p_activate = subparsers.add_parser("activate", help="Show project-scoped activation and handoff state")
+    p_activate.add_argument("--change-id", default=None, help="Explicit active change to continue")
     p_activate.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     for command_name in ("onboard", "setup"):

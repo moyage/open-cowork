@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .contract import ContractValidationError
 from .current_state import sync_current_state
-from .index import read_current_change
+from .index import read_active_changes, read_current_change
 from .paths import GovernancePaths
+from .simple_yaml import load_yaml
 from .simple_yaml import write_yaml
 from .step_matrix import STEP_LABELS, render_status_snapshot
 
 
-def build_project_activation(root: str | Path) -> dict:
+def build_project_activation(root: str | Path, change_id: str | None = None) -> dict:
     paths = GovernancePaths(Path(root).expanduser().resolve())
     activation = {
         "schema": "project-activation/v1",
@@ -32,12 +34,41 @@ def build_project_activation(root: str | Path) -> dict:
         return activation
 
     activation["governance_state"] = "installed"
+    active_changes = _active_changes(paths)
+    activation["active_changes"] = active_changes
+    if change_id:
+        selected = _find_active_change(paths, change_id)
+        if not selected:
+            activation.update({
+                "recommended_mode": "change-not-found",
+                "active_change": None,
+                "agent_instructions": [
+                    f"Requested change '{change_id}' was not found in active changes or .governance/changes.",
+                    "Run activation without --change-id to inspect available project work.",
+                ],
+            })
+            _write_activation(paths, activation)
+            return activation
+        return _activation_for_change(paths, activation, str(change_id), selected)
+
     current = read_current_change(paths.root)
     nested = current.get("current_change", {})
     if not isinstance(nested, dict):
         nested = {}
     change_id = current.get("current_change_id") or nested.get("change_id")
     status = current.get("status") or nested.get("status") or "idle"
+    if len(active_changes) > 1:
+        activation.update({
+            "recommended_mode": "choose-active-change",
+            "active_change": None,
+            "agent_instructions": [
+                "Multiple active changes exist in this project.",
+                "Select the intended work item with internal activation: ocw activate --change-id <change-id>.",
+                "Do not infer the target change from chat history or from another Agent session.",
+            ],
+        })
+        _write_activation(paths, activation)
+        return activation
     if not change_id or status in {"idle", "archived", "abandoned", "superseded", "none"}:
         activation.update({
             "recommended_mode": "open-new-change",
@@ -50,13 +81,50 @@ def build_project_activation(root: str | Path) -> dict:
         _write_activation(paths, activation)
         return activation
 
-    snapshot = render_status_snapshot(paths.root, str(change_id))
-    sync_current_state(paths.root, str(change_id))
-    current_step = snapshot.get("current_step")
+    return _activation_for_change(paths, activation, str(change_id), nested)
+
+
+def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: str, selected: dict) -> dict:
+    try:
+        snapshot = render_status_snapshot(paths.root, str(change_id))
+        sync_current_state(paths.root, str(change_id))
+        current_step = snapshot.get("current_step")
+    except ContractValidationError as exc:
+        current_step = selected.get("current_step") or 1
+        activation.update({
+            "recommended_mode": "continue-draft-change",
+            "active_change": {
+                "change_id": str(change_id),
+                "status": selected.get("status") or "drafting",
+                "current_step": current_step,
+                "current_step_name": STEP_LABELS.get(current_step, str(current_step)),
+                "current_phase": "Phase 1 / 定义与对齐",
+                "current_owner": selected.get("owner") or "orchestrator",
+                "waiting_on": "contract.yaml and bindings.yaml",
+                "next_decision": f"Step {current_step} / {STEP_LABELS.get(current_step, current_step)}",
+            },
+            "recommended_read_set": [
+                ".governance/AGENTS.md",
+                ".governance/current-state.md",
+                ".governance/agent-playbook.md",
+                ".governance/open-cowork-skill.md",
+                f".governance/changes/{change_id}/manifest.yaml",
+                f".governance/changes/{change_id}/contract.yaml",
+                f".governance/changes/{change_id}/bindings.yaml",
+            ],
+            "agent_instructions": [
+                "Continue the selected draft change; do not reinstall unless .governance is missing.",
+                "Complete contract.yaml and bindings.yaml before execution.",
+                f"Draft activation detail: {exc}",
+            ],
+        })
+        _write_activation(paths, activation)
+        return activation
     active_read_set = [
         ".governance/AGENTS.md",
         ".governance/current-state.md",
         ".governance/agent-playbook.md",
+        ".governance/open-cowork-skill.md",
         f".governance/changes/{change_id}/contract.yaml",
         f".governance/changes/{change_id}/bindings.yaml",
         f".governance/changes/{change_id}/step-reports/step-{current_step}.md",
@@ -104,6 +172,17 @@ def format_project_activation(payload: dict) -> str:
             f"- waiting_on: {active.get('waiting_on')}",
             f"- next_decision: {active.get('next_decision')}",
         ])
+    active_changes = payload.get("active_changes") or []
+    if active_changes:
+        lines.extend(["", "Active changes:"])
+        for item in active_changes:
+            lines.append(
+                "- "
+                f"{item.get('change_id')} "
+                f"status={item.get('status')} "
+                f"step={item.get('current_step')} "
+                f"title={item.get('title') or ''}".rstrip()
+            )
     lines.extend(["", "Recommended read set:"])
     for item in payload.get("recommended_read_set", []):
         lines.append(f"- {item}")
@@ -116,3 +195,45 @@ def format_project_activation(payload: dict) -> str:
 def _write_activation(paths: GovernancePaths, payload: dict) -> None:
     paths.governance_dir.mkdir(parents=True, exist_ok=True)
     write_yaml(paths.governance_dir / "PROJECT_ACTIVATION.yaml", payload)
+
+
+def _active_changes(paths: GovernancePaths) -> list[dict]:
+    indexed = read_active_changes(paths.root).get("changes", [])
+    if indexed:
+        return indexed
+    current = read_current_change(paths.root)
+    nested = current.get("current_change", {})
+    if not isinstance(nested, dict):
+        nested = {}
+    change_id = current.get("current_change_id") or nested.get("change_id")
+    status = current.get("status") or nested.get("status")
+    if not change_id or status in {"idle", "archived", "abandoned", "superseded", "none", None}:
+        return []
+    return [{
+        "change_id": str(change_id),
+        "path": nested.get("path") or f".governance/changes/{change_id}",
+        "status": status,
+        "current_step": current.get("current_step") or nested.get("current_step"),
+        "title": nested.get("title"),
+        "owner": nested.get("owner"),
+    }]
+
+
+def _find_active_change(paths: GovernancePaths, change_id: str) -> dict:
+    for item in _active_changes(paths):
+        if str(item.get("change_id")) == str(change_id):
+            return item
+    manifest_path = paths.change_file(change_id, "manifest.yaml")
+    if not manifest_path.exists():
+        return {}
+    manifest = load_yaml(manifest_path)
+    if manifest.get("status") in {"idle", "archived", "abandoned", "superseded", "none", None}:
+        return {}
+    return {
+        "change_id": change_id,
+        "path": f".governance/changes/{change_id}",
+        "status": manifest.get("status"),
+        "current_step": manifest.get("current_step"),
+        "title": manifest.get("title"),
+        "owner": manifest.get("owner"),
+    }

@@ -44,6 +44,9 @@ class GovernancePaths:
     def current_change_file(self) -> Path:
         return self.index_dir / "current-change.yaml"
 
+    def active_changes_file(self) -> Path:
+        return self.index_dir / "active-changes.yaml"
+
     def changes_index_file(self) -> Path:
         return self.index_dir / "changes-index.yaml"
 

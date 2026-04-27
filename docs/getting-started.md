@@ -20,22 +20,30 @@ Agent 的职责是理解项目目标，安装或定位 open-cowork，初始化 `
 
 ## 2. 已实施项目如何接续
 
-如果项目已经实施过 open-cowork，新会话或另一个 Agent 应先运行项目激活检查：
-
-```bash
-ocw activate
-```
-
-然后读取目标项目中的：
+如果项目已经实施过 open-cowork，新会话或另一个 Agent 应先做项目激活检查。Agent 会在内部选择或确认当前 change，然后读取目标项目中的：
 
 - `.governance/AGENTS.md`
 - `.governance/current-state.md`
+- `.governance/index/active-changes.yaml`
+- `.governance/open-cowork-skill.md`
 - `.governance/agent-playbook.md`
 - 当前 change 的 `contract.yaml`
 - 当前 change 的 `bindings.yaml`
 - 当前 step report
 
 不要从聊天历史或历史 archive 里重新猜状态。
+
+如果同一个项目里同时有需求 1 和需求 2，人的说法应该是：
+
+```text
+请用 open-cowork 接续需求 1 的 change。
+```
+
+或者：
+
+```text
+请查看这个项目当前有哪些 active changes，并接续我指定的那个。
+```
 
 ## 3. 人应该看到什么
 
@@ -75,42 +83,16 @@ Agent 不应该把命令清单当成主要汇报。推荐汇报形状是：
 
 ## 5. Shell 备用路径
 
-Shell 只用于安装、排障或帮助 Agent 定位工具：
+Shell 只用于安装、排障或帮助 Agent 定位工具。普通人只需要知道有两类备用动作：
 
-```bash
-git clone https://github.com/moyage/open-cowork.git
-cd open-cowork
-./scripts/bootstrap.sh
-source .venv/bin/activate
-ocw version
-./scripts/smoke-test.sh
-```
+- 安装 / 更新 open-cowork。
+- 检查当前机器上的 open-cowork 版本和路径。
 
-在目标项目中初始化：
-
-```bash
-ocw onboard --target /path/to/your-project --mode quickstart --yes
-```
-
-`onboard` 会初始化 `.governance/`，输出状态和 session 诊断。它不会替换你的 IDE、CI/CD、脚本或 Agent 工具链。
+这些动作由 Agent 执行和汇报结果。不要把安装命令、初始化命令和诊断命令当成人的日常任务清单。
 
 ## 6. 准备一个可执行 change
 
-Agent 可以用 `pilot` 或 `change prepare` 生成当前 change 的主链材料。它们是内部工具，不是人的默认任务清单。
-
-```bash
-ocw pilot \
-  --target /path/to/your-project \
-  --change-id current-iteration \
-  --title "Current iteration" \
-  --goal "在当前项目中试用 open-cowork 主链" \
-  --scope-in "src/**" \
-  --scope-in "tests/**" \
-  --verify-command "<本项目测试命令>" \
-  --yes
-```
-
-这会生成或补齐：
+Agent 会生成或补齐当前 change 的主链材料：
 
 - `intent.md`
 - `requirements.md`
@@ -146,12 +128,7 @@ ocw pilot \
 
 ## 8. 上下文压缩或中断恢复
 
-如果会话过长、自动压缩失败或 Agent 中断，优先生成结构化恢复包：
-
-```bash
-ocw --root . diagnose-session
-ocw --root . session-recovery-packet
-```
+如果会话过长、自动压缩失败或 Agent 中断，优先让 Agent 生成结构化恢复包。
 
 如果有 Codex session jsonl，可以让 Agent 带上 `--session-log`，恢复包会记录 remote compact、最后 token 计数和最后错误事件。
 

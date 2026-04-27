@@ -46,8 +46,8 @@ echo "Agent-first adoption plan preview:"
 cat <<NEXT
 
 Human control baseline after a change exists:
-- participants setup: confirm the 9-step owner / assistant / reviewer / human gate matrix
-- intent capture / confirm: make requirements, scope, risks, and acceptance visible before Step 6
-- step report: show owner, inputs, outputs, blockers, and human decisions for the current step
-- step approve: record Step 5 human approval before execution
+- confirm the 9-step owner / assistant / reviewer / human gate matrix
+- make requirements, scope, risks, and acceptance visible before execution
+- ask the Agent for a step report with owner, inputs, outputs, blockers, and decisions
+- record explicit human approval before execution starts
 NEXT

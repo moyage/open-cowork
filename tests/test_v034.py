@@ -68,7 +68,7 @@ class V034HumanOnboardingTests(unittest.TestCase):
         self.assertIn("人只需要对 Agent 说", readme)
         self.assertIn("CLI 是 Agent 内部工具", readme)
         self.assertIn("flowchart TD", readme)
-        self.assertIn("ocw activate", readme)
+        self.assertIn("activate 后接续", readme)
         self.assertLess(readme.count("ocw "), 12)
 
         self.assertIn("普通读者先看", docs_map)

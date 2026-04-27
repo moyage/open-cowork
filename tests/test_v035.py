@@ -9,11 +9,88 @@ from pathlib import Path
 import test_support  # noqa: F401
 
 from governance.cli import main
-from governance.index import ensure_governance_index
+from governance.index import ensure_governance_index, upsert_change_entry
 from governance.simple_yaml import load_yaml, write_yaml
 
 
-class V035DogfoodCleanupTests(unittest.TestCase):
+class V035ProjectActivationTests(unittest.TestCase):
+    def test_parallel_active_changes_can_be_explicitly_activated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._run_cli(root, "init")
+            self._prepare(root, "REQ-1", "需求 1")
+            self._prepare(root, "REQ-2", "需求 2")
+
+            active = load_yaml(root / ".governance/index/active-changes.yaml")
+            active_ids = {item["change_id"] for item in active["changes"]}
+            self.assertEqual(active_ids, {"REQ-1", "REQ-2"})
+
+            ambiguous = self._run_cli(root, "activate")
+            self.assertIn("recommended_mode: choose-active-change", ambiguous)
+            self.assertIn("REQ-1", ambiguous)
+            self.assertIn("REQ-2", ambiguous)
+
+            req1 = self._run_cli(root, "activate", "--change-id", "REQ-1")
+            activation = load_yaml(root / ".governance/PROJECT_ACTIVATION.yaml")
+
+            self.assertIn("recommended_mode: continue-active-change", req1)
+            self.assertIn("active_change_id: REQ-1", req1)
+            self.assertIn(".governance/open-cowork-skill.md", req1)
+            self.assertEqual(activation["active_change"]["change_id"], "REQ-1")
+            self.assertEqual(activation["recommended_mode"], "continue-active-change")
+
+            req2_manifest_path = root / ".governance/changes/REQ-2/manifest.yaml"
+            req2_manifest = load_yaml(req2_manifest_path)
+            req2_manifest["status"] = "archived"
+            write_yaml(req2_manifest_path, req2_manifest)
+            upsert_change_entry(root, {
+                "change_id": "REQ-2",
+                "path": ".governance/changes/REQ-2",
+                "status": "archived",
+                "current_step": 9,
+            })
+            archived = self._run_cli(root, "activate", "--change-id", "REQ-2")
+            self.assertIn("recommended_mode: change-not-found", archived)
+
+    def test_agent_skill_pack_is_generated_for_target_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._run_cli(root, "init")
+            self._prepare(root, "REQ-SKILL", "Skill adoption")
+
+            skill = root / ".governance/open-cowork-skill.md"
+            agents = root / ".governance/AGENTS.md"
+            current_state = root / ".governance/current-state.md"
+
+            self.assertTrue(skill.exists())
+            skill_text = skill.read_text(encoding="utf-8")
+            self.assertIn("project-scoped, not Agent-scoped", skill_text)
+            self.assertIn("ocw activate --change-id REQ-SKILL", skill_text)
+            self.assertIn("Do not ask the human to memorize", skill_text)
+            self.assertIn(".governance/open-cowork-skill.md", agents.read_text(encoding="utf-8"))
+            self.assertIn(".governance/index/active-changes.yaml", current_state.read_text(encoding="utf-8"))
+
+    def test_human_docs_hide_cli_first_burden(self):
+        project_root = Path(__file__).resolve().parents[1]
+        readme = (project_root / "README.md").read_text(encoding="utf-8")
+        getting_started = (project_root / "docs/getting-started.md").read_text(encoding="utf-8")
+        agent_adoption = (project_root / "docs/agent-adoption.md").read_text(encoding="utf-8")
+        docs_map = (project_root / "docs/README.md").read_text(encoding="utf-8")
+        agent_skill = (project_root / "docs/agent-skill.md").read_text(encoding="utf-8")
+        bootstrap = (project_root / "scripts/bootstrap.sh").read_text(encoding="utf-8")
+        quickstart = (project_root / "scripts/quickstart.sh").read_text(encoding="utf-8")
+
+        self.assertNotIn("```bash", readme)
+        self.assertEqual(readme.count("ocw "), 0)
+        self.assertNotIn("```bash", getting_started)
+        self.assertLessEqual(getting_started.count("ocw "), 2)
+        self.assertNotIn("```bash", agent_adoption)
+        self.assertIn("active-changes.yaml", docs_map)
+        self.assertIn("不要让人记 open-cowork CLI", agent_skill)
+        self.assertIn("not as a human checklist", bootstrap)
+        self.assertNotIn("participants setup", bootstrap)
+        self.assertNotIn("step approve", quickstart)
+
     def test_step_reports_project_authoritative_scope_when_intent_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -99,13 +176,7 @@ class V035DogfoodCleanupTests(unittest.TestCase):
             )
             self.assertIn("Review recorded: CHG-V035-REVIEW -> review-approved", review)
 
-            archive_fail = self._run_cli(
-                root,
-                "archive",
-                "--change-id",
-                "CHG-V035-REVIEW",
-                expect=1,
-            )
+            archive_fail = self._run_cli(root, "archive", "--change-id", "CHG-V035-REVIEW", expect=1)
             self.assertIn("Step 8 human gate approval is required", archive_fail)
 
             self._run_cli(root, "step", "approve", "--change-id", "CHG-V035-REVIEW", "--step", "8", "--approved-by", "human-sponsor")
@@ -178,6 +249,10 @@ class V035DogfoodCleanupTests(unittest.TestCase):
             contract = load_yaml(root / ".governance/changes/CHG-V035-GOAL/contract.yaml")
             self.assertEqual(contract["objective"], "Reuse captured intent")
 
+    def _prepare(self, root: Path, change_id: str, goal: str) -> None:
+        self._run_cli(root, "change", "create", change_id, "--title", goal)
+        self._run_cli(root, "change", "prepare", change_id, "--goal", goal)
+
     def _run_cli(self, root: Path, *args: str, expect: int = 0) -> str:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -205,7 +280,11 @@ class V035DogfoodCleanupTests(unittest.TestCase):
             "checks": [],
             "issues": [],
         })
-        write_yaml(root / f".governance/changes/{change_id}/human-gates.yaml", {"schema": "human-gates/v1", "change_id": change_id, "approvals": {}})
+        write_yaml(root / f".governance/changes/{change_id}/human-gates.yaml", {
+            "schema": "human-gates/v1",
+            "change_id": change_id,
+            "approvals": {},
+        })
 
     def _write_change(self, root: Path, change_id: str, *, current_step: int, status: str) -> None:
         ensure_governance_index(root)
@@ -251,11 +330,21 @@ class V035DogfoodCleanupTests(unittest.TestCase):
             "status": status,
             "current_change_id": change_id,
             "current_step": current_step,
-            "current_change": {"change_id": change_id, "path": f".governance/changes/{change_id}", "status": status, "current_step": current_step},
+            "current_change": {
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": status,
+                "current_step": current_step,
+            },
         })
         write_yaml(root / ".governance/index/changes-index.yaml", {
             "schema": "changes-index/v1",
-            "changes": [{"change_id": change_id, "path": f".governance/changes/{change_id}", "status": status, "current_step": current_step}],
+            "changes": [{
+                "change_id": change_id,
+                "path": f".governance/changes/{change_id}",
+                "status": status,
+                "current_step": current_step,
+            }],
         })
         write_yaml(root / ".governance/index/maintenance-status.yaml", {
             "schema": "maintenance-status/v1",

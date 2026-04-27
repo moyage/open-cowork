@@ -18,10 +18,6 @@
 
 ## 初始化方式
 
-在目标项目根目录执行：
-
-```bash
-ocw --root . init
-```
+初始化由 Agent 在目标项目根目录内部完成。人类默认只需要用自然语言要求 Agent “在当前项目中实施 open-cowork”。
 
 如果你只是阅读 `open-cowork` 框架本身，通常不需要手动编辑 `.governance/`。

@@ -9,6 +9,7 @@
 | `../README.md` | 一页理解 open-cowork 是什么、怎么让 Agent 使用、9 个步骤叫什么。 |
 | `glossary.md` | 解释 Contract、Evidence、Bindings、Continuity、Gate、Digest 等术语。 |
 | `getting-started.md` | 安装、试用、升级、恢复和个人域多 Agent 建议。 |
+| `agent-skill.md` | 说明目标项目中 `.governance/open-cowork-skill.md` 的作用。 |
 
 ## Agent 执行面
 
@@ -19,6 +20,8 @@
 | `agent-adoption.md` | Agent 如何把 open-cowork 应用到目标项目。 |
 | 目标项目 `.governance/AGENTS.md` | 已实施项目里的 Agent 入口。 |
 | 目标项目 `.governance/current-state.md` | 新会话或另一个 Agent 接续时优先读取的当前状态。 |
+| 目标项目 `.governance/index/active-changes.yaml` | 同一项目内并行需求 / 并行 change 的列表。 |
+| 目标项目 `.governance/open-cowork-skill.md` | 任意 Agent 进入项目后的固定激活与汇报规则。 |
 
 ## 当前有效规格
 

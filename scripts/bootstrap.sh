@@ -87,19 +87,9 @@ fi
 
 echo
 echo "Bootstrap complete."
-echo "Activate with:"
+echo "Optional shell activation for diagnostics:"
 echo "  source \"$VENV_DIR/bin/activate\""
 echo
-echo "Verify with:"
-echo "  ocw --help"
-echo "  open-cowork --help"
-echo "  ocw version"
-echo "  ocw --root . init"
-echo "  ocw --root . status"
-echo "  ocw --root . adopt --target . --goal \"Describe the project iteration to govern\" --dry-run"
-echo "  ocw --root . participants setup --profile personal --change-id <change-id>"
-echo "  ocw --root . intent capture --change-id <change-id> --project-intent \"Describe the real iteration intent\""
-echo "  ocw --root . intent confirm --change-id <change-id> --confirmed-by human-sponsor"
-echo "  ocw --root . step report --change-id <change-id> --step 5"
-echo "  ocw --root . step approve --change-id <change-id> --step 5 --approved-by human-sponsor"
-echo "  ocw --root . hygiene"
+echo "Agent-first next step:"
+echo "  Ask your Agent to apply open-cowork to the target project."
+echo "  The CLI is installed for Agent/internal diagnostics, not as a human checklist."

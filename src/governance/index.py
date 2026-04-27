@@ -20,6 +20,8 @@ def ensure_governance_index(root: str | Path) -> dict:
             "current_change": None,
             "note": "No active governance change.",
         })
+    if not paths.active_changes_file().exists():
+        write_yaml(paths.active_changes_file(), {"schema": "active-changes/v1", "changes": []})
     if not paths.changes_index_file().exists():
         write_yaml(paths.changes_index_file(), {"schema": "changes-index/v1", "changes": []})
     if not paths.maintenance_status_file().exists():
@@ -61,7 +63,15 @@ def set_current_change(root: str | Path, change: dict) -> dict:
         "current_change": change,
     }
     write_yaml(paths.current_change_file(), payload)
+    _upsert_active_change(paths, payload.get("current_change") or payload)
     return payload
+
+
+def read_active_changes(root: str | Path) -> dict:
+    paths = GovernancePaths(Path(root))
+    if not paths.active_changes_file().exists():
+        return {"schema": "active-changes/v1", "changes": []}
+    return load_yaml(paths.active_changes_file())
 
 
 def read_changes_index(root: str | Path) -> dict:
@@ -83,9 +93,11 @@ def upsert_change_entry(root: str | Path, entry: dict) -> dict:
                 incoming_step=entry.get("current_step"),
             )
             changes[index] = {**current, **entry}
+            _upsert_active_change(paths, changes[index])
             break
     else:
         changes.append(entry)
+        _upsert_active_change(paths, entry)
     write_yaml(paths.changes_index_file(), data)
     return data
 
@@ -257,3 +269,27 @@ def _find_archive_entry_by_change_id(archive_map: dict, change_id: str) -> dict:
         if str(entry.get("change_id")) == str(change_id):
             return entry
     return {}
+
+
+_TERMINAL_ACTIVE_STATUSES = {"idle", "archived", "abandoned", "superseded", "none", None}
+
+
+def _upsert_active_change(paths: GovernancePaths, entry: dict) -> None:
+    change_id = entry.get("change_id") or entry.get("current_change_id")
+    status = entry.get("status")
+    if not change_id:
+        return
+    data = read_active_changes(paths.root)
+    changes = data.setdefault("changes", [])
+    next_changes = [item for item in changes if str(item.get("change_id")) != str(change_id)]
+    if status not in _TERMINAL_ACTIVE_STATUSES:
+        next_changes.append({
+            "change_id": str(change_id),
+            "path": entry.get("path") or f".governance/changes/{change_id}",
+            "status": status,
+            "current_step": entry.get("current_step"),
+            "title": entry.get("title"),
+            "owner": entry.get("owner"),
+        })
+    data["changes"] = sorted(next_changes, key=lambda item: str(item.get("change_id")))
+    write_yaml(paths.active_changes_file(), data)
