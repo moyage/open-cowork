@@ -1,6 +1,8 @@
 # open-cowork Agent Skill
 
-本页说明目标项目中的 `.governance/open-cowork-skill.md`。它不是给人背诵的命令手册，而是给任意本地个人域 Agent 的固定接手规则。
+本页说明目标项目中的 `.governance/open-cowork-skill.md`。它放在 `.governance/` 下，是因为它属于项目级协作事实和接手规则，需要跟项目一起走；它不是某个 Agent 平台专属的安装型 Skill，也不是给人背诵的命令手册。
+
+如果 Agent 环境支持自定义 Skill，可以把这份文件注册进去；如果不支持，Agent 直接把它当成项目内接手说明读取即可。
 
 ## 触发场景
 
@@ -14,6 +16,12 @@
 
 ```text
 请接续需求 1 / 需求 2 的 open-cowork 进展。
+```
+
+或：
+
+```text
+这个项目已经实施 open-cowork，请按项目里的 open-cowork 接手规则接续当前需求。
 ```
 
 Agent 必须把 open-cowork 当成项目级框架，而不是当前会话私有状态。

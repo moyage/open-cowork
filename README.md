@@ -16,7 +16,19 @@
 请用 open-cowork 管理当前项目接下来的开发任务。
 ```
 
-如果这个项目已经实施过 open-cowork，新会话或另一个 Agent 会先做项目激活检查，读取 `.governance/AGENTS.md`、`.governance/current-state.md`、`.governance/open-cowork-skill.md` 和当前 change 的 contract / bindings / step report，然后继续当前步骤。open-cowork 的应用对象是项目，不是某个单独 Agent。
+如果这个项目已经实施过 open-cowork，人不需要知道内部文件怎么读，只需要告诉新会话或另一个 Agent：
+
+```text
+这个项目已经实施 open-cowork，请按项目里的 open-cowork 接手规则接续当前需求。
+```
+
+如果同一个项目里有多个并行需求，可以说：
+
+```text
+请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续。
+```
+
+Agent 会在内部做项目激活、读取项目事实、确认要接续的 change，然后继续当前步骤。open-cowork 的应用对象是项目，不是某个单独 Agent。
 
 ## 典型使用场景
 
@@ -32,27 +44,29 @@
 
 多人团队中，每个人可以有自己的个人域 Agent 和熟悉的 AI Coding 环境。open-cowork 不要求团队统一 runtime 或工作台，而是在项目层提供共同事实面：谁负责、当前范围是什么、何时允许执行、证据在哪里、谁做独立审查、是否可以归档。这样每个“超级个体”可以保持自己的工具组合，同时通过项目级 contract、evidence、review 和 archive 形成可持续协作的“超级组织”。
 
-## 项目级 Skill 怎么用
+## 项目级接手规则（Skill）怎么用
 
-v0.3.5 起，open-cowork 会在已实施项目中生成 `.governance/open-cowork-skill.md`。它不是给人背命令的教程，而是给任意 Agent 的固定接手规则。
+open-cowork 会在已实施项目中生成 `.governance/open-cowork-skill.md`。它放在 `.governance/` 下，是因为它属于“这个项目的协作事实和接手规则”，需要跟项目一起走；它不是某个 Agent 平台专属的安装型 Skill，也不是给人背命令的教程。
+
+如果某个 Agent 环境支持自定义 Skill，可以把这份文件注册进去；如果不支持，Agent 直接把它当成项目内接手说明读取即可。
 
 使用场景：
 
-- 新会话接续：把当前 Agent 指向项目，让它先读取 `.governance/open-cowork-skill.md` 和 activation 结果。
-- 跨 Agent 接续：从 Codex 切到 Claude Code、Hermes、OMOC 或其他 Agent 时，让新 Agent 按这个 skill 读取项目事实。
-- 并行需求选择：当同一项目有多个 active changes，让 Agent 先列出可接续项，再由人用自然语言选择需求。
-- 团队成员接入：团队成员在自己的个人域 Agent 中打开项目后，使用同一份 skill 遵守相同流程和边界。
+- 新会话接续：让当前 Agent 按项目接手规则恢复进度。
+- 跨 Agent 接续：从 Codex 切到 Claude Code、Hermes、OMOC 或其他 Agent 时，让新 Agent 按同一份接手规则读取项目事实。
+- 并行需求选择：当同一项目有多个正在进行的需求，让 Agent 先列出可接续项，再由人选择。
+- 团队成员接入：团队成员在自己的个人域 Agent 中打开项目后，使用同一份接手规则遵守相同流程和边界。
 
 你可以这样对 Agent 说：
 
 ```text
-这个项目已经实施 open-cowork，请先读取 .governance/open-cowork-skill.md，然后接续当前需求。
+这个项目已经实施 open-cowork，请按项目里的 open-cowork 接手规则接续当前需求。
 ```
 
 或：
 
 ```text
-请查看这个项目的 active changes，并按 open-cowork skill 接续需求 2。
+请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续需求 2。
 ```
 
 ## 一张图
@@ -87,17 +101,26 @@ flowchart TD
 | 8 | 独立审查 / Independent review | 非执行者给出 approve / revise / reject。 |
 | 9 | 归档接续 / Archive and handoff | 归档、收束、生成下一轮接续状态。 |
 
-## 当前版本
+## 核心能力
 
-当前 `v0.3.5` 是 “Zero-Command Human Onboarding and Multi-Agent Project Activation”。它在 v0.3.4 的基础上，把团队试用反馈彻底收束到项目级接续模型里：
+open-cowork 的 README 只说明当前框架和流程，不承担版本发布说明。具体版本变化请看 `CHANGELOG.md` 和 GitHub Release。
 
-- 人类 README 不再要求记忆任何 open-cowork 命令。
-- 项目级 activation 支持并行 active changes；Codex、Claude Code、Hermes、OMOC 或新会话都必须从项目事实接续。
-- `.governance/open-cowork-skill.md` 会随项目实施生成，让任意 Agent 进入项目后执行同一套激活和汇报规则。
-- Step 名称、术语表、文档地图、specs 当前/历史边界都保持人类可读。
-- Step report 继续作为决策面，投影 artifact summary、review gate vs decision 和 evidence。
+- 项目事实层：把意图、范围、角色、证据、审查、归档和接续状态落到 `.governance/`。
+- 9 步协作主链：从明确意图到归档接续，区分人类决策、Agent 执行、验证和独立审查。
+- 项目级接续：新会话、另一个 Agent 或另一个团队成员都从项目事实继续，而不是从聊天历史猜状态。
+- 并行需求管理：同一项目可以同时存在多个正在推进的 change，接手时先选择要继续的需求。
+- 执行边界：通过 contract 明确允许范围、禁止动作、验证要求和证据要求。
+- 证据与审查：执行结果、测试输出、review decision 和 human gate 都可追溯。
+- 低侵入协同：不强制统一 IDE、Agent runtime、工作台或团队成员的个人域工具组合。
 
-v0.3.3 已经具备 strict single-step gate、可选 sponsor-held approval token、decision-grade Step report、review/rework lifecycle、scope overlap 产品化恢复建议和 Step 9 closeout report。
+## 核心概念
+
+- `change` / 变更包：一轮可执行、可验证、可归档的工作单元。
+- `contract` / 执行边界：说明目标、范围、允许动作、禁止动作、验证方式和证据要求。
+- `bindings` / 角色绑定：说明每一步由谁负责、谁协助、谁审查、哪些步骤需要人确认。
+- `evidence` / 证据：执行输出、测试结果、修改摘要和其他可审查材料。
+- `review` / 独立审查：非执行者给出 approve / revise / reject。
+- `archive` / 归档接续：收束本轮工作，留下下一轮可恢复的状态。
 
 ## 人类最小操作面
 

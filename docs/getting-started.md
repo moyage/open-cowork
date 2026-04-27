@@ -195,7 +195,13 @@ open-cowork 在这个场景里的重点是：
 人的自然语言入口：
 
 ```text
-请先读取 .governance/open-cowork-skill.md，再按项目当前事实接续。
+这个项目已经实施 open-cowork，请按项目里的 open-cowork 接手规则接续当前需求。
+```
+
+如果项目里有多个并行需求，可以说：
+
+```text
+请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续。
 ```
 
 如果 Agent 环境支持自定义 Skill，也可以把该文件内容注册成项目级 Skill；如果不支持，直接作为项目内接手文档读取即可。

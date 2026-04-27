@@ -93,7 +93,12 @@ class V035ProjectActivationTests(unittest.TestCase):
         self.assertIn("个人域单一 Agent 系统", readme)
         self.assertIn("本地个人域多个 Agent 系统调度协同", readme)
         self.assertIn("团队多人域场景", readme)
-        self.assertIn("项目级 Skill 怎么用", readme)
+        self.assertIn("项目级接手规则（Skill）怎么用", readme)
+        self.assertIn("open-cowork 的 README 只说明当前框架和流程", readme)
+        self.assertIn("核心能力", readme)
+        self.assertIn("核心概念", readme)
+        self.assertNotIn("当前 `v0.3.5`", readme)
+        self.assertNotIn("active changes，并按 open-cowork skill", readme)
         self.assertIn("三类典型落地场景", getting_started)
         self.assertIn("项目级 Skill 使用方式", getting_started)
 
