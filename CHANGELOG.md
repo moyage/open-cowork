@@ -1,5 +1,13 @@
 # 变更日志
 
+## 0.3.7
+
+- 增加 `ocw profile list/show/apply`，提供轻量协作、个人多 Agent 协作、团队标准协作和团队严格协作四种基础协作模式；大量资料阅读改为可叠加的 Agent 内部模式，而不是单独档位。
+- 增加成员/Agent 职责边界目录 `.governance/participants/`，记录角色、权限、审查资格和工作边界，为“超级个体 -> 超级组织”协作提供最小成员事实面。
+- 增加 `ocw context-pack create/read` 和 `ocw handoff --compact`，为 active change 生成接手资料索引和接手摘要；这些材料只指向权威事实，不替代 contract、intent、verify、review 等真相源。
+- 将 project activation / resume 的内部建议读取顺序接入接手资料索引和接手摘要，使新会话优先读取最小权威材料，再按需深入。
+- 补充 v0.3.7 回归测试和规格文档，锁定协作模式、成员职责边界、接手资料索引、接手摘要和接续读取顺序行为。
+
 ## 0.3.6
 
 - 增加 `ocw resume` 确定性接续入口，作为新会话、跨 Agent、跨成员接手项目时的稳定触发点。

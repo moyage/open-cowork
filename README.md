@@ -108,6 +108,8 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 - 项目事实层：把意图、范围、角色、证据、审查、归档和接续状态落到 `.governance/`。
 - 9 步协作主链：从明确意图到归档接续，区分人类决策、Agent 执行、验证和独立审查。
 - 项目级接续：新会话、另一个 Agent 或另一个团队成员都从项目事实继续，而不是从聊天历史猜状态。
+- 团队协作模式：Agent 推荐轻量、个人多 Agent、团队标准或团队严格协作，人只确认协作强度是否合适。
+- 接手摘要：为当前 change 生成内部接手资料索引和短摘要，帮助长任务在上下文压缩后恢复。
 - 并行需求管理：同一项目可以同时存在多个正在推进的 change，接手时先选择要继续的需求。
 - 执行边界：通过 contract 明确允许范围、禁止动作、验证要求和证据要求。
 - 证据与审查：执行结果、测试输出、review decision 和 human gate 都可追溯。
@@ -131,8 +133,10 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 | Agent 接手入口 | `.governance/AGENTS.md`、`.governance/agent-entry.md` | Agent |
 | 当前状态摘要 | `.governance/local/current-state.md` | 人 + Agent |
 | 项目索引 | `.governance/index/*.yaml` | Agent |
+| 协作模式与成员职责边界 | `.governance/profiles/adoption.yaml`、`.governance/participants/*.yaml` | Agent + 团队 |
 | 当前变更包 | `.governance/changes/<change-id>/` | Agent + Reviewer |
 | 执行边界与角色绑定 | `contract.yaml`、`bindings.yaml` | Agent + 人 |
+| 接手材料 | `context/context-pack.yaml`、`context/handoff-compact.md` | 新会话 Agent + Reviewer |
 | 阶段报告 | `step-reports/*.md` | 人 + 团队 |
 | 执行证据与验证 | `evidence/**`、`verify.yaml`、`review.yaml` | Agent + Reviewer |
 | 归档与接续 | `.governance/archive/<change-id>/` | Agent + 审计 |

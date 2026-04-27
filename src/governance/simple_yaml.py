@@ -180,6 +180,9 @@ def _dump_node(value, indent: int) -> str:
             if isinstance(item, (dict, list)):
                 lines.append(f"{space}{key}:")
                 lines.append(_dump_node(item, indent + 2))
+            elif _needs_block_scalar(item):
+                lines.append(f"{space}{key}: |-")
+                lines.extend(_dump_block_scalar_lines(str(item), indent + 2))
             else:
                 lines.append(f"{space}{key}: {_dump_scalar(item)}")
         return "\n".join(lines) if lines else f"{space}{{}}"
@@ -193,6 +196,9 @@ def _dump_node(value, indent: int) -> str:
                     if isinstance(nested, (dict, list)):
                         lines.append(f"{prefix}{key}:")
                         lines.append(_dump_node(nested, indent + 4))
+                    elif _needs_block_scalar(nested):
+                        lines.append(f"{prefix}{key}: |-")
+                        lines.extend(_dump_block_scalar_lines(str(nested), indent + 4))
                     else:
                         lines.append(f"{prefix}{key}: {_dump_scalar(nested)}")
                     first = False
@@ -201,10 +207,22 @@ def _dump_node(value, indent: int) -> str:
             elif isinstance(item, list):
                 lines.append(f"{space}-")
                 lines.append(_dump_node(item, indent + 2))
+            elif _needs_block_scalar(item):
+                lines.append(f"{space}- |-")
+                lines.extend(_dump_block_scalar_lines(str(item), indent + 2))
             else:
                 lines.append(f"{space}- {_dump_scalar(item)}")
         return "\n".join(lines) if lines else f"{space}[]"
     return f"{space}{_dump_scalar(value)}"
+
+
+def _needs_block_scalar(value) -> bool:
+    return isinstance(value, str) and "\n" in value
+
+
+def _dump_block_scalar_lines(text: str, indent: int) -> list[str]:
+    space = " " * indent
+    return [f"{space}{line}" if line else space for line in text.splitlines()]
 
 
 def _dump_scalar(value) -> str:
