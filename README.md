@@ -129,14 +129,14 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 | 内容 | 典型位置 | 主要消费者 |
 | --- | --- | --- |
 | Agent 接手入口 | `.governance/AGENTS.md`、`.governance/agent-entry.md` | Agent |
-| 当前状态摘要 | `.governance/current-state.md` | 人 + Agent |
+| 当前状态摘要 | `.governance/local/current-state.md` | 人 + Agent |
 | 项目索引 | `.governance/index/*.yaml` | Agent |
 | 当前变更包 | `.governance/changes/<change-id>/` | Agent + Reviewer |
 | 执行边界与角色绑定 | `contract.yaml`、`bindings.yaml` | Agent + 人 |
 | 阶段报告 | `step-reports/*.md` | 人 + 团队 |
 | 执行证据与验证 | `evidence/**`、`verify.yaml`、`review.yaml` | Agent + Reviewer |
 | 归档与接续 | `.governance/archive/<change-id>/` | Agent + 审计 |
-| 临时运行投影 | `.governance/runtime/**`、`PROJECT_ACTIVATION.yaml` | Agent |
+| 临时运行投影 | `.governance/local/runtime/**`、`PROJECT_ACTIVATION.yaml` | Agent |
 
 人和团队通常只需要读 `current-state.md`、当前 step report、review 摘要和 archive closeout；Agent 才需要消费 YAML 索引、contract、bindings、evidence 和 runtime 投影。
 

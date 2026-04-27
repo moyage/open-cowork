@@ -31,7 +31,7 @@ class V035ProjectActivationTests(unittest.TestCase):
             self.assertIn("REQ-2", ambiguous)
 
             req1 = self._run_cli(root, "activate", "--change-id", "REQ-1")
-            activation = load_yaml(root / ".governance/PROJECT_ACTIVATION.yaml")
+            activation = load_yaml(root / ".governance/local/PROJECT_ACTIVATION.yaml")
 
             self.assertIn("recommended_mode: continue-active-change", req1)
             self.assertIn("active_change_id: REQ-1", req1)
@@ -60,13 +60,13 @@ class V035ProjectActivationTests(unittest.TestCase):
 
             agent_entry = root / ".governance/agent-entry.md"
             agents = root / ".governance/AGENTS.md"
-            current_state = root / ".governance/current-state.md"
+            current_state = root / ".governance/local/current-state.md"
 
             self.assertTrue(agent_entry.exists())
             agent_entry_text = agent_entry.read_text(encoding="utf-8")
             self.assertIn("project-scoped, not Agent-scoped", agent_entry_text)
             self.assertIn("project-scoped source of truth", agent_entry_text)
-            self.assertIn("ocw activate --change-id REQ-SKILL", agent_entry_text)
+            self.assertIn("ocw resume --change-id <change-id>", agent_entry_text)
             self.assertIn("Do not ask the human to memorize", agent_entry_text)
             self.assertIn(".governance/agent-entry.md", agents.read_text(encoding="utf-8"))
             self.assertIn(".governance/index/active-changes.yaml", current_state.read_text(encoding="utf-8"))
@@ -241,6 +241,7 @@ class V035ProjectActivationTests(unittest.TestCase):
             "02-change-package-and-contract.md",
             "03-evidence-review-archive.md",
             "04-agent-adoption-and-doc-governance.md",
+            "05-deterministic-resume-and-merge-safe-governance.md",
             "README.md",
         ])
 

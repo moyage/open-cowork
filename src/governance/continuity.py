@@ -1318,7 +1318,7 @@ def _operator_start_pack(paths: GovernancePaths, change_id: str) -> list[str]:
 
 def _handoff_recommended_read_set(paths: GovernancePaths, change_id: str) -> list[str]:
     refs = [
-        ".governance/current-state.md",
+        ".governance/local/current-state.md",
         ".governance/agent-playbook.md",
         ".governance/index/current-change.yaml",
         *_operator_start_pack(paths, change_id),

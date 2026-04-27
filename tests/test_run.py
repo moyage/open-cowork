@@ -449,7 +449,7 @@ class RunTests(unittest.TestCase):
 
             reserved_targets = [
                 ".governance/index/current-change.yaml",
-                ".governance/runtime/status/change-status.yaml",
+                ".governance/local/runtime/status/change-status.yaml",
                 ".governance/archive/CHG-8/manifest.yaml",
             ]
             for target in reserved_targets:

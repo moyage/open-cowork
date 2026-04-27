@@ -19,7 +19,7 @@
 | `agent-playbook.md` | Agent 如何维护 `.governance/`、汇报进展、处理 handoff。 |
 | `agent-adoption.md` | Agent 如何把 open-cowork 应用到目标项目。 |
 | 目标项目 `.governance/AGENTS.md` | 已实施项目里的 Agent 入口。 |
-| 目标项目 `.governance/current-state.md` | 新会话或另一个 Agent 接续时优先读取的当前状态。 |
+| 目标项目 `.governance/local/current-state.md` | 新会话或另一个 Agent 接续时优先读取的当前状态。 |
 | 目标项目 `.governance/index/active-changes.yaml` | 同一项目内并行需求 / 并行 change 的列表。 |
 | 目标项目 `.governance/agent-entry.md` | 任意 Agent 进入项目后的固定激活与汇报规则。 |
 

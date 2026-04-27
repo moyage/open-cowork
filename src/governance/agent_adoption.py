@@ -8,7 +8,7 @@ from .step_matrix import STEP_LABELS
 
 
 DEFAULT_RECOMMENDED_READ_SET = [
-    ".governance/current-state.md",
+    ".governance/local/current-state.md",
     ".governance/index/active-changes.yaml",
     ".governance/index/current-change.yaml",
     ".governance/agent-playbook.md",
@@ -86,17 +86,20 @@ def write_agent_adoption_pack(
     bindings: dict,
 ) -> None:
     governance_dir = Path(root) / ".governance"
+    local_dir = governance_dir / "local"
     governance_dir.mkdir(parents=True, exist_ok=True)
-    (governance_dir / "AGENTS.md").write_text(_agent_entry(change_id), encoding="utf-8")
-    (governance_dir / "agent-playbook.md").write_text(_agent_playbook(change_id), encoding="utf-8")
-    (governance_dir / "agent-entry.md").write_text(_agent_runtime_entry(change_id), encoding="utf-8")
-    (governance_dir / "current-state.md").write_text(
+    local_dir.mkdir(parents=True, exist_ok=True)
+    _write_governance_gitignore(governance_dir)
+    (governance_dir / "AGENTS.md").write_text(_agent_entry(), encoding="utf-8")
+    (governance_dir / "agent-playbook.md").write_text(_agent_playbook(), encoding="utf-8")
+    (governance_dir / "agent-entry.md").write_text(_agent_runtime_entry(), encoding="utf-8")
+    (local_dir / "current-state.md").write_text(
         _current_state(change_id, title, goal, profile, bindings),
         encoding="utf-8",
     )
 
 
-def _agent_entry(change_id: str) -> str:
+def _agent_entry() -> str:
     return "\n".join([
         "# Agent-first open-cowork project",
         "",
@@ -104,17 +107,17 @@ def _agent_entry(change_id: str) -> str:
         "",
         "## 优先读取",
         "",
-        "1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。",
-        "2. `.governance/index/active-changes.yaml`：项目级并行 change 列表。",
-        "3. `.governance/agent-entry.md`：任意 Agent 接手项目时的固定入口。",
-        "4. `.governance/agent-playbook.md`：Agent 操作规则。",
-        f"5. `.governance/changes/{change_id}/contract.yaml`：执行边界。",
-        f"6. `.governance/changes/{change_id}/bindings.yaml`：owner 和角色绑定。",
+        "1. `.governance/agent-entry.md`：任意 Agent 接手项目时的固定入口。",
+        "2. `.governance/agent-playbook.md`：Agent 操作规则。",
+        "3. `.governance/index/active-changes.yaml`：项目级并行 change 列表。",
+        "4. `.governance/local/current-state.md`：本地可再生状态投影。",
+        "5. `ocw resume` 输出的 recommended read set：当前 change 的权威事实。",
         "",
         "只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。",
         "",
         "## 操作规则",
         "",
+        "Deterministic protocol trigger: run `ocw resume` before continuing project work. Natural language is only a request to run the command, not the protocol trigger.",
         "Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, archive, and continuity.",
         "",
         "## 硬边界",
@@ -127,7 +130,7 @@ def _agent_entry(change_id: str) -> str:
     ])
 
 
-def _agent_runtime_entry(change_id: str) -> str:
+def _agent_runtime_entry() -> str:
     return "\n".join([
         "# open-cowork Agent Entry",
         "",
@@ -135,18 +138,26 @@ def _agent_runtime_entry(change_id: str) -> str:
         "",
         "This file is the project-scoped source of truth for Agent handoff. It can be registered as a platform Skill when supported, but it is not tied to any single Agent runtime.",
         "",
+        "## Deterministic protocol trigger",
+        "",
+        "- Reliable trigger: run `ocw resume` in the project root.",
+        "- List work: run `ocw resume --list`.",
+        "- Continue explicit work: run `ocw resume --change-id <change-id>`.",
+        "- Natural-language phrasing is only a request to run this command; do not rely on keywords, language, or chat history.",
+        "- `.governance/local/**` is a local projection, not team-authoritative truth.",
+        "",
         "## Activation rule",
         "",
         "1. Treat open-cowork as project-scoped, not Agent-scoped.",
-        "2. Run project activation internally before acting.",
+        "2. Run deterministic project resume internally before acting.",
         "3. If multiple active changes exist, select the explicit change requested by the human; otherwise ask for the change_id before execution.",
-        "4. Read only the recommended read set from activation.",
+        "4. Read only the recommended read set from resume.",
         "5. Never reconstruct project state from chat history when `.governance/` facts exist.",
         "",
         "## Default internal activation",
         "",
-        f"- Continue this packaged change with `ocw activate --change-id {change_id}` when the human refers to it.",
-        "- Use `ocw activate` only to discover whether the project has one active change, multiple active changes, or no active change.",
+        "- Use `ocw resume` to discover whether the project has one active change, multiple active changes, or no active change.",
+        "- Use `ocw resume --change-id <change-id>` when the human has selected a specific work item.",
         "",
         "## Human-facing report",
         "",
@@ -176,21 +187,21 @@ def _agent_runtime_entry(change_id: str) -> str:
     ])
 
 
-def _agent_playbook(change_id: str) -> str:
+def _agent_playbook() -> str:
     return "\n".join([
         "# open-cowork Agent Playbook",
         "",
         "## 触发语句",
         "",
-        "当人说 `安装 open-cowork，并在当前项目中实施这套协同治理框架`，或要求用 open-cowork 推进当前任务时，请按本手册执行。",
+        "当人要求继续、接手、审查、验证或发布本项目工作时，先运行确定性入口 `ocw resume`。自然语言只是请求入口，不是协议触发条件。",
         "",
         "## Agent 职责",
         "",
         "1. 行动前先理解项目目标。",
-        "2. 先做项目级 activation；多 active change 时必须显式选择 change_id。",
-        "3. 保持 `.governance/current-state.md` 与 active change 对齐。",
-        f"4. 使用 `.governance/changes/{change_id}/contract.yaml` 作为执行边界。",
-        f"5. 使用 `.governance/changes/{change_id}/bindings.yaml` 作为 owner 映射。",
+        "2. 先做项目级 resume；多 active change 时必须显式选择 change_id。",
+        "3. 保持 `.governance/local/current-state.md` 与 active change 对齐。",
+        "4. 使用 `ocw resume` recommended read set 中的 contract.yaml 作为执行边界。",
+        "5. 使用 `ocw resume` recommended read set 中的 bindings.yaml 作为 owner 映射。",
         "6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。",
         "7. verify、review 或 archive 前先记录客观 evidence。",
         "8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。",
@@ -213,6 +224,17 @@ def _agent_playbook(change_id: str) -> str:
         "不要把命令执行当成汇报标题。优先汇报项目进展、owner、阻断、下一步和需要人决策的事项。",
         "",
     ])
+
+
+def _write_governance_gitignore(governance_dir: Path) -> None:
+    target = governance_dir / ".gitignore"
+    required = ["/local/", "/PROJECT_ACTIVATION.yaml", "/current-state.md", "/runtime/status/"]
+    existing = target.read_text(encoding="utf-8").splitlines() if target.exists() else []
+    merged = list(existing)
+    for item in required:
+        if item not in merged:
+            merged.append(item)
+    target.write_text("\n".join(merged).rstrip() + "\n", encoding="utf-8")
 
 
 def _current_state(change_id: str, title: str, goal: str, profile: str, bindings: dict) -> str:

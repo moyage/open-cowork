@@ -43,14 +43,14 @@ class V034HumanOnboardingTests(unittest.TestCase):
             self._run_cli(root, "change", "prepare", "CHG-V034-ACTIVATE", "--goal", "Cross-agent activation")
 
             output = self._run_cli(root, "activate")
-            activation = load_yaml(root / ".governance/PROJECT_ACTIVATION.yaml")
+            activation = load_yaml(root / ".governance/local/PROJECT_ACTIVATION.yaml")
 
             self.assertIn("open-cowork project activation", output)
             self.assertIn("project_scope: project-level", output)
             self.assertIn("active_change_id: CHG-V034-ACTIVATE", output)
             self.assertIn("current_step: 1", output)
             self.assertIn(".governance/AGENTS.md", output)
-            self.assertIn(".governance/current-state.md", output)
+            self.assertIn(".governance/local/current-state.md", output)
             self.assertIn(".governance/changes/CHG-V034-ACTIVATE/contract.yaml", output)
             self.assertIn("continue the active change; do not reinstall", output)
             self.assertEqual(activation["project_scope"], "project-level")

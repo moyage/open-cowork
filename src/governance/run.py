@@ -119,6 +119,8 @@ def _is_reserved_governance_artifact(change_id: str, path: str, allowed_scopes: 
         return True
     if path.startswith(".governance/runtime/"):
         return True
+    if path.startswith(".governance/local/runtime/"):
+        return True
     if path.startswith(".governance/archive/"):
         return True
     evidence_prefix = f".governance/changes/{change_id}/evidence/"

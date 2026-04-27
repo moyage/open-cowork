@@ -145,7 +145,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("Change prepared: CHG-PREPARE", output)
             self.assertIn("Agent-first handoff ready", output)
-            self.assertIn(".governance/current-state.md", output)
+            self.assertIn(".governance/local/current-state.md", output)
             self.assertNotIn("personal domain Agent prompt", output)
             self.assertIn("Use open-cowork", (change_dir / "intent.md").read_text(encoding="utf-8"))
             self.assertIn("src/**", (change_dir / "requirements.md").read_text(encoding="utf-8"))
@@ -168,7 +168,7 @@ class CliTests(unittest.TestCase):
             governance_dir = root / ".governance"
             agent_entry = (governance_dir / "AGENTS.md").read_text(encoding="utf-8")
             agent_playbook = (governance_dir / "agent-playbook.md").read_text(encoding="utf-8")
-            current_state = (governance_dir / "current-state.md").read_text(encoding="utf-8")
+            current_state = (governance_dir / "local/current-state.md").read_text(encoding="utf-8")
             self.assertIn("Agent-first open-cowork project", agent_entry)
             self.assertIn("Do not ask the human to memorize ocw commands", agent_entry)
             self.assertIn("Current phase: Phase 1", current_state)
@@ -416,7 +416,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["active_change"]["change_id"], "ACTIVE-CHANGE")
             self.assertTrue(payload["active_change"]["requires_lifecycle_decision"])
             self.assertIn("continue", payload["active_change"]["allowed_policies"])
-            self.assertIn(".governance/current-state.md", payload["recommended_read_set"])
+            self.assertIn(".governance/local/current-state.md", payload["recommended_read_set"])
             self.assertEqual(payload["role_suggestions"]["Openclaw"], ["orchestrator"])
             self.assertEqual(payload["role_suggestions"]["Codex"], ["executor", "verifier"])
             self.assertEqual(payload["role_suggestions"]["OOSO"], ["reviewer", "verification_assistant"])
@@ -466,7 +466,7 @@ class CliTests(unittest.TestCase):
             self.assertTrue((change_dir / "contract.yaml").exists())
             self.assertTrue((change_dir / "bindings.yaml").exists())
             self.assertTrue((target / ".governance/AGENTS.md").exists())
-            self.assertTrue((target / ".governance/current-state.md").exists())
+            self.assertTrue((target / ".governance/local/current-state.md").exists())
             self.assertIn("open-cowork pilot complete", output)
             self.assertIn("Contract valid", output)
             self.assertIn("# open-cowork status", output)
@@ -713,7 +713,7 @@ class CliTests(unittest.TestCase):
             self.assertIsNone(current_change["current_change_id"])
             self.assertEqual(changes_index["changes"][0]["status"], "archived")
             self.assertEqual(maintenance["last_archived_change"], "CHG-CLI-2")
-            current_state = (root / ".governance/current-state.md").read_text(encoding="utf-8")
+            current_state = (root / ".governance/local/current-state.md").read_text(encoding="utf-8")
             self.assertIn("当前状态：idle", current_state)
             self.assertIn("lifecycle: idle", current_state)
             self.assertIn("最近归档变更：CHG-CLI-2", current_state)
@@ -1267,7 +1267,7 @@ class CliTests(unittest.TestCase):
             root = Path(tmp)
             ensure_governance_index(root)
             (root / ".governance/AGENTS.md").write_text("# Agent entry\n", encoding="utf-8")
-            (root / ".governance/current-state.md").write_text("# Current State\n", encoding="utf-8")
+            (root / ".governance/local/current-state.md").write_text("# Current State\n", encoding="utf-8")
             (root / ".governance/agent-playbook.md").write_text("# Playbook\n", encoding="utf-8")
             (root / "docs/archive/plans").mkdir(parents=True, exist_ok=True)
             (root / "docs/archive/plans/60-v0.2.6-agent-first-adoption-closure-change-package.md").write_text("# Change Package\n", encoding="utf-8")
@@ -1299,7 +1299,7 @@ class CliTests(unittest.TestCase):
             root = Path(tmp)
             with contextlib.redirect_stdout(io.StringIO()):
                 main(["--root", str(root), "init"])
-            (root / ".governance/current-state.md").write_text(
+            (root / ".governance/local/current-state.md").write_text(
                 "# open-cowork Current State\n\nLifecycle: idle\nLast archived change: None\n",
                 encoding="utf-8",
             )
@@ -1312,7 +1312,7 @@ class CliTests(unittest.TestCase):
             payload = json.loads(stdout.getvalue())
             self.assertEqual(payload["state_consistency"]["status"], "pass")
 
-            (root / ".governance/current-state.md").write_text(
+            (root / ".governance/local/current-state.md").write_text(
                 "# open-cowork Current State\n\nActive change: stale-change\n",
                 encoding="utf-8",
             )
@@ -1382,7 +1382,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.3.5", output)
+        self.assertIn("open-cowork 0.3.6", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)
@@ -1550,7 +1550,7 @@ class CliTests(unittest.TestCase):
             self.assertTrue(handoff_path.exists())
             handoff = load_yaml(handoff_path)
             self.assertIn("recommended_read_set", handoff)
-            self.assertIn(".governance/current-state.md", handoff["recommended_read_set"])
+            self.assertIn(".governance/local/current-state.md", handoff["recommended_read_set"])
             self.assertIn(f".governance/changes/{change_id}/contract.yaml", handoff["recommended_read_set"])
             self.assertIn("Do not full-scan archive history", handoff["context_budget_rule"])
 

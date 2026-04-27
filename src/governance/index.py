@@ -13,6 +13,8 @@ def ensure_governance_index(root: str | Path) -> dict:
     paths.changes_dir.mkdir(parents=True, exist_ok=True)
     paths.archive_dir.mkdir(parents=True, exist_ok=True)
     paths.governance_dir.joinpath("templates").mkdir(parents=True, exist_ok=True)
+    paths.local_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_governance_gitignore(paths)
     if not paths.current_change_file().exists():
         write_yaml(paths.current_change_file(), {
             "schema": "current-change/v1",
@@ -37,6 +39,44 @@ def ensure_governance_index(root: str | Path) -> dict:
     if not paths.archive_map_file().exists():
         write_yaml(paths.archive_map_file(), {"schema": "archive-map/v1", "archives": []})
     return {"current_change": read_current_change(root), "changes_index": read_changes_index(root)}
+
+
+def rebuild_governance_index(root: str | Path) -> dict:
+    paths = GovernancePaths(Path(root))
+    ensure_governance_index(paths.root)
+    changes = _entries_from_change_manifests(paths)
+    archived_entries = _entries_from_archive_receipts(paths)
+    archived_ids = {entry["change_id"] for entry in archived_entries}
+    combined = _merge_change_entries(changes, archived_entries)
+    active = [
+        entry for entry in combined
+        if entry.get("change_id") not in archived_ids
+        and str(entry.get("status")) not in {"idle", "archived", "abandoned", "superseded", "none"}
+    ]
+    archive_map = {
+        "schema": "archive-map/v1",
+        "archives": [
+            {
+                "change_id": entry["change_id"],
+                "archive_path": f".governance/archive/{entry['change_id']}/",
+                "archived_at": entry.get("archived_at"),
+                "receipt": f".governance/archive/{entry['change_id']}/archive-receipt.yaml",
+            }
+            for entry in archived_entries
+        ],
+    }
+    write_yaml(paths.changes_index_file(), {"schema": "changes-index/v1", "changes": combined})
+    write_yaml(paths.active_changes_file(), {"schema": "active-changes/v1", "changes": active})
+    write_yaml(paths.archive_map_file(), archive_map)
+    return {
+        "schema": "index-rebuild/v1",
+        "changes_count": len(combined),
+        "active_count": len(active),
+        "archive_count": len(archived_entries),
+        "changes_index": str(paths.changes_index_file().relative_to(paths.root)),
+        "active_changes": str(paths.active_changes_file().relative_to(paths.root)),
+        "archive_map": str(paths.archive_map_file().relative_to(paths.root)),
+    }
 
 
 def read_current_change(root: str | Path) -> dict:
@@ -181,6 +221,72 @@ def _normalize_step(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _ensure_governance_gitignore(paths: GovernancePaths) -> None:
+    target = paths.governance_dir / ".gitignore"
+    required = ["/local/", "/PROJECT_ACTIVATION.yaml", "/current-state.md", "/runtime/status/"]
+    if target.exists():
+        existing = target.read_text(encoding="utf-8").splitlines()
+    else:
+        existing = []
+    merged = list(existing)
+    for item in required:
+        if item not in merged:
+            merged.append(item)
+    target.write_text("\n".join(merged).rstrip() + "\n", encoding="utf-8")
+
+
+def _entries_from_change_manifests(paths: GovernancePaths) -> list[dict]:
+    entries = []
+    if not paths.changes_dir.exists():
+        return entries
+    for manifest_path in sorted(paths.changes_dir.glob("*/manifest.yaml")):
+        manifest = load_yaml(manifest_path)
+        change_id = str(manifest.get("change_id") or manifest_path.parent.name)
+        entries.append({
+            "change_id": change_id,
+            "path": str(manifest_path.parent.relative_to(paths.root)),
+            "status": manifest.get("status") or "drafting",
+            "current_step": manifest.get("current_step"),
+            "title": manifest.get("title"),
+            "owner": manifest.get("owner"),
+        })
+    return entries
+
+
+def _entries_from_archive_receipts(paths: GovernancePaths) -> list[dict]:
+    entries = []
+    if not paths.archive_dir.exists():
+        return entries
+    for receipt_path in sorted(paths.archive_dir.glob("*/archive-receipt.yaml")):
+        receipt = load_yaml(receipt_path)
+        archive_dir = receipt_path.parent
+        manifest_path = archive_dir / "manifest.yaml"
+        manifest = load_yaml(manifest_path) if manifest_path.exists() else {}
+        change_id = str(receipt.get("change_id") or manifest.get("change_id") or archive_dir.name)
+        entries.append({
+            "change_id": change_id,
+            "path": f".governance/archive/{change_id}",
+            "status": "archived",
+            "current_step": manifest.get("current_step") or 9,
+            "title": manifest.get("title") or change_id,
+            "owner": manifest.get("owner"),
+            "archived_at": receipt.get("archived_at"),
+        })
+    return entries
+
+
+def _merge_change_entries(active_entries: list[dict], archived_entries: list[dict]) -> list[dict]:
+    by_id = {}
+    for entry in active_entries:
+        by_id[entry["change_id"]] = entry
+    for entry in archived_entries:
+        by_id[entry["change_id"]] = {
+            key: value for key, value in entry.items()
+            if key != "archived_at"
+        }
+    return [by_id[key] for key in sorted(by_id)]
 
 
 def _ensure_non_regressive_maintenance_status(current: dict, updates: dict) -> None:

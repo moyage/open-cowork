@@ -8,11 +8,12 @@ IGNORED_ARTIFACT_PATTERNS = [
     ".governance/changes/**",
     ".governance/archive/**",
     ".governance/runtime/**",
+    ".governance/local/**",
 ]
 
 AGENT_HANDOFF_FILES = [
     ".governance/AGENTS.md",
-    ".governance/current-state.md",
+    ".governance/local/current-state.md",
     ".governance/agent-playbook.md",
 ]
 
@@ -23,9 +24,9 @@ def build_hygiene_report(root: str | Path) -> dict:
         ".governance/index/current-change.yaml",
         ".governance/index/changes-index.yaml",
         ".governance/index/maintenance-status.yaml",
-        ".governance/runtime/status/change-status.yaml",
-        ".governance/runtime/status/steps-status.yaml",
-        ".governance/runtime/status/participants-status.yaml",
+        ".governance/local/runtime/status/change-status.yaml",
+        ".governance/local/runtime/status/steps-status.yaml",
+        ".governance/local/runtime/status/participants-status.yaml",
     ])
     agent_handoff_files = _existing(root_path, AGENT_HANDOFF_FILES)
     pending_docs = _pending_docs(root_path)
@@ -78,14 +79,16 @@ def _recommendations(agent_handoff_files: list[str], pending_docs: list[str]) ->
         "Treat docs/archive/** as cold history; do not load it into Agent context by default.",
     ]
     if agent_handoff_files:
-        recommendations.append("Commit or deliberately carry .governance/AGENTS.md, current-state.md, and agent-playbook.md as Agent handoff files.")
+        recommendations.append("Commit durable Agent entry files; treat .governance/local/current-state.md as a regenerable local projection.")
     if pending_docs:
         recommendations.append("Review pending docs and decide which are source documents for the active change.")
     return recommendations
 
 
 def _state_consistency(root: Path) -> dict:
-    current_state = root / ".governance/current-state.md"
+    current_state = root / ".governance/local/current-state.md"
+    if not current_state.exists():
+        current_state = root / ".governance/current-state.md"
     current_change = root / ".governance/index/current-change.yaml"
     maintenance_status = root / ".governance/index/maintenance-status.yaml"
     if not current_state.exists() or not current_change.exists():

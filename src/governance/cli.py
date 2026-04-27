@@ -108,7 +108,7 @@ def _format_agent_handoff(change_id: str) -> str:
         "Agent-first handoff ready.",
         "Read these files before continuing:",
         "- .governance/AGENTS.md",
-        "- .governance/current-state.md",
+        "- .governance/local/current-state.md",
         "- .governance/agent-playbook.md",
         f"- .governance/changes/{change_id}/contract.yaml",
         f"- .governance/changes/{change_id}/bindings.yaml",
@@ -415,6 +415,54 @@ def cmd_activate(args):
         print(dump_yaml(payload), end="")
         return 0
     print(format_project_activation(payload), end="")
+    return 0
+
+
+def cmd_resume(args):
+    from governance.activation import build_project_activation, format_project_activation
+
+    payload = build_project_activation(args.root, change_id=args.change_id)
+    if args.list and payload.get("active_changes"):
+        payload = {
+            **payload,
+            "recommended_mode": "choose-active-change",
+            "active_change": None,
+            "agent_instructions": [
+                "List mode only: select the intended work item with ocw resume --change-id <change-id>.",
+                "Do not infer the target change from chat history or natural-language keywords.",
+            ],
+        }
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(format_project_activation(payload), end="")
+    return 0
+
+
+def cmd_index_rebuild(args):
+    from governance.index import rebuild_governance_index
+
+    payload = rebuild_governance_index(args.root)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print("Index rebuilt")
+    print(f"- changes_count: {payload['changes_count']}")
+    print(f"- active_count: {payload['active_count']}")
+    print(f"- archive_count: {payload['archive_count']}")
+    print(f"- changes_index: {payload['changes_index']}")
+    print(f"- active_changes: {payload['active_changes']}")
+    print(f"- archive_map: {payload['archive_map']}")
     return 0
 
 
@@ -1598,6 +1646,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_activate = subparsers.add_parser("activate", help="Show project-scoped activation and handoff state")
     p_activate.add_argument("--change-id", default=None, help="Explicit active change to continue")
     p_activate.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_resume = subparsers.add_parser("resume", help="Deterministically resume open-cowork project work")
+    p_resume.add_argument("--list", action="store_true", help="List active changes without selecting one")
+    p_resume.add_argument("--change-id", default=None, help="Explicit active change to continue")
+    p_resume.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     for command_name in ("onboard", "setup"):
         p_onboard = subparsers.add_parser(command_name, help="Run interactive or scripted onboarding")
@@ -1707,6 +1759,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_change.add_argument("--active-policy", choices=["continue", "supersede", "abandon", "archive-first", "force"], default=None, help="Policy for unresolved active change conflicts")
     p_change.add_argument("--profile", choices=["personal", "team"], default="personal", help="Role binding profile")
     p_change.add_argument("--format", choices=["human", "text", "yaml", "json"], default="human", help="Output format for status")
+
+    p_index = subparsers.add_parser("index", help="Governance index maintenance")
+    p_index_sub = p_index.add_subparsers(dest="subcmd")
+    p_index_rebuild = p_index_sub.add_parser("rebuild", help="Rebuild merge-safe governance indexes from authoritative facts")
+    p_index_rebuild.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     p_contract = subparsers.add_parser("contract", help="Contract management")
     p_contract_sub = p_contract.add_subparsers(dest="subcmd")
@@ -1876,6 +1933,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_adopt(args)
     elif args.command == "activate":
         return cmd_activate(args)
+    elif args.command == "resume":
+        return cmd_resume(args)
     elif args.command in {"hygiene", "doctor"}:
         return cmd_hygiene(args)
     elif args.command == "participants" and args.subcmd == "setup":
@@ -1898,6 +1957,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_change_prepare(args)
     elif args.command == "change" and args.subcmd == "status":
         return cmd_change_status(args)
+    elif args.command == "index" and args.subcmd == "rebuild":
+        return cmd_index_rebuild(args)
     elif args.command == "status":
         cmd_status(args)
     elif args.command == "contract" and args.subcmd == "validate":

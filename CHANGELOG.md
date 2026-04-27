@@ -1,5 +1,15 @@
 # 变更日志
 
+## 0.3.6
+
+- 增加 `ocw resume` 确定性接续入口，作为新会话、跨 Agent、跨成员接手项目时的稳定触发点。
+- 将 project activation 输出改为 `protocol_trigger: command`，并把 recommended read set 指向当前 change 的权威事实。
+- 将可再生本地投影迁入 `.governance/local/**`，包括 current-state、PROJECT_ACTIVATION 和 runtime status，降低多人/多 Agent 合并冲突。
+- 增加 `.governance/.gitignore` 默认规则，忽略 local projection、旧 root 投影和 runtime status。
+- 增加 `ocw index rebuild`，可从 change manifest 和 archive receipt 重建 active changes、changes index 和 archive map。
+- 生成的 Agent Entry / Playbook 去除单个 change id 绑定，改为要求先运行 `ocw resume` 并按返回的 recommended read set 接续。
+- 增加 v0.3.6 回归覆盖，锁定 missing / idle / single / multi active changes 的 resume 行为、generic Agent Entry 和 index rebuild。
+
 ## 0.3.5
 
 - 完成 “Zero-Command Human Onboarding and Multi-Agent Project Activation”：README 和 getting-started 进一步下沉 CLI 细节，普通人不再需要记忆 open-cowork 命令。

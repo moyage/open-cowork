@@ -265,7 +265,7 @@ class RuntimeStatusTests(unittest.TestCase):
                 exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-1"])
 
             self.assertEqual(exit_code, 0)
-            runtime_status_dir = root / ".governance/runtime/status"
+            runtime_status_dir = root / ".governance/local/runtime/status"
             change_status = load_yaml(runtime_status_dir / "change-status.yaml")
             steps_status = load_yaml(runtime_status_dir / "steps-status.yaml")
             participants_status = load_yaml(runtime_status_dir / "participants-status.yaml")
@@ -353,7 +353,7 @@ class RuntimeStatusTests(unittest.TestCase):
                 exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-PROJ-CHANGE"])
 
             self.assertEqual(exit_code, 0)
-            payload = load_yaml(root / ".governance/runtime/status/change-status.yaml")
+            payload = load_yaml(root / ".governance/local/runtime/status/change-status.yaml")
             self.assertEqual(
                 payload["projection_sources"]["current_status"]["source_ref"],
                 ".governance/changes/CHG-RT-PROJ-CHANGE/manifest.yaml",
@@ -430,7 +430,7 @@ class RuntimeStatusTests(unittest.TestCase):
                 exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-PROJ-STEPS"])
 
             self.assertEqual(exit_code, 0)
-            payload = load_yaml(root / ".governance/runtime/status/steps-status.yaml")
+            payload = load_yaml(root / ".governance/local/runtime/status/steps-status.yaml")
             self.assertEqual(payload["projection_sources"]["current_step"]["source_field"], "current_step")
             self.assertEqual(payload["projection_sources"]["next_step"]["derivation"], "next_step")
             self.assertEqual(
@@ -507,14 +507,14 @@ class RuntimeStatusTests(unittest.TestCase):
                 exit_code = main(["--root", str(root), "runtime-status", "--change-id", "CHG-RT-PROJ-PART"])
 
             self.assertEqual(exit_code, 0)
-            payload = load_yaml(root / ".governance/runtime/status/participants-status.yaml")
+            payload = load_yaml(root / ".governance/local/runtime/status/participants-status.yaml")
             self.assertEqual(
                 payload["projection_sources"]["participants[].actor_id"]["source_ref"],
                 ".governance/changes/CHG-RT-PROJ-PART/bindings.yaml",
             )
             self.assertEqual(
                 payload["projection_sources"]["participants[].status"]["source_ref"],
-                ".governance/runtime/status/steps-status.yaml",
+                ".governance/local/runtime/status/steps-status.yaml",
             )
 
     def test_timeline_writes_current_month_event_log(self):

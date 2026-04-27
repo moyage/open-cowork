@@ -21,7 +21,8 @@ def sync_current_state(root: str | Path, change_id: str | None = None) -> str:
         text = _idle_current_state(paths)
     else:
         text = _active_current_state(paths, str(resolved_change_id))
-    target = paths.governance_dir / "current-state.md"
+    paths.local_dir.mkdir(parents=True, exist_ok=True)
+    target = paths.current_state_file()
     target.write_text(text, encoding="utf-8")
     return str(target)
 

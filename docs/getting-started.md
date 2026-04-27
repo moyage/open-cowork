@@ -23,7 +23,7 @@ Agent 的职责是理解项目目标，安装或定位 open-cowork，初始化 `
 如果项目已经实施过 open-cowork，新会话或另一个 Agent 应先做项目激活检查。Agent 会在内部选择或确认当前 change，然后读取目标项目中的：
 
 - `.governance/AGENTS.md`
-- `.governance/current-state.md`
+- `.governance/local/current-state.md`
 - `.governance/index/active-changes.yaml`
 - `.governance/agent-entry.md`
 - `.governance/agent-playbook.md`
@@ -102,7 +102,7 @@ Agent 会生成或补齐当前 change 的主链材料：
 - `bindings.yaml`
 - `.governance/AGENTS.md`
 - `.governance/agent-playbook.md`
-- `.governance/current-state.md`
+- `.governance/local/current-state.md`
 
 如果 change 已经有 intent 或 contract，`change prepare` 可以复用已有目标；只有完全没有 goal 来源时才需要补充目标。
 
@@ -135,7 +135,7 @@ Agent 会生成或补齐当前 change 的主链材料：
 open-cowork 在这个场景里的重点是：
 
 - 把需求、范围、任务拆解、执行边界和验证结果沉淀到项目事实中。
-- 让同一个 Agent 在新会话中可以从 `.governance/current-state.md` 和当前 change 接续。
+- 让同一个 Agent 在新会话中可以从 `.governance/local/current-state.md` 和当前 change 接续。
 - 把长任务拆成可审查、可恢复、可归档的 increment。
 - 避免“任务做到一半，聊天上下文没了就只能重讲一遍”。
 
@@ -220,7 +220,7 @@ open-cowork 在这个场景里的重点是：
 
 - Agent 能在几分钟内完成安装、初始化和当前状态输出。
 - 任意一个 Agent 能围绕同一个 `change-id` 继续推进。
-- 从一个 Agent 切换到另一个 Agent 时，接手者能通过 `.governance/AGENTS.md`、`.governance/current-state.md` 和 handoff / digest 理解状态。
+- 从一个 Agent 切换到另一个 Agent 时，接手者能通过 `.governance/AGENTS.md`、`.governance/local/current-state.md` 和 handoff / digest 理解状态。
 - 人能看懂当前处于哪个阶段、下一步需要谁做什么。
 - session 压缩或断裂时，可以生成恢复包，而不是只能回聊天记录里打捞上下文。
 

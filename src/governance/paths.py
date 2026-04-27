@@ -30,8 +30,16 @@ class GovernancePaths:
         return self.governance_dir / "runtime"
 
     @property
+    def local_dir(self) -> Path:
+        return self.governance_dir / "local"
+
+    @property
+    def local_runtime_dir(self) -> Path:
+        return self.local_dir / "runtime"
+
+    @property
     def runtime_status_dir(self) -> Path:
-        return self.runtime_dir / "status"
+        return self.local_runtime_dir / "status"
 
     @property
     def runtime_timeline_dir(self) -> Path:
@@ -103,6 +111,18 @@ class GovernancePaths:
     def runtime_timeline_month_file(self, month_key: str | None = None) -> Path:
         resolved_month = month_key or datetime.now(timezone.utc).strftime("%Y%m")
         return self.runtime_timeline_dir / f"events-{resolved_month}.yaml"
+
+    def current_state_file(self) -> Path:
+        return self.local_dir / "current-state.md"
+
+    def legacy_current_state_file(self) -> Path:
+        return self.governance_dir / "current-state.md"
+
+    def project_activation_file(self) -> Path:
+        return self.local_dir / "PROJECT_ACTIVATION.yaml"
+
+    def legacy_project_activation_file(self) -> Path:
+        return self.governance_dir / "PROJECT_ACTIVATION.yaml"
 
     def sync_history_month_file(self, month_key: str | None = None) -> Path:
         resolved_month = month_key or datetime.now(timezone.utc).strftime("%Y%m")

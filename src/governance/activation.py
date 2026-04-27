@@ -17,12 +17,14 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
         "schema": "project-activation/v1",
         "project_scope": "project-level",
         "root": str(paths.root),
+        "protocol_trigger": "command",
+        "trigger_command": "ocw resume",
         "governance_state": "missing",
         "recommended_mode": "install-or-initialize",
         "active_change": None,
         "recommended_read_set": [
             ".governance/AGENTS.md",
-            ".governance/current-state.md",
+            _current_state_path(paths),
             ".governance/agent-playbook.md",
         ],
         "agent_instructions": [
@@ -44,7 +46,7 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
                 "active_change": None,
                 "agent_instructions": [
                     f"Requested change '{change_id}' was not found in active changes or .governance/changes.",
-                    "Run activation without --change-id to inspect available project work.",
+                    "Run resume without --change-id to inspect available project work.",
                 ],
             })
             _write_activation(paths, activation)
@@ -63,7 +65,7 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
             "active_change": None,
             "agent_instructions": [
                 "Multiple active changes exist in this project.",
-                "Select the intended work item with internal activation: ocw activate --change-id <change-id>.",
+                "Select the intended work item with deterministic resume: ocw resume --change-id <change-id>.",
                 "Do not infer the target change from chat history or from another Agent session.",
             ],
         })
@@ -105,7 +107,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
             },
             "recommended_read_set": [
                 ".governance/AGENTS.md",
-                ".governance/current-state.md",
+                _current_state_path(paths),
                 ".governance/agent-playbook.md",
                 _agent_entry_path(paths),
                 f".governance/changes/{change_id}/manifest.yaml",
@@ -122,7 +124,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
         return activation
     active_read_set = [
         ".governance/AGENTS.md",
-        ".governance/current-state.md",
+        _current_state_path(paths),
         ".governance/agent-playbook.md",
         _agent_entry_path(paths),
         f".governance/changes/{change_id}/contract.yaml",
@@ -159,6 +161,7 @@ def format_project_activation(payload: dict) -> str:
         "open-cowork project activation",
         "",
         f"- project_scope: {payload.get('project_scope')}",
+        f"- protocol_trigger: {payload.get('protocol_trigger')}",
         f"- governance_state: {payload.get('governance_state')}",
         f"- recommended_mode: {payload.get('recommended_mode')}",
     ]
@@ -193,8 +196,16 @@ def format_project_activation(payload: dict) -> str:
 
 
 def _write_activation(paths: GovernancePaths, payload: dict) -> None:
-    paths.governance_dir.mkdir(parents=True, exist_ok=True)
-    write_yaml(paths.governance_dir / "PROJECT_ACTIVATION.yaml", payload)
+    paths.local_dir.mkdir(parents=True, exist_ok=True)
+    write_yaml(paths.project_activation_file(), payload)
+
+
+def _current_state_path(paths: GovernancePaths) -> str:
+    if paths.current_state_file().exists():
+        return ".governance/local/current-state.md"
+    if paths.legacy_current_state_file().exists():
+        return ".governance/current-state.md"
+    return ".governance/local/current-state.md"
 
 
 def _agent_entry_path(paths: GovernancePaths) -> str:

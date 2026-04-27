@@ -408,7 +408,7 @@ class ContinuityTests(unittest.TestCase):
             projections = payload["projection_sources"]["summary"]
             self.assertEqual(
                 projections["status"]["source_ref"],
-                ".governance/runtime/status/change-status.yaml",
+                ".governance/local/runtime/status/change-status.yaml",
             )
             self.assertEqual(projections["status"]["source_field"], "current_status")
             self.assertEqual(
@@ -1615,7 +1615,7 @@ class ContinuityTests(unittest.TestCase):
                 "change_id": change_id,
                 "decision": {"status": "approve"},
             })
-            runtime_status_dir = root / ".governance/runtime/status"
+            runtime_status_dir = root / ".governance/local/runtime/status"
             runtime_status_dir.mkdir(parents=True, exist_ok=True)
             write_yaml(runtime_status_dir / "change-status.yaml", {
                 "schema": "runtime-change-status/v1",
@@ -2261,8 +2261,8 @@ class ContinuityTests(unittest.TestCase):
             output_path = Path(materialize_handoff_package(root, change_id))
             payload = load_yaml(output_path)
 
-            self.assertTrue((root / ".governance/runtime/status/change-status.yaml").exists())
-            self.assertEqual(payload["refs"]["runtime_change_status"], ".governance/runtime/status/change-status.yaml")
+            self.assertTrue((root / ".governance/local/runtime/status/change-status.yaml").exists())
+            self.assertEqual(payload["refs"]["runtime_change_status"], ".governance/local/runtime/status/change-status.yaml")
 
     def test_handoff_package_uses_optional_refs_when_available(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2465,7 +2465,7 @@ class ContinuityTests(unittest.TestCase):
             })
             (target_dir / "tasks.md").write_text("# Tasks\n\nRefresh stale runtime snapshot.\n", encoding="utf-8")
 
-            runtime_status_dir = root / ".governance/runtime/status"
+            runtime_status_dir = root / ".governance/local/runtime/status"
             runtime_status_dir.mkdir(parents=True, exist_ok=True)
             write_yaml(runtime_status_dir / "change-status.yaml", {
                 "schema": "runtime-change-status/v1",

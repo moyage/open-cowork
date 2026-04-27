@@ -15,7 +15,7 @@
 | Increment | 增量接续。当前轮次中出现新发现、新风险或新范围时，生成给下一轮或并行工作的结构化输入。 |
 | Digest | 压缩摘要。给人或新 Agent 快速读取的状态摘要，避免从长聊天或大量文件里重新考古。 |
 | Archive | 归档。把完成的 change package 变成可追溯历史事实，并刷新项目维护状态。 |
-| Current state | 当前状态快照。目标项目 `.governance/current-state.md`，新会话和另一个 Agent 优先读取。 |
+| Current state | 当前状态快照。目标项目 `.governance/local/current-state.md`，新会话和另一个 Agent 优先读取。 |
 | Approval token | 可选的人持有令牌。用于把 Step approval 从“文本声明”提升为本地可信确认。 |
 | Review decision | 独立审查结论。只表示 reviewer 的 approve / revise / reject，不等同于人批准进入 review。 |
 | Project activation | 项目级激活。任意 Agent 在已实施 open-cowork 的项目中读取 `.governance` 当前事实，并接续 active change。 |
