@@ -18,6 +18,43 @@
 
 如果这个项目已经实施过 open-cowork，新会话或另一个 Agent 会先做项目激活检查，读取 `.governance/AGENTS.md`、`.governance/current-state.md`、`.governance/open-cowork-skill.md` 和当前 change 的 contract / bindings / step report，然后继续当前步骤。open-cowork 的应用对象是项目，不是某个单独 Agent。
 
+## 典型使用场景
+
+### 个人域单一 Agent 系统
+
+一个人只使用 Codex、Claude Code 或其他单一 AI Coding 环境时，open-cowork 主要解决“长任务不断线”的问题。Agent 把本轮需求、范围、执行证据、验证结果和下一步接续状态写入项目里的 `.governance/`，即使会话压缩、重开窗口或隔天继续，也可以从项目事实恢复，而不是靠聊天记录回忆。
+
+### 本地个人域多个 Agent 系统调度协同
+
+一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先读取项目级 activation 和 `.governance/open-cowork-skill.md`，再围绕同一个 active change、contract、bindings 和 evidence 协作。需求 1 和需求 2 可以同时存在于 active changes 列表中，但接手时必须显式选择要继续哪个 change。
+
+### 团队多人域场景
+
+多人团队中，每个人可以有自己的个人域 Agent 和熟悉的 AI Coding 环境。open-cowork 不要求团队统一 runtime 或工作台，而是在项目层提供共同事实面：谁负责、当前范围是什么、何时允许执行、证据在哪里、谁做独立审查、是否可以归档。这样每个“超级个体”可以保持自己的工具组合，同时通过项目级 contract、evidence、review 和 archive 形成可持续协作的“超级组织”。
+
+## 项目级 Skill 怎么用
+
+v0.3.5 起，open-cowork 会在已实施项目中生成 `.governance/open-cowork-skill.md`。它不是给人背命令的教程，而是给任意 Agent 的固定接手规则。
+
+使用场景：
+
+- 新会话接续：把当前 Agent 指向项目，让它先读取 `.governance/open-cowork-skill.md` 和 activation 结果。
+- 跨 Agent 接续：从 Codex 切到 Claude Code、Hermes、OMOC 或其他 Agent 时，让新 Agent 按这个 skill 读取项目事实。
+- 并行需求选择：当同一项目有多个 active changes，让 Agent 先列出可接续项，再由人用自然语言选择需求。
+- 团队成员接入：团队成员在自己的个人域 Agent 中打开项目后，使用同一份 skill 遵守相同流程和边界。
+
+你可以这样对 Agent 说：
+
+```text
+这个项目已经实施 open-cowork，请先读取 .governance/open-cowork-skill.md，然后接续当前需求。
+```
+
+或：
+
+```text
+请查看这个项目的 active changes，并按 open-cowork skill 接续需求 2。
+```
+
 ## 一张图
 
 ```mermaid

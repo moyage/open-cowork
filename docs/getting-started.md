@@ -126,7 +126,81 @@ Agent 会生成或补齐当前 change 的主链材料：
 - Review 尽量由另一个 Agent、另一个会话或人完成。
 - 人只在目标确认、风险确认、review 决策和 closeout 时介入。
 
-## 8. 上下文压缩或中断恢复
+## 8. 三类典型落地场景
+
+### 场景 A：个人域单一 Agent 系统
+
+适合一个人长期主要使用一个 AI Coding 环境的情况，例如只用 Codex 或只用 Claude Code 推进项目。
+
+open-cowork 在这个场景里的重点是：
+
+- 把需求、范围、任务拆解、执行边界和验证结果沉淀到项目事实中。
+- 让同一个 Agent 在新会话中可以从 `.governance/current-state.md` 和当前 change 接续。
+- 把长任务拆成可审查、可恢复、可归档的 increment。
+- 避免“任务做到一半，聊天上下文没了就只能重讲一遍”。
+
+人的自然语言入口：
+
+```text
+请用 open-cowork 管理这个项目当前需求，后续新会话也要能接续。
+```
+
+### 场景 B：本地个人域多个 Agent 系统调度协同
+
+适合一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode、OpenClaw 等多个本地 Agent 的情况。
+
+open-cowork 在这个场景里的重点是：
+
+- 项目是协作中心，不是某个 Agent 的私有会话。
+- 所有 Agent 接手前都读取 `.governance/open-cowork-skill.md`。
+- 多个需求可以同时存在于 `.governance/index/active-changes.yaml`。
+- Agent 必须显式选择或确认 change_id，不能从聊天历史猜测。
+- Executor、Verifier、Reviewer 可以由不同 Agent 或不同会话承担。
+
+人的自然语言入口：
+
+```text
+Codex 正在做需求 1；请让 Claude Code 按 open-cowork 接续需求 2，并先确认 active changes。
+```
+
+### 场景 C：团队多人域协作
+
+适合多名团队成员各自拥有不同个人域 Agent、AI Coding 环境和工作习惯的情况。
+
+open-cowork 在这个场景里的重点是：
+
+- 不强制统一 runtime、IDE、Agent 或工作台。
+- 用项目级 contract 对齐范围、允许动作和禁止动作。
+- 用 bindings 明确 owner、assistant、reviewer 和 human gate。
+- 用 evidence / verify / review 让协作结果可追溯。
+- 用 archive / continuity 让项目可以跨人、跨 Agent、跨阶段持续推进。
+
+人的自然语言入口：
+
+```text
+请按 open-cowork 的团队协作方式推进这个项目，让不同成员的 Agent 都能从项目事实接续。
+```
+
+## 9. 项目级 Skill 使用方式
+
+`.governance/open-cowork-skill.md` 是目标项目里的 Agent 接手说明。它适合以下情况：
+
+- 新会话不知道旧会话进度。
+- 另一个 Agent 要接手同一项目。
+- 同一项目里有多个 active changes。
+- 团队成员希望自己的本地 Agent 按同一套流程工作。
+
+使用方式很简单：让 Agent 先读取这个文件，再做 activation，并只读取 activation 给出的 recommended read set。
+
+人的自然语言入口：
+
+```text
+请先读取 .governance/open-cowork-skill.md，再按项目当前事实接续。
+```
+
+如果 Agent 环境支持自定义 Skill，也可以把该文件内容注册成项目级 Skill；如果不支持，直接作为项目内接手文档读取即可。
+
+## 10. 上下文压缩或中断恢复
 
 如果会话过长、自动压缩失败或 Agent 中断，优先让 Agent 生成结构化恢复包。
 
@@ -134,7 +208,7 @@ Agent 会生成或补齐当前 change 的主链材料：
 
 恢复时只读取恢复包的 recommended read set，不要重新全文扫描仓库历史和 archive。
 
-## 9. 判断试用是否成功
+## 11. 判断试用是否成功
 
 一次个人域试用成功，不要求项目立刻进入复杂团队协作，只要求满足：
 
@@ -144,7 +218,7 @@ Agent 会生成或补齐当前 change 的主链材料：
 - 人能看懂当前处于哪个阶段、下一步需要谁做什么。
 - session 压缩或断裂时，可以生成恢复包，而不是只能回聊天记录里打捞上下文。
 
-## 10. 不推荐的首次试用方式
+## 12. 不推荐的首次试用方式
 
 - 让人先背命令、schema 和内部文件路径。
 - 让执行 Agent 自己完成最终 review 并直接 archive。

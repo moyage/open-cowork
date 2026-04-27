@@ -90,6 +90,12 @@ class V035ProjectActivationTests(unittest.TestCase):
         self.assertIn("not as a human checklist", bootstrap)
         self.assertNotIn("participants setup", bootstrap)
         self.assertNotIn("step approve", quickstart)
+        self.assertIn("个人域单一 Agent 系统", readme)
+        self.assertIn("本地个人域多个 Agent 系统调度协同", readme)
+        self.assertIn("团队多人域场景", readme)
+        self.assertIn("项目级 Skill 怎么用", readme)
+        self.assertIn("三类典型落地场景", getting_started)
+        self.assertIn("项目级 Skill 使用方式", getting_started)
 
     def test_step_reports_project_authoritative_scope_when_intent_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
