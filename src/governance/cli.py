@@ -421,17 +421,7 @@ def cmd_activate(args):
 def cmd_resume(args):
     from governance.activation import build_project_activation, format_project_activation
 
-    payload = build_project_activation(args.root, change_id=args.change_id)
-    if args.list and payload.get("active_changes"):
-        payload = {
-            **payload,
-            "recommended_mode": "choose-active-change",
-            "active_change": None,
-            "agent_instructions": [
-                "List mode only: select the intended work item with ocw resume --change-id <change-id>.",
-                "Do not infer the target change from chat history or natural-language keywords.",
-            ],
-        }
+    payload = build_project_activation(args.root, change_id=args.change_id, list_only=args.list)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -441,6 +431,95 @@ def cmd_resume(args):
         print(dump_yaml(payload), end="")
         return 0
     print(format_project_activation(payload), end="")
+    return 0
+
+
+def cmd_profile(args):
+    from governance.profiles import apply_adoption_profile, get_adoption_profile, list_adoption_profiles
+
+    if args.profile_subcmd == "list":
+        profiles = list_adoption_profiles()
+        if args.format == "json":
+            from governance.profiles import ADOPTION_ADD_ONS
+
+            print(json.dumps({"profiles": profiles, "agent_selected_add_ons": list(ADOPTION_ADD_ONS.values())}, ensure_ascii=False, indent=2))
+            return 0
+        for item in profiles:
+            print(f"- {item['profile_id']}: {item['human_label']} - {item['description']}")
+        print("Agent-selected add-ons:")
+        print("- large-reference-set: 大量资料阅读模式 - 可叠加，不是单独协作档位")
+        return 0
+    if args.profile_subcmd == "show":
+        try:
+            profile = get_adoption_profile(args.profile_id)
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        if args.format == "json":
+            print(json.dumps(profile, ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(profile), end="")
+            return 0
+        print(f"{profile['profile_id']}: {profile['display_name']}")
+        print(f"Human label: {profile['human_label']}")
+        print(profile["description"])
+        print(f"Selection: {profile['selection_guidance']}")
+        return 0
+    if args.profile_subcmd == "apply":
+        try:
+            result = apply_adoption_profile(args.root, args.profile_id, agent_id=args.agent_id)
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        if args.format == "json":
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        print(f"Applied adoption profile: {result['profile_id']}")
+        print(f"- path: {result['path']}")
+        print(f"- participant_profile_dir: {result['participant_profile_dir']}")
+        return 0
+    return 0
+
+
+def cmd_context_pack(args):
+    from governance.context_pack import create_context_pack, read_context_pack
+
+    if args.context_pack_subcmd == "create":
+        result = create_context_pack(args.root, args.change_id, level=args.level)
+        print("Context pack created")
+        print(f"- context_pack: {result['context_pack']}")
+        print(f"- context_pack_md: {result['context_pack_md']}")
+        return 0
+    if args.context_pack_subcmd == "read":
+        pack = read_context_pack(args.root, args.change_id, level=args.level)
+        if args.format == "json":
+            print(json.dumps(pack, ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(pack), end="")
+            return 0
+        print(f"Context pack: {pack.get('change_id')}")
+        for item in pack.get("authoritative_reads", []):
+            print(f"- {item}")
+        return 0
+    return 0
+
+
+def cmd_handoff(args):
+    from governance.context_pack import write_compact_handoff
+
+    if not args.compact:
+        print("Only compact handoff is supported: use --compact.")
+        return 1
+    result = write_compact_handoff(args.root, args.change_id)
+    print("Compact handoff written")
+    print(f"- handoff: {result['handoff']}")
+    print(f"- context_pack: {result['context_pack']}")
     return 0
 
 
@@ -940,6 +1019,33 @@ def cmd_review(args):
         )
         print(f"Review failed: {exc}")
         return 1
+
+
+def cmd_review_invocation(args):
+    from governance.review_invocation import record_review_invocation
+
+    try:
+        payload = record_review_invocation(
+            args.root,
+            change_id=args.change_id,
+            status=args.status,
+            reviewer=args.reviewer,
+            runtime=args.runtime or "",
+            note=args.note or "",
+            timeout_policy=args.timeout_policy or "",
+            artifact_ref=args.artifact_ref or "",
+        )
+        from governance.step_report import materialize_step_report
+
+        materialize_step_report(args.root, change_id=args.change_id, step=8)
+    except Exception as exc:
+        print(f"Review invocation failed: {exc}")
+        return 1
+    print(f"Review invocation recorded: {payload['change_id']} -> {payload['status']}")
+    print(f"- last_heartbeat_at: {payload.get('last_heartbeat_at')}")
+    print(f"- ref: .governance/changes/{args.change_id}/review-invocation.yaml")
+    print(f"- Step 8 report: .governance/changes/{args.change_id}/step-reports/step-8.md")
+    return 0
 
 
 def cmd_archive(args):
@@ -1651,6 +1757,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_resume.add_argument("--change-id", default=None, help="Explicit active change to continue")
     p_resume.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
+    p_profile = subparsers.add_parser("profile", help="Manage collaboration modes")
+    p_profile_sub = p_profile.add_subparsers(dest="profile_subcmd")
+    p_profile_list = p_profile_sub.add_parser("list", help="List collaboration modes")
+    p_profile_list.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    p_profile_show = p_profile_sub.add_parser("show", help="Show a collaboration mode")
+    p_profile_show.add_argument("profile_id", help="Profile id")
+    p_profile_show.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_profile_apply = p_profile_sub.add_parser("apply", help="Apply a collaboration mode")
+    p_profile_apply.add_argument("profile_id", help="Profile id")
+    p_profile_apply.add_argument("--agent-id", default="current-agent", help="Current Agent participant id")
+    p_profile_apply.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    p_context_pack = subparsers.add_parser("context-pack", help="Create or read handoff material indexes")
+    p_context_pack_sub = p_context_pack.add_subparsers(dest="context_pack_subcmd")
+    p_context_pack_create = p_context_pack_sub.add_parser("create", help="Create a handoff material index for a change")
+    p_context_pack_create.add_argument("--change-id", required=True, help="Target change id")
+    p_context_pack_create.add_argument("--level", choices=["minimal", "standard", "deep"], default="standard", help="Context pack level")
+    p_context_pack_read = p_context_pack_sub.add_parser("read", help="Read a handoff material index for a change")
+    p_context_pack_read.add_argument("--change-id", required=True, help="Target change id")
+    p_context_pack_read.add_argument("--level", choices=["minimal", "standard", "deep"], default="standard", help="Context pack level")
+    p_context_pack_read.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_handoff = subparsers.add_parser("handoff", help="Write a short handoff summary for a change")
+    p_handoff.add_argument("--compact", action="store_true", help="Write a short handoff summary")
+    p_handoff.add_argument("--change-id", required=True, help="Target change id")
+
     for command_name in ("onboard", "setup"):
         p_onboard = subparsers.add_parser(command_name, help="Run interactive or scripted onboarding")
         p_onboard.add_argument("--target", default=None, help="Target project directory")
@@ -1802,6 +1934,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--fallback-reviewer", default="", help="Fallback reviewer actor when primary failed")
     p_review.add_argument("--review-artifact-ref", default="", help="Review artifact produced by actual reviewer")
 
+    p_review_invocation = subparsers.add_parser("review-invocation", help="Record reviewer invocation progress or heartbeat")
+    p_review_invocation.add_argument("--change-id", required=True, help="Target change id")
+    p_review_invocation.add_argument("--status", choices=["started", "running", "completed", "failed", "timeout"], required=True, help="Reviewer invocation status")
+    p_review_invocation.add_argument("--reviewer", required=True, help="Reviewer identifier")
+    p_review_invocation.add_argument("--runtime", default="", help="Actual reviewer runtime or local agent used")
+    p_review_invocation.add_argument("--note", default="", help="Progress note or heartbeat detail")
+    p_review_invocation.add_argument("--timeout-policy", default="", help="Timeout policy for this reviewer invocation")
+    p_review_invocation.add_argument("--artifact-ref", default="", help="Progress or final artifact reference")
+
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")
     p_status = subparsers.add_parser("status", help="Show current step, gate status, and blockers")
@@ -1935,6 +2076,12 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_activate(args)
     elif args.command == "resume":
         return cmd_resume(args)
+    elif args.command == "profile":
+        return cmd_profile(args)
+    elif args.command == "context-pack":
+        return cmd_context_pack(args)
+    elif args.command == "handoff":
+        return cmd_handoff(args)
     elif args.command in {"hygiene", "doctor"}:
         return cmd_hygiene(args)
     elif args.command == "participants" and args.subcmd == "setup":
@@ -1969,6 +2116,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_verify(args)
     elif args.command == "review":
         return cmd_review(args)
+    elif args.command == "review-invocation":
+        return cmd_review_invocation(args)
     elif args.command == "archive":
         return cmd_archive(args)
     elif args.command == "revise":

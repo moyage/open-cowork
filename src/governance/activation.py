@@ -9,9 +9,10 @@ from .paths import GovernancePaths
 from .simple_yaml import load_yaml
 from .simple_yaml import write_yaml
 from .step_matrix import STEP_LABELS, render_status_snapshot
+from .context_pack import context_read_set
 
 
-def build_project_activation(root: str | Path, change_id: str | None = None) -> dict:
+def build_project_activation(root: str | Path, change_id: str | None = None, *, list_only: bool = False) -> dict:
     paths = GovernancePaths(Path(root).expanduser().resolve())
     activation = {
         "schema": "project-activation/v1",
@@ -38,6 +39,19 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
     activation["governance_state"] = "installed"
     active_changes = _active_changes(paths)
     activation["active_changes"] = active_changes
+    if list_only:
+        activation.update({
+            "recommended_mode": "choose-active-change" if active_changes else "open-new-change",
+            "active_change": None,
+            "agent_instructions": [
+                "List mode only: select the intended work item with ocw resume --change-id <change-id>.",
+                "Do not infer the target change from chat history or natural-language keywords.",
+            ] if active_changes else [
+                "No active changes were found in this project.",
+                "Ask the human for the next project intent before opening a new change.",
+            ],
+        })
+        return activation
     if change_id:
         selected = _find_active_change(paths, change_id)
         if not selected:
@@ -71,6 +85,11 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
         })
         _write_activation(paths, activation)
         return activation
+    if len(active_changes) == 1 and (
+        not change_id or status in {"idle", "archived", "abandoned", "superseded", "none"}
+    ):
+        selected = active_changes[0]
+        return _activation_for_change(paths, activation, str(selected["change_id"]), selected)
     if not change_id or status in {"idle", "archived", "abandoned", "superseded", "none"}:
         activation.update({
             "recommended_mode": "open-new-change",
@@ -122,11 +141,13 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
         })
         _write_activation(paths, activation)
         return activation
+    context_reads = context_read_set(paths.root, str(change_id))
     active_read_set = [
         ".governance/AGENTS.md",
         _current_state_path(paths),
         ".governance/agent-playbook.md",
         _agent_entry_path(paths),
+        *context_reads,
         f".governance/changes/{change_id}/contract.yaml",
         f".governance/changes/{change_id}/bindings.yaml",
         f".governance/changes/{change_id}/step-reports/step-{current_step}.md",
@@ -147,6 +168,10 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
         "agent_instructions": [
             "continue the active change; do not reinstall unless .governance is missing.",
             "Read the recommended set before acting.",
+            *(
+                ["Context pack is a pointer to authoritative governance facts."]
+                if context_reads else []
+            ),
             "Respect the active contract scope and the current single-step gate.",
             "Report goal, current step, owner, blockers, next action, and human decision needed.",
         ],

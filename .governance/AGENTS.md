@@ -4,17 +4,17 @@
 
 ## 优先读取
 
-1. `.governance/current-state.md`：人和 Agent 都能读的项目状态。
-2. `.governance/agent-entry.md`：任意 Agent 接手本项目时的固定入口。
-3. `.governance/agent-playbook.md`：Agent 操作规则。
-4. `.governance/index/active-changes.yaml`：项目级并行 change 列表；如果文件不存在，视为没有 active change。
-5. 当前 active change 的 `contract.yaml`：执行边界。
-6. 当前 active change 的 `bindings.yaml`：owner 和角色绑定。
+1. `.governance/agent-entry.md`：任意 Agent 接手项目时的固定入口。
+2. `.governance/agent-playbook.md`：Agent 操作规则。
+3. `.governance/index/active-changes.yaml`：项目级并行 change 列表。
+4. `.governance/local/current-state.md`：本地可再生状态投影。
+5. `ocw resume` 输出的 recommended read set：当前 change 的权威事实。
 
 只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。
 
 ## 操作规则
 
+Deterministic protocol trigger: run `ocw resume` before continuing project work. Natural language is only a request to run the command, not the protocol trigger.
 Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, archive, and continuity.
 
 ## 硬边界

@@ -97,6 +97,46 @@ class V036DeterministicResumeTests(unittest.TestCase):
             self.assertEqual(archive_map["archives"][0]["change_id"], "REQ-ARCHIVED")
             self.assertEqual(archive_map["archives"][0]["receipt"], ".governance/archive/REQ-ARCHIVED/archive-receipt.yaml")
 
+    def test_resume_uses_single_indexed_active_change_when_current_pointer_is_idle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._run_cli(root, "init")
+            self._prepare(root, "REQ-ONLY", "Only active work")
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "idle",
+                "current_change": None,
+                "note": "Simulate a stale local pointer after index recovery.",
+            })
+
+            output = self._run_cli(root, "resume")
+
+            self.assertIn("recommended_mode: continue-active-change", output)
+            self.assertIn("active_change_id: REQ-ONLY", output)
+            activation = load_yaml(root / ".governance/local/PROJECT_ACTIVATION.yaml")
+            self.assertEqual(activation["active_change"]["change_id"], "REQ-ONLY")
+
+    def test_resume_list_is_list_only_and_does_not_write_activation_projection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._run_cli(root, "init")
+            self._prepare(root, "REQ-LIST", "List only")
+            local_dir = root / ".governance/local"
+            for path in sorted(local_dir.glob("**/*"), reverse=True):
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    path.rmdir()
+            if local_dir.exists():
+                local_dir.rmdir()
+
+            output = self._run_cli(root, "resume", "--list")
+
+            self.assertIn("recommended_mode: choose-active-change", output)
+            self.assertIn("REQ-LIST", output)
+            self.assertFalse((root / ".governance/local/PROJECT_ACTIVATION.yaml").exists())
+            self.assertFalse((root / ".governance/local/current-state.md").exists())
+
     def _prepare(self, root: Path, change_id: str, goal: str) -> None:
         self._run_cli(root, "change", "create", change_id, "--title", goal)
         self._run_cli(root, "change", "prepare", change_id, "--goal", goal, "--active-policy", "force")
