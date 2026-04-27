@@ -437,6 +437,22 @@ def cmd_participants_setup(args):
     return 0
 
 
+def cmd_participants_list(args):
+    from governance.status_views import participants_list, render_participants_list
+
+    payload = participants_list(args.root, args.change_id)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(render_participants_list(payload), end="")
+    return 0
+
+
 def cmd_intent_capture(args):
     from governance.intent import capture_intent
 
@@ -479,6 +495,42 @@ def cmd_intent_confirm(args):
     return 0
 
 
+def cmd_intent_status(args):
+    from governance.status_views import intent_status, render_intent_status
+
+    payload = intent_status(args.root, args.change_id)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(render_intent_status(payload), end="")
+    return 0
+
+
+def cmd_change_status(args):
+    from governance.status_views import change_status, render_change_status
+
+    change_id = args.change_id_flag or args.change_id
+    if not change_id:
+        print("--change-id is required for 'ocw change status'.")
+        return 1
+    payload = change_status(args.root, change_id)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(render_change_status(payload), end="")
+    return 0
+
+
 def cmd_step_report(args):
     from governance.contract import ContractValidationError
     from governance.step_report import materialize_step_report
@@ -515,6 +567,12 @@ def cmd_step_report(args):
         print("## Outputs")
         for item in payload["outputs"]:
             print(f"- {item}")
+        print("")
+        print("## Intent summary")
+        _print_mapping(payload.get("intent_summary", {}))
+        print("")
+        print("## Evidence")
+        _print_evidence(payload.get("evidence", []))
         print("")
         print("## Done criteria")
         for item in payload["done_criteria"]:
@@ -561,6 +619,49 @@ def cmd_step_report(args):
     return 0
 
 
+def _print_mapping(payload: dict) -> None:
+    if not payload:
+        print("- none")
+        return
+    for key, value in payload.items():
+        if isinstance(value, list):
+            print(f"- {key}:")
+            if value:
+                for item in value:
+                    print(f"  - {item}")
+            else:
+                print("  - none")
+        else:
+            print(f"- {key}: {value}")
+
+
+def _print_evidence(items: list[dict]) -> None:
+    if not items:
+        print("- none")
+        return
+    for item in items:
+        print(f"- {item.get('kind')}:")
+        for key, value in item.items():
+            if key == "kind":
+                continue
+            if isinstance(value, list):
+                print(f"  - {key}:")
+                if value:
+                    for entry in value:
+                        print(f"    - {entry}")
+                else:
+                    print("    - none")
+            elif isinstance(value, dict):
+                print(f"  - {key}:")
+                if value:
+                    for nested_key, nested_value in value.items():
+                        print(f"    - {nested_key}: {nested_value}")
+                else:
+                    print("    - none")
+            else:
+                print(f"  - {key}: {value}")
+
+
 def cmd_step_approve(args):
     from governance.human_gates import approve_step
 
@@ -591,7 +692,10 @@ def _mark_step5_approved_for_step6(root: str | Path, change_id: str) -> None:
     package = read_change_package(root, change_id)
     readiness = dict(package.manifest.get("readiness") or {})
     readiness["step6_entry_ready"] = True
-    readiness["missing_items"] = [item for item in readiness.get("missing_items", []) if item not in {"step5_approval"}]
+    readiness["missing_items"] = [
+        item for item in readiness.get("missing_items", [])
+        if item not in {"intent_confirmation", "step1_confirmation", "step5_approval", "step5_confirmation"}
+    ]
     manifest = update_manifest(root, change_id, status="step6-in-progress", current_step=6, readiness=readiness)
     current = read_current_change(root).get("current_change") or {}
     entry = {
@@ -605,6 +709,9 @@ def _mark_step5_approved_for_step6(root: str | Path, change_id: str) -> None:
     set_current_change(root, entry)
     upsert_change_entry(root, entry)
     set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
+    from governance.step_report import materialize_step_report
+    for step in range(1, 6):
+        materialize_step_report(root, change_id=change_id, step=step)
 
 
 def cmd_verify(args):
@@ -649,8 +756,19 @@ def cmd_review(args):
             bypass_reason=args.bypass_reason or "",
             bypass_recorded_by=args.bypass_recorded_by or "",
             bypass_evidence_ref=args.bypass_evidence_ref or "",
+            runtime=args.runtime or "",
+            health_check=args.health_check or "",
+            invocation_status=args.invocation_status or "",
+            failure_reason=args.failure_reason or "",
+            fallback_reviewer=args.fallback_reviewer or "",
+            review_artifact_ref=args.review_artifact_ref or "",
         )
-        print(f"Review recorded: {payload['change_id']} -> {payload['decision']['status']}")
+        status_label = {
+            "approve": "review-approved",
+            "reject": "review-rejected",
+            "revise": "review-revise",
+        }.get(payload["decision"]["status"], payload["decision"]["status"])
+        print(f"Review recorded: {payload['change_id']} -> {status_label}")
         for warning in payload.get("warnings", []):
             print(f"- warning: {warning}")
             if args.allow_reviewer_mismatch:
@@ -696,6 +814,31 @@ def cmd_archive(args):
             extra={"reason": str(exc)},
         )
         print(f"Archive failed: {exc}")
+        return 1
+
+
+def cmd_revise(args):
+    from governance.revision import open_revision
+    from governance.runtime_events import append_runtime_event
+
+    try:
+        payload = open_revision(args.root, args.change_id, reason=args.reason, recorded_by=args.recorded_by)
+        append_runtime_event(
+            args.root,
+            change_id=args.change_id,
+            event_type="revision_opened",
+            step=6,
+            from_status="review-revise",
+            to_status="revision-open",
+            actor_id=args.recorded_by,
+            refs=[payload["history_ref"]],
+        )
+        print(f"Revision opened: {payload['change_id']} round={payload['revision']['revision_round']}")
+        print(f"- status: {payload['status']}")
+        print(f"- ref: {payload['history_ref']}")
+        return 0
+    except Exception as exc:
+        print(f"Revision failed: {exc}")
         return 1
 
 
@@ -862,6 +1005,18 @@ def cmd_status(args):
             path = sync_current_state(args.root)
             print(f"Current state synced: {path}")
             return
+        if getattr(args, "last_archive", False):
+            from governance.status_views import last_archive_summary, render_last_archive_summary
+
+            print(render_last_archive_summary(last_archive_summary(args.root)), end="")
+            return
+        if getattr(args, "change_id", None):
+            from governance.step_matrix import format_status_snapshot_view, write_status_snapshot
+
+            snapshot_path = write_status_snapshot(args.root, args.change_id)
+            snapshot = load_yaml(snapshot_path)
+            print(format_status_snapshot_view(snapshot))
+            return
         current = read_current_change(args.root)
         nested_current = current.get("current_change", {})
         has_active_change = bool(current.get("current_change_id"))
@@ -878,6 +1033,11 @@ def cmd_status(args):
                 maintenance = load_yaml(maintenance_path)
                 print(f"- last_archived_change: {maintenance.get('last_archived_change')}")
                 print(f"- last_archive_at: {maintenance.get('last_archive_at')}")
+                if maintenance.get("last_archived_change"):
+                    from governance.status_views import last_archive_summary, render_last_archive_summary
+
+                    print("")
+                    print(render_last_archive_summary(last_archive_summary(args.root)), end="")
             print("- next_action: create or set an active change before running step matrix view")
             return
         snapshot_path = write_status_snapshot(args.root)
@@ -1377,6 +1537,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_participants_setup.add_argument("--step-reviewer", action="append", default=[], help="Map a step reviewer, e.g. 8=review-agent")
     p_participants_setup.add_argument("--change-id", default=None, help="Optional change id whose bindings.yaml should be updated")
     p_participants_setup.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_participants_list = p_participants_sub.add_parser("list", help="List participants and step owner matrix")
+    p_participants_list.add_argument("--change-id", default=None, help="Optional change id whose bindings.yaml should be included")
+    p_participants_list.add_argument("--format", choices=["human", "text", "yaml", "json"], default="human", help="Output format")
 
     p_intent = subparsers.add_parser("intent", help="Capture and confirm project intent")
     p_intent_sub = p_intent.add_subparsers(dest="subcmd")
@@ -1399,6 +1562,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_intent_confirm.add_argument("--confirmed-by", required=True, help="Human or sponsor confirming the intent")
     p_intent_confirm.add_argument("--note", default="", help="Confirmation note")
     p_intent_confirm.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    p_intent_status = p_intent_sub.add_parser("status", help="Show captured intent status")
+    p_intent_status.add_argument("--change-id", required=True, help="Target change id")
+    p_intent_status.add_argument("--format", choices=["human", "text", "yaml", "json"], default="human", help="Output format")
 
     p_step = subparsers.add_parser("step", help="Create human-visible step reports")
     p_step_sub = p_step.add_subparsers(dest="subcmd")
@@ -1416,8 +1582,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_step_approve.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     p_change = subparsers.add_parser("change", help="Change package management")
-    p_change.add_argument("subcmd", choices=["create", "prepare"], help="Create or prepare change package")
-    p_change.add_argument("change_id", help="Change identifier")
+    p_change.add_argument("subcmd", choices=["create", "prepare", "status"], help="Create, prepare, or inspect change package")
+    p_change.add_argument("change_id", nargs="?", help="Change identifier")
+    p_change.add_argument("--change-id", dest="change_id_flag", default=None, help="Target change id for status")
     p_change.add_argument("--title", default="", help="Optional change title")
     p_change.add_argument("--goal", default="", help="Change goal for generated authoring files")
     p_change.add_argument("--scope-in", action="append", default=[], help="Allowed implementation path or glob")
@@ -1426,6 +1593,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_change.add_argument("--source-doc", action="append", default=[], help="Source document path")
     p_change.add_argument("--active-policy", choices=["continue", "supersede", "abandon", "archive-first", "force"], default=None, help="Policy for unresolved active change conflicts")
     p_change.add_argument("--profile", choices=["personal", "team"], default="personal", help="Role binding profile")
+    p_change.add_argument("--format", choices=["human", "text", "yaml", "json"], default="human", help="Output format for status")
 
     p_contract = subparsers.add_parser("contract", help="Contract management")
     p_contract_sub = p_contract.add_subparsers(dest="subcmd")
@@ -1455,11 +1623,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--bypass-reason", default="", help="Human-readable reviewer mismatch bypass reason")
     p_review.add_argument("--bypass-recorded-by", default="", help="Actor recording reviewer mismatch risk acceptance")
     p_review.add_argument("--bypass-evidence-ref", default="", help="Evidence reference for reviewer mismatch risk acceptance")
+    p_review.add_argument("--runtime", default="", help="Actual reviewer runtime or local agent used")
+    p_review.add_argument("--health-check", default="", help="Reviewer runtime health check status")
+    p_review.add_argument("--invocation-status", default="", help="Reviewer runtime invocation status")
+    p_review.add_argument("--failure-reason", default="", help="Reviewer runtime failure reason")
+    p_review.add_argument("--fallback-reviewer", default="", help="Fallback reviewer actor when primary failed")
+    p_review.add_argument("--review-artifact-ref", default="", help="Review artifact produced by actual reviewer")
 
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")
     p_status = subparsers.add_parser("status", help="Show current step, gate status, and blockers")
     p_status.add_argument("--sync-current-state", action="store_true", help="Refresh .governance/current-state.md from current index/runtime state")
+    p_status.add_argument("--change-id", default=None, help="Show status for a specific change")
+    p_status.add_argument("--last-archive", action="store_true", help="Show the last archived closeout summary")
+    p_revise = subparsers.add_parser("revise", help="Open a revision loop after review revise")
+    p_revise.add_argument("--change-id", required=True, help="Target change id")
+    p_revise.add_argument("--reason", required=True, help="Revision reason")
+    p_revise.add_argument("--recorded-by", required=True, help="Actor recording the revision")
     p_runtime_status = subparsers.add_parser("runtime-status", help="Write machine-readable runtime status snapshot")
     p_runtime_status.add_argument("--change-id", required=True, help="Target change id")
     p_runtime_status.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
@@ -1579,10 +1759,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_hygiene(args)
     elif args.command == "participants" and args.subcmd == "setup":
         return cmd_participants_setup(args)
+    elif args.command == "participants" and args.subcmd == "list":
+        return cmd_participants_list(args)
     elif args.command == "intent" and args.subcmd == "capture":
         return cmd_intent_capture(args)
     elif args.command == "intent" and args.subcmd == "confirm":
         return cmd_intent_confirm(args)
+    elif args.command == "intent" and args.subcmd == "status":
+        return cmd_intent_status(args)
     elif args.command == "step" and args.subcmd == "report":
         return cmd_step_report(args)
     elif args.command == "step" and args.subcmd == "approve":
@@ -1591,6 +1775,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_change_create(args)
     elif args.command == "change" and args.subcmd == "prepare":
         return cmd_change_prepare(args)
+    elif args.command == "change" and args.subcmd == "status":
+        return cmd_change_status(args)
     elif args.command == "status":
         cmd_status(args)
     elif args.command == "contract" and args.subcmd == "validate":
@@ -1603,6 +1789,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_review(args)
     elif args.command == "archive":
         return cmd_archive(args)
+    elif args.command == "revise":
+        return cmd_revise(args)
     elif args.command == "runtime-status":
         return cmd_runtime_status(args)
     elif args.command == "timeline":

@@ -7,6 +7,7 @@ from .change_package import read_change_package, update_manifest
 from .index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
 from .simple_yaml import load_yaml, write_yaml
 from .agent_adoption import write_agent_adoption_pack
+from .defaults import DEFAULT_SCOPE_OUT
 
 REQUIRED_FORBIDDEN_ACTIONS = [
     "no_truth_source_pollution",
@@ -34,11 +35,7 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
     root = Path(request.root)
     title = request.title or package.manifest.get("title") or request.change_id
     scope_in = request.scope_in or ["src/**", "tests/**"]
-    scope_out = request.scope_out or [
-        ".governance/index/**",
-        ".governance/archive/**",
-        ".governance/runtime/**",
-    ]
+    scope_out = _merge_scope_out(request.scope_out)
     verify_commands = request.verify_commands or []
 
     source_docs = list(request.source_docs or [])
@@ -65,7 +62,7 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         current_step=1,
         source_docs=source_docs,
         target_validation_objects=contract["validation_objects"],
-        readiness={"step1_entry_ready": True, "step6_entry_ready": False, "missing_items": ["intent_confirmation", "step1_confirmation"]},
+        readiness=_readiness_for_step1(package.path),
     )
     _materialize_prepare_step_reports(request.root, request.change_id)
     current = read_current_change(request.root).get("current_change") or {}
@@ -86,6 +83,27 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         current_change_id=request.change_id,
     )
     return {"change_id": request.change_id, "path": str(package.path), "contract": contract, "bindings": bindings}
+
+
+def _merge_scope_out(scope_out: list[str]) -> list[str]:
+    merged = []
+    for item in [*(scope_out or []), *DEFAULT_SCOPE_OUT]:
+        if item not in merged:
+            merged.append(item)
+    return merged
+
+
+def _readiness_for_step1(change_dir: Path) -> dict:
+    intent = load_yaml(change_dir / "intent-confirmation.yaml") if (change_dir / "intent-confirmation.yaml").exists() else {}
+    gates = load_yaml(change_dir / "human-gates.yaml") if (change_dir / "human-gates.yaml").exists() else {}
+    approvals = gates.get("approvals", {}) if isinstance(gates, dict) else {}
+    step1_approval = approvals.get(1) or approvals.get("1") or {}
+    missing_items = []
+    if intent.get("status") != "confirmed":
+        missing_items.append("intent_confirmation")
+    if step1_approval.get("status") != "approved":
+        missing_items.append("step1_confirmation")
+    return {"step1_entry_ready": True, "step6_entry_ready": False, "missing_items": missing_items}
 
 
 def _preserve_participant_bindings(existing: dict, generated: dict) -> dict:

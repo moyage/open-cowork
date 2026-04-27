@@ -126,7 +126,9 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 
 ## 当前版本完成度
 
-当前 `v0.3.0` 是“Human Participation and Closeout Readability”。重点是在 v0.2.9 已验证的 Step 5 / Step 8 / Step 9 hard gates 之上，把标准 Step 1-9、人类可读 step report、status approval 语义、review trace、archive closeout 和 Agent handoff 统一为人能理解、Agent 能维护、审计能追踪的协作事实。
+当前 `v0.3.1` 是“Human Participation Runtime Hardening”。重点是在 v0.3.0 的人类可见 Step 1-9 与 Step 5 / Step 8 / Step 9 hard gates 之上，修复实践中暴露的“前置步骤不可见、prepare 像是已完成 Step 1-5、状态面过于 CLI-first、review 失败后恢复路径不清、独立 review 调度证据不足”等问题。
+
+v0.3.1 的原则是：新 change 默认从 Step 1 开始；`change prepare` 只生成材料，不代表 Step 1-5 已完成；Agent 应通过 intent / participants / change status / step report 向人汇报“当前在哪一步、谁负责、证据是什么、下一步需要谁批准”。
 
 已经具备：
 
@@ -143,9 +145,11 @@ AI 大模型、Agent 和 AI Coding 工具正在把个体能力快速放大。一
 - `ocw intent capture` / `ocw intent confirm` 捕获并确认需求、优化、Bug、范围、风险和验收标准。
 - `ocw step report` 为 4 阶段 9 步生成可读阶段报告。
 - `ocw step report --format human` 输出人类可读步骤报告，包含标准 Step、传统映射、owner、输入、输出、完成标准、下一步进入条件、框架约束、Agent 已做动作、Agent 预期动作和短确认选项。
+- `ocw intent status` / `ocw participants list` / `ocw change status` / `ocw status --last-archive` 输出更适合 Agent 汇报的人类可读状态面。
 - `ocw step approve` 记录 human gate approval；Step 5 / Step 8 / Step 9 approval 分别会被 `ocw run` / `ocw review` / `ocw archive` 消费。
 - `ocw contract validate` 检查 confirmed intent 与 contract scope 是否漂移。
 - `ocw review` 默认阻止 reviewer mismatch；只有显式 bypass 才会写入审计记录。
+- `ocw review` 可记录真实独立 reviewer 的 runtime evidence；`ocw revise` 可把 `review-revise` 决策显式带回 Step 6 修订。
 - `ocw status` 输出 9-step progress table，显示每一步 report、`gate_type`、`gate_state` 和 `approval_state`。
 - `ocw archive` 生成最终状态一致性快照、Step 9 report traceability，以及 Step 5 / Step 8 / Step 9 human gate summary，便于归档审计。
 - `ocw pilot` 完成个人域试用 change 的初始化、准备、校验、状态输出和 Agent handoff pack。

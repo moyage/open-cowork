@@ -43,12 +43,15 @@ ocw --root . adopt --target . --goal "当前项目迭代目标" --dry-run
 
 如果有需求基线、dogfood 报告或审计报告，Agent 应通过 `--source-doc` 绑定来源，而不是把归档历史全文读进上下文。
 
-v0.3.0 起，`change prepare` 只代表准备材料生成完成，不代表 Step 1-5 已完成。Agent 应从 Step 1 输入接入与问题定界开始向人汇报，并让 Step 5 / Step 8 / Step 9 approval 分别成为执行、审查和归档前的明确记录：
+v0.3.1 起，`change prepare` 只代表准备材料生成完成，不代表 Step 1-5 已完成；新 change 的默认运行位置应从 Step 1 开始。Agent 应从 Step 1 输入接入与问题定界开始向人汇报，并让 Step 5 / Step 8 / Step 9 approval 分别成为执行、审查和归档前的明确记录：
 
 ```bash
 ocw --root . participants setup --profile personal --change-id <change-id>
 ocw --root . intent capture --change-id <change-id> --project-intent "本轮真实迭代意图"
 ocw --root . intent confirm --change-id <change-id> --confirmed-by human-sponsor
+ocw --root . intent status --change-id <change-id> --format human
+ocw --root . participants list --change-id <change-id> --format human
+ocw --root . change status --change-id <change-id> --format human
 ocw --root . step report --change-id <change-id> --step 1 --format human
 ocw --root . step report --change-id <change-id> --step 5 --format human
 ocw --root . step approve --change-id <change-id> --step 5 --approved-by human-sponsor
@@ -56,7 +59,7 @@ ocw --root . step approve --change-id <change-id> --step 8 --approved-by human-s
 ocw --root . step approve --change-id <change-id> --step 9 --approved-by human-sponsor
 ```
 
-这些命令仍然是 Agent 的内部工具。对人的汇报应聚焦“谁负责、要做什么、是否确认、当前步骤能否推进”，并明确说明 `gate_type`、`gate_state` 和 `approval_state`。Human gate 的确认动作应尽量提供 `approve` / `revise` / `reject` 短选项，避免要求人输入长篇审批句。Step 8 review 应由独立 reviewer 完成；reviewer mismatch 默认阻断，只有人明确接受 audited bypass，并记录 reason、recorded_by、evidence_ref 时才允许继续。
+这些命令仍然是 Agent 的内部工具。对人的汇报应聚焦“谁负责、要做什么、是否确认、当前步骤能否推进、证据在哪里”，并明确说明 `gate_type`、`gate_state` 和 `approval_state`。Human gate 的确认动作应尽量提供 `approve` / `revise` / `reject` 短选项，避免要求人输入长篇审批句。Step 8 review 应由独立 reviewer 完成，并记录真实 reviewer runtime evidence；reviewer mismatch 默认阻断，只有人明确接受 audited bypass，并记录 reason、recorded_by、evidence_ref 时才允许继续。若 review 返回 `revise`，Agent 应显式打开 revise loop，回到 Step 6 修订，而不是隐式跳过审查失败。
 
 ## 不应该怎么做
 

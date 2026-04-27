@@ -68,7 +68,7 @@ def _default_manifest(change_id: str, title: str, policy_level: str) -> dict:
         "title": title,
         "policy_level": policy_level,
         "status": "drafting",
-        "current_step": 5,
+        "current_step": 1,
         "owner": "orchestrator",
         "files": {"required": list(CORE_CHANGE_FILES), "directories": ["evidence/"]},
         "readiness": {"step6_entry_ready": False, "missing_items": []},

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .change_package import update_manifest
-from .index import read_current_change, set_current_change, upsert_change_entry
+from .index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
 from .lifecycle import require_transition_state
 from .paths import GovernancePaths
 from .simple_yaml import load_yaml, write_yaml
@@ -20,6 +20,12 @@ def write_review_decision(
     bypass_reason: str = "",
     bypass_recorded_by: str = "",
     bypass_evidence_ref: str = "",
+    runtime: str = "",
+    health_check: str = "",
+    invocation_status: str = "",
+    failure_reason: str = "",
+    fallback_reviewer: str = "",
+    review_artifact_ref: str = "",
 ) -> dict:
     paths = GovernancePaths(Path(root))
     require_transition_state(
@@ -78,6 +84,20 @@ def write_review_decision(
             "step8_approval_ref": f".governance/changes/{change_id}/human-gates.yaml#approvals.8",
         },
     }
+    runtime_evidence = {
+        key: value
+        for key, value in {
+            "runtime": runtime,
+            "health_check": health_check,
+            "invocation_status": invocation_status,
+            "failure_reason": failure_reason,
+            "fallback_reviewer": fallback_reviewer,
+            "review_artifact_ref": review_artifact_ref,
+        }.items()
+        if value
+    }
+    if runtime_evidence:
+        payload["runtime_evidence"] = runtime_evidence
     if warnings:
         payload["warnings"] = warnings
         payload["reviewer_mismatch_bypass"] = {
@@ -104,6 +124,7 @@ def write_review_decision(
         "status": manifest.get("status"),
         "current_step": manifest.get("current_step"),
     })
+    set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
     return payload
 
 

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .change_package import read_change_package
+from .contract import ContractValidationError
 from .simple_yaml import load_yaml, write_yaml
 from .step_matrix import (
     ACTION_PURPOSES,
@@ -18,12 +19,17 @@ from .step_matrix import (
 
 def materialize_step_report(root: str | Path, *, change_id: str, step: int | None = None) -> dict:
     package = read_change_package(root, change_id)
-    matrix = render_step_matrix(root, change_id)
+    intent = _load_optional_yaml(package.path / "intent-confirmation.yaml")
+    try:
+        matrix = render_step_matrix(root, change_id)
+    except ContractValidationError:
+        if step not in {1, 2} or not intent:
+            raise
+        matrix = _early_intent_matrix(package.manifest)
     selected_step = step or matrix["current_step"]
     if not isinstance(selected_step, int) or selected_step < 1 or selected_step > 9:
         raise ValueError("step must be an integer from 1 to 9")
     bindings = _load_optional_yaml(package.path / "bindings.yaml")
-    intent = _load_optional_yaml(package.path / "intent-confirmation.yaml")
     human_gates = _load_optional_yaml(package.path / "human-gates.yaml")
     step_binding = _step_binding(bindings, selected_step)
     approval = _approval_for_step(human_gates, selected_step)
@@ -50,11 +56,13 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         "objective": ACTION_PURPOSES[selected_step],
         "inputs": _inputs_for_step(selected_step, change_id),
         "outputs": _outputs_for_step(selected_step, change_id),
+        "intent_summary": _intent_summary(selected_step, intent),
+        "evidence": _evidence_summary(package.path, selected_step),
         "done_criteria": _done_criteria(selected_step, intent),
         "next_entry_criteria": _next_entry_criteria(selected_step),
         "blockers": matrix.get("blockers", []),
         "framework_controls": _framework_controls(selected_step, gate_type),
-        "agent_actions_done": _agent_actions_done(selected_step),
+        "agent_actions_done": _agent_actions_done(selected_step, package.path),
         "agent_actions_expected": _agent_actions_expected(selected_step, step_binding),
         "human_decisions_required": _human_decisions(selected_step, step_binding, intent),
         "human_confirmation_options": _human_confirmation_options(step_binding),
@@ -66,6 +74,15 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
     write_yaml(report_dir / f"step-{selected_step}.yaml", payload)
     (report_dir / f"step-{selected_step}.md").write_text(_format_report(payload), encoding="utf-8")
     return payload
+
+
+def _early_intent_matrix(manifest: dict) -> dict:
+    return {
+        "current_step": manifest.get("current_step") or 1,
+        "current_status": manifest.get("status") or "intent-captured",
+        "current_owner_or_stage_actor": "human-sponsor",
+        "blockers": [],
+    }
 
 
 def _load_optional_yaml(path: Path) -> dict:
@@ -184,8 +201,79 @@ def _framework_controls(step: int, gate_type: str) -> list[str]:
     return controls
 
 
-def _agent_actions_done(step: int) -> list[str]:
-    return [f"Generated Step {step} report from the active change package."]
+def _agent_actions_done(step: int, change_dir: Path) -> list[str]:
+    actions = [f"Generated Step {step} report from the active change package."]
+    evidence = _evidence_summary(change_dir, step)
+    for item in evidence:
+        summary = item.get("summary")
+        if summary:
+            actions.append(str(summary))
+    return actions
+
+
+def _intent_summary(step: int, intent: dict) -> dict:
+    if step not in {1, 2} or not intent:
+        return {}
+    return {
+        "status": intent.get("status"),
+        "project_intent": intent.get("project_intent"),
+        "requirements": intent.get("requirements", []),
+        "optimizations": intent.get("optimizations", []),
+        "bugs": intent.get("bugs", []),
+        "scope_in": intent.get("scope_in", []),
+        "scope_out": intent.get("scope_out", []),
+        "acceptance_criteria": intent.get("acceptance_criteria", []),
+        "risks": intent.get("risks", []),
+        "open_questions": intent.get("open_questions", []),
+    }
+
+
+def _evidence_summary(change_dir: Path, step: int) -> list[dict]:
+    evidence_dir = change_dir / "evidence"
+    items: list[dict] = []
+    if step == 6:
+        execution = _load_optional_yaml(evidence_dir / "execution-summary.yaml")
+        command = _load_optional_yaml(evidence_dir / "command-output-summary.yaml")
+        tests = _load_optional_yaml(evidence_dir / "test-output-summary.yaml")
+        changed = _load_optional_yaml(evidence_dir / "changed-files-manifest.yaml")
+        if execution:
+            items.append({
+                "kind": "execution",
+                "summary": f"execution run_id={execution.get('run_id')} status={execution.get('status')}",
+                "run_id": execution.get("run_id"),
+                "status": execution.get("status"),
+                "artifacts": execution.get("artifacts", {}),
+                "evidence_refs": execution.get("evidence_refs", []),
+            })
+        if command:
+            items.append({"kind": "command_output", "summary": command.get("summary"), "command": command.get("command")})
+        if tests:
+            items.append({"kind": "test_output", "summary": tests.get("summary")})
+        if changed:
+            items.append({"kind": "changed_files", "created": changed.get("created", []), "modified": changed.get("modified", [])})
+    if step == 7:
+        verify = _load_optional_yaml(change_dir / "verify.yaml")
+        if verify:
+            items.append({
+                "kind": "verify",
+                "summary": f"verify_status: {verify.get('summary', {}).get('status')}",
+                "verify_status": verify.get("summary", {}).get("status"),
+                "blocker_count": verify.get("summary", {}).get("blocker_count"),
+                "checks": verify.get("checks", []),
+                "issues": verify.get("issues", []),
+            })
+    if step == 8:
+        review = _load_optional_yaml(change_dir / "review.yaml")
+        if review:
+            items.append({
+                "kind": "review",
+                "summary": f"review_decision: {review.get('decision', {}).get('status')}",
+                "review_decision": review.get("decision", {}).get("status"),
+                "reviewers": review.get("reviewers", []),
+                "conditions": review.get("conditions", {}),
+                "runtime_evidence": review.get("runtime_evidence", {}),
+            })
+    return items
 
 
 def _agent_actions_expected(step: int, binding: dict) -> list[str]:
@@ -235,6 +323,12 @@ def _format_report(payload: dict) -> str:
         "## Outputs",
         *_bullets(payload["outputs"]),
         "",
+        "## Intent summary",
+        *_format_mapping(payload.get("intent_summary", {})),
+        "",
+        "## Evidence",
+        *_format_evidence(payload.get("evidence", [])),
+        "",
         "## Done criteria",
         *_bullets(payload["done_criteria"]),
         "",
@@ -273,6 +367,43 @@ def _format_confirmation_options(items: list[dict]) -> list[str]:
     if not items:
         return ["- none"]
     return [f"- {item['action']}: {item['label']}" for item in items]
+
+
+def _format_mapping(payload: dict) -> list[str]:
+    if not payload:
+        return ["- none"]
+    lines = []
+    for key, value in payload.items():
+        if isinstance(value, list):
+            lines.append(f"- {key}:")
+            lines.extend([f"  - {item}" for item in value] or ["  - none"])
+        else:
+            lines.append(f"- {key}: {value}")
+    return lines
+
+
+def _format_evidence(items: list[dict]) -> list[str]:
+    if not items:
+        return ["- none"]
+    lines = []
+    for item in items:
+        lines.append(f"- {item.get('kind')}:")
+        for key, value in item.items():
+            if key == "kind":
+                continue
+            if isinstance(value, list):
+                lines.append(f"  - {key}:")
+                lines.extend([f"    - {entry}" for entry in value] or ["    - none"])
+            elif isinstance(value, dict):
+                lines.append(f"  - {key}:")
+                if value:
+                    for nested_key, nested_value in value.items():
+                        lines.append(f"    - {nested_key}: {nested_value}")
+                else:
+                    lines.append("    - none")
+            else:
+                lines.append(f"  - {key}: {value}")
+    return lines
 
 
 def _participant_responsibilities(binding: dict) -> list[str]:

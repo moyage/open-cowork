@@ -1345,7 +1345,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.3.0", output)
+        self.assertIn("open-cowork 0.3.1", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)
@@ -1417,8 +1417,8 @@ class CliTests(unittest.TestCase):
             self.assertEqual(launch_exit, 0)
             self.assertIn("continuity-launch-input.yaml", stdout.getvalue())
             launch_payload = load_yaml(root / f".governance/changes/{current_change}/continuity-launch-input.yaml")
-            self.assertEqual(launch_payload["decision_summary"]["current_phase"], "Phase 2 / 方案与准备")
-            self.assertEqual(launch_payload["decision_summary"]["next_decision"], "Step 5 / Approve the start")
+            self.assertEqual(launch_payload["decision_summary"]["current_phase"], "Phase 1 / 定义与对齐")
+            self.assertEqual(launch_payload["decision_summary"]["next_decision"], "Step 1 / Clarify the goal")
             self.assertTrue(launch_payload["decision_summary"]["next_input_suggestion"])
 
             stdout = io.StringIO()

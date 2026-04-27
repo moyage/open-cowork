@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .change_package import read_change_package
+from .change_package import read_change_package, update_manifest
 from .simple_yaml import load_yaml, write_yaml
 
 
@@ -34,6 +34,8 @@ def approve_step(
     if evidence_ref:
         approvals[step]["evidence_ref"] = evidence_ref
     write_yaml(path, payload)
+    _clean_readiness_after_approval(root, package, step)
+    _refresh_step_report_if_possible(root, change_id, step)
     return payload
 
 
@@ -83,6 +85,34 @@ def _step_binding(bindings: dict, step: int) -> dict:
 
 def _load_yaml(path: Path) -> dict:
     return load_yaml(path) if path.exists() else {}
+
+
+def _clean_readiness_after_approval(root: str | Path, package, step: int) -> None:
+    readiness = dict(package.manifest.get("readiness") or {})
+    missing_items = list(readiness.get("missing_items") or [])
+    remove = {f"step{step}_approval", f"step{step}_confirmation"}
+    if step == 1 and _intent_is_confirmed(package.path):
+        remove.add("intent_confirmation")
+    cleaned = [item for item in missing_items if item not in remove]
+    if cleaned != missing_items:
+        readiness["missing_items"] = cleaned
+        update_manifest(root, package.change_id, readiness=readiness)
+
+
+def _intent_is_confirmed(change_dir: Path) -> bool:
+    intent = _load_yaml(change_dir / "intent-confirmation.yaml")
+    return intent.get("status") == "confirmed"
+
+
+def _refresh_step_report_if_possible(root: str | Path, change_id: str, step: int) -> None:
+    try:
+        from .step_report import materialize_step_report
+
+        materialize_step_report(root, change_id=change_id, step=step)
+    except Exception:
+        # Approval is the canonical truth; report materialization can still be
+        # blocked before a change has enough files for the requested step.
+        return
 
 
 def _now_utc() -> str:

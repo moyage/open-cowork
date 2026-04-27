@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1
+
+- Made Step 1 the default starting point for new change packages so `change create` / `change prepare` can no longer make Step 1-5 look completed before human-visible confirmation
+- Added human-facing status views for intent, participants, per-change status, and last archive summary so Agents can report progress without exposing CLI-first details
+- Added Step 6 / Step 7 / Step 8 evidence summaries into human step reports, including execution artifacts, verification evidence, review runtime evidence, and independent reviewer invocation metadata
+- Added audited `review-revise` recovery with a `revise` command and revision history so failed review decisions return to Step 6 instead of creating an ambiguous dead end
+- Added default `scope_out` exclusions for unstable/generated directories and propagated them through adoption and change preparation
+- Extended review decision records with reviewer runtime evidence fields for real local-agent review dispatch, fallback, and failure transparency
+- Updated continuity/version tests and v0.3.1 regression coverage for Step 1 visibility, status surfaces, evidence aggregation, revise loops, review runtime evidence, and version reporting
+
 ## 0.3.0
 
 - Promoted the standard 9-step runtime flow into human-visible Step 1-9 reports, while keeping the 4 traditional human phases as explanatory mapping only

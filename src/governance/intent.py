@@ -83,6 +83,8 @@ def _update_manifest(root: str | Path, change_id: str, payload: dict) -> None:
     update_manifest(
         root,
         change_id,
+        status="step1-ready" if confirmed else "intent-captured",
+        current_step=1,
         intent_confirmation={
             "status": payload.get("status"),
             "ref": f".governance/changes/{change_id}/intent-confirmation.yaml",

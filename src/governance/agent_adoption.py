@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .defaults import DEFAULT_SCOPE_OUT
+
 
 DEFAULT_RECOMMENDED_READ_SET = [
     ".governance/current-state.md",
@@ -46,11 +48,7 @@ def build_adoption_plan(
             "change_id": candidate_change_id,
             "title": _candidate_title(goal),
             "scope_in": ["src/**", "tests/**", "docs/**"],
-            "scope_out": [
-                ".governance/index/**",
-                ".governance/archive/**",
-                ".governance/runtime/**",
-            ],
+            "scope_out": list(DEFAULT_SCOPE_OUT),
             "verify_commands": ["python3 -m unittest discover -s tests"],
         },
         "source_docs": source_docs,

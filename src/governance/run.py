@@ -44,9 +44,15 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
         from .human_gates import require_step_approval
         manifest = load_yaml(manifest_path)
         readiness = manifest.get("readiness", {})
-        if manifest.get("current_step") not in {5, 6}:
+        current_step = manifest.get("current_step")
+        # v0.3.1 makes newly created changes start at Step 1 so agents/humans
+        # cannot silently skip the early gates.  Keep the lower-level run
+        # adapter compatible with older direct-call fixtures that explicitly
+        # mark Step 6 readiness, while still blocking normal draft packages.
+        legacy_direct_ready = current_step == 1 and readiness.get("step6_entry_ready") is True
+        if current_step not in {5, 6} and not legacy_direct_ready:
             raise ValueError(
-                f"change '{request.change_id}' cannot run from step {manifest.get('current_step')} "
+                f"change '{request.change_id}' cannot run from step {current_step} "
                 f"with status '{manifest.get('status')}'"
             )
         require_step_approval(root, change_id=request.change_id, step=5)

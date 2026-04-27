@@ -3,24 +3,25 @@
 Profile: personal
 
 ## Participants
-- human-sponsor (human): sponsor, final-decision
-- orchestrator-agent (agent): orchestrator
-- analyst-agent (agent): analyst
-- architect-agent (agent): architect
-- executor-agent (agent): executor
-- verifier-agent (agent): verifier
+- human-sponsor (human): final-decision, intent-confirmation
+- orchestrator-agent (agent): coordination, change-package
+- analyst-agent (agent): requirements, scope-analysis
+- architect-agent (agent): design, risk-analysis
+- executor-agent (agent): implementation, evidence
+- verifier-agent (agent): tests, acceptance
 - independent-reviewer (agent): review, decision-check
-- maintainer-agent (agent): maintainer
-- hermes-agent (agent): reviewer
+- maintainer-agent (agent): archive, continuity
+- codex-orchestrator (agent): coordination, implementation, evidence
+- hermes-reviewer (agent): independent-review, local-agent
 
 ## 9-step owner matrix
 
-- Step 1 / Clarify the goal: owner=human-sponsor; assistants=orchestrator-agent; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
-- Step 2 / Lock the scope: owner=analyst-agent; assistants=human-sponsor; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
-- Step 3 / Shape the approach: owner=architect-agent; assistants=human-sponsor; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
-- Step 4 / Assemble the change: owner=orchestrator-agent; assistants=architect-agent; reviewer=human-sponsor; human_gate=false; final_decision=human-sponsor
+- Step 1 / Clarify the goal: owner=human-sponsor; assistants=analyst-agent, orchestrator-agent; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
+- Step 2 / Lock the scope: owner=analyst-agent; assistants=orchestrator-agent; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
+- Step 3 / Shape the approach: owner=architect-agent; assistants=analyst-agent; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
+- Step 4 / Assemble the change: owner=codex-orchestrator; assistants=architect-agent; reviewer=human-sponsor; human_gate=false; final_decision=human-sponsor
 - Step 5 / Approve the start: owner=human-sponsor; assistants=orchestrator-agent; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
-- Step 6 / Execute the change: owner=executor-agent; assistants=orchestrator-agent; reviewer=verifier-agent; human_gate=false; final_decision=human-sponsor
-- Step 7 / Verify the result: owner=verifier-agent; assistants=executor-agent; reviewer=hermes-agent; human_gate=false; final_decision=human-sponsor
-- Step 8 / Review and decide: owner=hermes-agent; assistants=human-sponsor; reviewer=hermes-agent; human_gate=true; final_decision=human-sponsor
-- Step 9 / Archive and carry forward: owner=maintainer-agent; assistants=human-sponsor; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor
+- Step 6 / Execute the change: owner=codex-orchestrator; assistants=none; reviewer=verifier-agent; human_gate=false; final_decision=human-sponsor
+- Step 7 / Verify the result: owner=verifier-agent; assistants=none; reviewer=independent-reviewer; human_gate=false; final_decision=human-sponsor
+- Step 8 / Review and decide: owner=hermes-reviewer; assistants=human-sponsor; reviewer=hermes-reviewer; human_gate=true; final_decision=human-sponsor
+- Step 9 / Archive and carry forward: owner=maintainer-agent; assistants=orchestrator-agent; reviewer=human-sponsor; human_gate=true; final_decision=human-sponsor

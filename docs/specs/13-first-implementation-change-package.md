@@ -104,8 +104,8 @@
 至少必须包含：
 ```yaml
 change_id: CHG-YYYYMMDD-001
-status: step5-ready
-current_step: 5
+status: drafting
+current_step: 1
 policy_level: standard
 owner: orchestrator
 files:
@@ -127,9 +127,9 @@ readiness:
 ```
 
 要求：
-- `status` 必须反映“已准备、未执行”。
-- `current_step` 在进入执行前必须仍为 `5`。
-- `readiness.step6_entry_ready` 只有在全部检查通过后才能改为 `true`。
+- v0.3.1 起，初始 `status` / `current_step` 必须反映“仍在 Step 1 输入接入与问题定界”，不能由 `change prepare` 直接表达为 Step 1-5 已完成。
+- 只有 Step 1-5 均有对人可见报告和必要 approval 后，才可进入 Step 6 执行。
+- `readiness.step6_entry_ready` 只有在全部检查通过且 Step 5 approval 已记录后才能改为 `true`。
 
 ## 6. bindings.yaml 必备内容
 首个真实工程 change 在 Step 5 末尾必须存在 `bindings.yaml`，且至少覆盖 Step 5-9。

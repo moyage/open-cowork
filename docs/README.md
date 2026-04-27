@@ -68,6 +68,8 @@
 
 近期 dogfood 反馈和候选输入：
 
+- `archive/reports/2026-04-27-v031-release-and-next-dogfood.md`
+- `reports/2026-04-27-v031-final-retrospective-and-closeout-report.md`
 - `archive/reports/2026-04-26-v030-release-and-next-dogfood.md`
 - `reports/2026-04-26-v030-final-retrospective-and-closeout-report.md`
 - `archive/reports/2026-04-25-v026-external-dogfood-feedback.md`

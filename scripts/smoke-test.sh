@@ -18,19 +18,22 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
 "$OCW_BIN" --root "$SMOKE_ROOT" init >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change create smoke-human-control --title "Smoke human control" >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change prepare smoke-human-control \
-  --goal "Smoke test v0.3.0 human-visible gates" \
+  --goal "Smoke test v0.3.1 human participation runtime" \
   --scope-in "src/**" \
   --scope-in "tests/**" \
   --verify-command "python3 -m unittest discover -s tests" >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" participants setup --profile personal --change-id smoke-human-control >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" participants list --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" intent capture \
   --change-id smoke-human-control \
   --project-intent "Smoke test human-visible intent" \
   --requirement "Participants and intent are visible" \
   --acceptance "Step report can be generated" >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" intent status --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" intent confirm \
   --change-id smoke-human-control \
   --confirmed-by human-sponsor >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" change status --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" step report --change-id smoke-human-control --step 5 >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 5 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" run \
@@ -48,6 +51,7 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
 "$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 9 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" archive --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" status --sync-current-state >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" status --last-archive >/dev/null
 
 "$PYTHON_BIN" -m unittest discover -s tests -v
 

@@ -62,7 +62,7 @@ change_id: CHG-20260420-001
 title: 规格化阶段主干文档建立
 policy_level: standard
 status: drafting
-current_step: 5
+current_step: 1
 owner: orchestrator
 files:
   required:
@@ -77,6 +77,8 @@ files:
     - verify.yaml
     - review.yaml
 ```
+
+说明：v0.3.1 起，新 change package 默认从 `current_step: 1` 开始，表示输入接入与问题定界尚需对人可见确认。`change prepare` 可以生成 Step 3-5 所需材料，但不能把 Step 1-5 伪装成已完成。
 
 ## 8. 独立 review 条件
 一个 change package 只有在以下条件满足时才可进入独立 review：
