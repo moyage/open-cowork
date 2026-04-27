@@ -34,6 +34,7 @@
 | `specs/02-change-package-and-contract.md` | 变更包、Contract、scope 和 baseline separation。 |
 | `specs/03-evidence-review-archive.md` | Evidence、Verify、Review、Archive 和 review lifecycle。 |
 | `specs/04-agent-adoption-and-doc-governance.md` | Agent-first 实施、project activation 和文档治理。 |
+| `specs/05-deterministic-resume-and-merge-safe-governance.md` | v0.3.6 确定性接续入口与可合并 `.governance/` 布局设计。 |
 
 ## 真相源优先级
 

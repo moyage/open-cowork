@@ -11,5 +11,6 @@
 | `02-change-package-and-contract.md` | 变更包、Contract、scope、baseline separation。 |
 | `03-evidence-review-archive.md` | Evidence、Verify、Review、Archive、review lifecycle。 |
 | `04-agent-adoption-and-doc-governance.md` | Agent-first 实施、项目级 activation、文档治理。 |
+| `05-deterministic-resume-and-merge-safe-governance.md` | v0.3.6 确定性接续入口与可合并 `.governance/` 布局设计。 |
 
 普通使用者不需要先读本目录。Agent、维护者和 reviewer 在审计协议行为时按需读取。
