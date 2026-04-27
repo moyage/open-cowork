@@ -28,7 +28,7 @@
 请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续。
 ```
 
-Agent 会在内部做项目激活、读取项目事实、确认要接续的 change，然后继续当前步骤。open-cowork 的应用对象是项目，不是某个单独 Agent。
+Agent 会在内部运行确定性 resume 入口、读取项目事实、确认要接续的 change，然后继续当前步骤。自然语言只是请求 Agent 运行项目入口；协议触发点是项目内的 resume 入口，不是靠关键词猜测。open-cowork 的应用对象是项目，不是某个单独 Agent。
 
 ## 典型使用场景
 
@@ -38,7 +38,7 @@ Agent 会在内部做项目激活、读取项目事实、确认要接续的 chan
 
 ### 本地个人域多个 Agent 系统调度协同
 
-一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先读取项目级 activation 和 `.governance/agent-entry.md`，再围绕同一个 active change、contract、bindings 和 evidence 协作。需求 1 和需求 2 可以同时存在于 active changes 列表中，但接手时必须显式选择要继续哪个 change。
+一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先按 `.governance/agent-entry.md` 使用确定性 resume 入口，再围绕同一个 active change、contract、bindings 和 evidence 协作。需求 1 和需求 2 可以同时存在于 active changes 列表中，但接手时必须显式选择要继续哪个 change。
 
 ### 团队多人域场景
 

@@ -131,6 +131,42 @@ class V035ProjectActivationTests(unittest.TestCase):
             self.assertEqual(report["intent_summary"]["facts_source"], "contract")
             self.assertIn("python3 -c 'print(\"ok\")'", report["artifact_summary"]["verification_commands"])
 
+    def test_step_reports_fall_back_to_contract_when_intent_scope_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._run_cli(root, "init")
+            self._run_cli(root, "change", "create", "CHG-V035-MERGE-FACTS", "--title", "Merge facts")
+            self._run_cli(
+                root,
+                "change",
+                "prepare",
+                "CHG-V035-MERGE-FACTS",
+                "--goal",
+                "Decision facts",
+                "--scope-in",
+                "src/governance/**",
+                "--verify-command",
+                "python3 -c 'print(\"ok\")'",
+            )
+            write_yaml(root / ".governance/changes/CHG-V035-MERGE-FACTS/intent-confirmation.yaml", {
+                "schema": "intent-confirmation/v1",
+                "change_id": "CHG-V035-MERGE-FACTS",
+                "status": "confirmed",
+                "project_intent": "Decision facts",
+                "requirements": [],
+                "scope_in": [],
+                "scope_out": [],
+                "acceptance_criteria": [],
+            })
+
+            self._run_cli(root, "step", "report", "--change-id", "CHG-V035-MERGE-FACTS", "--step", "3")
+            report = load_yaml(root / ".governance/changes/CHG-V035-MERGE-FACTS/step-reports/step-3.yaml")
+
+            self.assertEqual(report["intent_summary"]["facts_source"], "intent-confirmation")
+            self.assertIn("src/governance/**", report["intent_summary"]["scope_in"])
+            self.assertIn("contract.scope_in", report["intent_summary"]["merged_from"])
+            self.assertIn("contract.verification.checks", report["intent_summary"]["merged_from"])
+
     def test_intent_confirm_satisfies_step1_and_non_gate_step_can_be_acknowledged(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -190,6 +226,10 @@ class V035ProjectActivationTests(unittest.TestCase):
                 "ready",
             )
             self.assertIn("Review recorded: CHG-V035-REVIEW -> review-approved", review)
+            review_path = root / ".governance/changes/CHG-V035-REVIEW/review.yaml"
+            review_payload = load_yaml(review_path)
+            review_payload["conditions"] = {"must_before_next_step": [], "followups": ["document release notes"]}
+            write_yaml(review_path, review_payload)
 
             archive_fail = self._run_cli(root, "archive", "--change-id", "CHG-V035-REVIEW", expect=1)
             self.assertIn("Step 8 human gate approval is required", archive_fail)
@@ -198,6 +238,38 @@ class V035ProjectActivationTests(unittest.TestCase):
             self._run_cli(root, "step", "approve", "--change-id", "CHG-V035-REVIEW", "--step", "9", "--approved-by", "human-sponsor")
             archive_ok = self._run_cli(root, "archive", "--change-id", "CHG-V035-REVIEW")
             self.assertIn("Archived change CHG-V035-REVIEW", archive_ok)
+            step9 = load_yaml(root / ".governance/archive/CHG-V035-REVIEW/step-reports/step-9.yaml")
+            self.assertIn(".governance/archive/CHG-V035-REVIEW/archive-receipt.yaml", step9["artifact_summary"]["archive_preview_files"])
+            self.assertIn("document release notes", step9["artifact_summary"]["carry_forward_items"])
+
+    def test_review_invocation_records_heartbeat_and_refreshes_step8_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_verified_change(root, "CHG-V035-REVIEW-HEARTBEAT")
+
+            output = self._run_cli(
+                root,
+                "review-invocation",
+                "--change-id",
+                "CHG-V035-REVIEW-HEARTBEAT",
+                "--status",
+                "started",
+                "--reviewer",
+                "hermes-agent",
+                "--runtime",
+                "hermes",
+                "--timeout-policy",
+                "timeout after 10 minutes; record heartbeat every minute",
+                "--note",
+                "Hermes review started",
+            )
+            self.assertIn("Review invocation recorded", output)
+            invocation = load_yaml(root / ".governance/changes/CHG-V035-REVIEW-HEARTBEAT/review-invocation.yaml")
+            self.assertEqual(invocation["status"], "started")
+            self.assertEqual(invocation["events"][0]["note"], "Hermes review started")
+            step8 = load_yaml(root / ".governance/changes/CHG-V035-REVIEW-HEARTBEAT/step-reports/step-8.yaml")
+            self.assertEqual(step8["artifact_summary"]["review_invocation_status"], "started")
+            self.assertIn("timeout after 10 minutes", step8["artifact_summary"]["review_invocation_timeout_policy"])
 
     def test_verify_can_execute_contract_commands_and_records_state_only_default(self):
         with tempfile.TemporaryDirectory() as tmp:

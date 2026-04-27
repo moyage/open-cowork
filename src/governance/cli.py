@@ -421,17 +421,7 @@ def cmd_activate(args):
 def cmd_resume(args):
     from governance.activation import build_project_activation, format_project_activation
 
-    payload = build_project_activation(args.root, change_id=args.change_id)
-    if args.list and payload.get("active_changes"):
-        payload = {
-            **payload,
-            "recommended_mode": "choose-active-change",
-            "active_change": None,
-            "agent_instructions": [
-                "List mode only: select the intended work item with ocw resume --change-id <change-id>.",
-                "Do not infer the target change from chat history or natural-language keywords.",
-            ],
-        }
+    payload = build_project_activation(args.root, change_id=args.change_id, list_only=args.list)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
@@ -940,6 +930,33 @@ def cmd_review(args):
         )
         print(f"Review failed: {exc}")
         return 1
+
+
+def cmd_review_invocation(args):
+    from governance.review_invocation import record_review_invocation
+
+    try:
+        payload = record_review_invocation(
+            args.root,
+            change_id=args.change_id,
+            status=args.status,
+            reviewer=args.reviewer,
+            runtime=args.runtime or "",
+            note=args.note or "",
+            timeout_policy=args.timeout_policy or "",
+            artifact_ref=args.artifact_ref or "",
+        )
+        from governance.step_report import materialize_step_report
+
+        materialize_step_report(args.root, change_id=args.change_id, step=8)
+    except Exception as exc:
+        print(f"Review invocation failed: {exc}")
+        return 1
+    print(f"Review invocation recorded: {payload['change_id']} -> {payload['status']}")
+    print(f"- last_heartbeat_at: {payload.get('last_heartbeat_at')}")
+    print(f"- ref: .governance/changes/{args.change_id}/review-invocation.yaml")
+    print(f"- Step 8 report: .governance/changes/{args.change_id}/step-reports/step-8.md")
+    return 0
 
 
 def cmd_archive(args):
@@ -1802,6 +1819,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--fallback-reviewer", default="", help="Fallback reviewer actor when primary failed")
     p_review.add_argument("--review-artifact-ref", default="", help="Review artifact produced by actual reviewer")
 
+    p_review_invocation = subparsers.add_parser("review-invocation", help="Record reviewer invocation progress or heartbeat")
+    p_review_invocation.add_argument("--change-id", required=True, help="Target change id")
+    p_review_invocation.add_argument("--status", choices=["started", "running", "completed", "failed", "timeout"], required=True, help="Reviewer invocation status")
+    p_review_invocation.add_argument("--reviewer", required=True, help="Reviewer identifier")
+    p_review_invocation.add_argument("--runtime", default="", help="Actual reviewer runtime or local agent used")
+    p_review_invocation.add_argument("--note", default="", help="Progress note or heartbeat detail")
+    p_review_invocation.add_argument("--timeout-policy", default="", help="Timeout policy for this reviewer invocation")
+    p_review_invocation.add_argument("--artifact-ref", default="", help="Progress or final artifact reference")
+
     p_archive = subparsers.add_parser("archive", help="Archive and refresh state")
     p_archive.add_argument("--change-id", required=True, help="Target change id")
     p_status = subparsers.add_parser("status", help="Show current step, gate status, and blockers")
@@ -1969,6 +1995,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_verify(args)
     elif args.command == "review":
         return cmd_review(args)
+    elif args.command == "review-invocation":
+        return cmd_review_invocation(args)
     elif args.command == "archive":
         return cmd_archive(args)
     elif args.command == "revise":

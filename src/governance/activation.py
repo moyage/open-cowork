@@ -11,7 +11,7 @@ from .simple_yaml import write_yaml
 from .step_matrix import STEP_LABELS, render_status_snapshot
 
 
-def build_project_activation(root: str | Path, change_id: str | None = None) -> dict:
+def build_project_activation(root: str | Path, change_id: str | None = None, *, list_only: bool = False) -> dict:
     paths = GovernancePaths(Path(root).expanduser().resolve())
     activation = {
         "schema": "project-activation/v1",
@@ -38,6 +38,19 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
     activation["governance_state"] = "installed"
     active_changes = _active_changes(paths)
     activation["active_changes"] = active_changes
+    if list_only:
+        activation.update({
+            "recommended_mode": "choose-active-change" if active_changes else "open-new-change",
+            "active_change": None,
+            "agent_instructions": [
+                "List mode only: select the intended work item with ocw resume --change-id <change-id>.",
+                "Do not infer the target change from chat history or natural-language keywords.",
+            ] if active_changes else [
+                "No active changes were found in this project.",
+                "Ask the human for the next project intent before opening a new change.",
+            ],
+        })
+        return activation
     if change_id:
         selected = _find_active_change(paths, change_id)
         if not selected:
@@ -71,6 +84,11 @@ def build_project_activation(root: str | Path, change_id: str | None = None) -> 
         })
         _write_activation(paths, activation)
         return activation
+    if len(active_changes) == 1 and (
+        not change_id or status in {"idle", "archived", "abandoned", "superseded", "none"}
+    ):
+        selected = active_changes[0]
+        return _activation_for_change(paths, activation, str(selected["change_id"]), selected)
     if not change_id or status in {"idle", "archived", "abandoned", "superseded", "none"}:
         activation.update({
             "recommended_mode": "open-new-change",

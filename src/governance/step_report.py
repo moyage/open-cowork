@@ -218,20 +218,33 @@ def _intent_summary(intent: dict, contract: dict) -> dict:
     if not intent and not contract:
         return {}
     source = "intent-confirmation" if intent else "contract"
-    scope_in = intent.get("scope_in", []) if intent else contract.get("scope_in", [])
-    scope_out = intent.get("scope_out", []) if intent else contract.get("scope_out", [])
-    acceptance = intent.get("acceptance_criteria", []) if intent else (contract.get("verification") or {}).get("checks", [])
+    contract_scope_in = list(contract.get("scope_in", []))
+    contract_scope_out = list(contract.get("scope_out", []))
+    contract_acceptance = (contract.get("verification") or {}).get("checks", [])
+    intent_scope_in = intent.get("scope_in", []) if intent else []
+    intent_scope_out = intent.get("scope_out", []) if intent else []
+    intent_acceptance = intent.get("acceptance_criteria", []) if intent else []
+    scope_in = intent_scope_in or contract_scope_in
+    scope_out = intent_scope_out or contract_scope_out
+    acceptance = intent_acceptance or contract_acceptance
+    merged_from = []
+    if intent and contract:
+        if not intent_scope_in and contract_scope_in:
+            merged_from.append("contract.scope_in")
+        if not intent_scope_out and contract_scope_out:
+            merged_from.append("contract.scope_out")
+        if not intent_acceptance and contract_acceptance:
+            merged_from.append("contract.verification.checks")
     conflicts = []
     if intent and contract:
-        contract_scope_in = list(contract.get("scope_in", []))
-        contract_scope_out = list(contract.get("scope_out", []))
-        if intent.get("scope_in", []) and intent.get("scope_in", []) != contract_scope_in:
+        if intent_scope_in and intent_scope_in != contract_scope_in:
             conflicts.append("intent scope_in differs from contract scope_in")
-        if intent.get("scope_out", []) and intent.get("scope_out", []) != contract_scope_out:
+        if intent_scope_out and intent_scope_out != contract_scope_out:
             conflicts.append("intent scope_out differs from contract scope_out")
     return {
         "status": intent.get("status"),
         "facts_source": source,
+        "merged_from": merged_from,
         "project_intent": intent.get("project_intent") or contract.get("objective"),
         "requirements": intent.get("requirements", []),
         "optimizations": intent.get("optimizations", []),
@@ -261,6 +274,7 @@ def _artifact_summary(change_dir: Path, step: int) -> dict:
     if step == 8:
         lifecycle = _load_optional_yaml(change_dir / "review-lifecycle.yaml")
         review = _load_optional_yaml(change_dir / "review.yaml")
+        invocation = _load_optional_yaml(change_dir / "review-invocation.yaml")
         baseline = _load_optional_yaml(change_dir / "baseline.yaml")
         summary = {
             "review_decision": (review.get("decision") or {}).get("status"),
@@ -273,6 +287,11 @@ def _artifact_summary(change_dir: Path, step: int) -> dict:
         if lifecycle:
             latest_round = (lifecycle.get("rounds") or [])[-1] if lifecycle.get("rounds") else {}
             summary["latest_review_findings"] = latest_round.get("blocking_findings", [])
+        if invocation:
+            summary["review_invocation_status"] = invocation.get("status")
+            summary["review_invocation_runtime"] = invocation.get("runtime")
+            summary["review_invocation_last_heartbeat_at"] = invocation.get("last_heartbeat_at")
+            summary["review_invocation_timeout_policy"] = invocation.get("timeout_policy")
         return summary
     if step == 7:
         verify = _load_optional_yaml(change_dir / "verify.yaml")
@@ -281,12 +300,31 @@ def _artifact_summary(change_dir: Path, step: int) -> dict:
     if step == 9:
         review = _load_optional_yaml(change_dir / "review.yaml")
         verify = _load_optional_yaml(change_dir / "verify.yaml")
+        receipt = _load_optional_yaml(change_dir / "archive-receipt.yaml")
+        traceability = receipt.get("traceability") or {}
+        review_followups = (review.get("conditions") or {}).get("followups", [])
+        residual_followups = receipt.get("residual_followups", [])
         return {
             "archive_destination": str(change_dir).replace("/.governance/changes/", "/.governance/archive/"),
             "review_decision": (review.get("decision") or {}).get("status"),
             "verify_status": (verify.get("summary") or {}).get("status"),
+            "archive_preview_files": list(traceability.values()) if traceability else _archive_preview_paths(change_dir),
+            "carry_forward_items": [*review_followups, *residual_followups],
         }
     return {}
+
+
+def _archive_preview_paths(change_dir: Path) -> list[str]:
+    change_id = change_dir.name
+    return [
+        f".governance/archive/{change_id}/archive-receipt.yaml",
+        f".governance/archive/{change_id}/manifest.yaml",
+        f".governance/archive/{change_id}/review.yaml",
+        f".governance/archive/{change_id}/verify.yaml",
+        f".governance/archive/{change_id}/step-reports/step-9.yaml",
+        f".governance/archive/{change_id}/FINAL_STATE_CONSISTENCY_CHECK.yaml",
+        f".governance/archive/{change_id}/FINAL_STATUS_SNAPSHOT.yaml",
+    ]
 
 
 def _contract_summary(change_dir: Path) -> dict:

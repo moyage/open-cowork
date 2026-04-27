@@ -2,15 +2,15 @@
 
 ## 触发语句
 
-当人说 `安装 open-cowork，并在当前项目中实施这套协同治理框架`，或要求用 open-cowork 推进当前任务时，请按本手册执行。
+当人要求继续、接手、审查、验证或发布本项目工作时，先运行确定性入口 `ocw resume`。自然语言只是请求入口，不是协议触发条件。
 
 ## Agent 职责
 
 1. 行动前先理解项目目标。
-2. 保持 `.governance/current-state.md` 与 active change 对齐。
-3. 先做项目级 activation；如果存在多个 active changes，必须显式选择 change_id。
-4. 使用当前 active change 的 `contract.yaml` 作为执行边界。
-5. 使用当前 active change 的 `bindings.yaml` 作为 owner 映射。
+2. 先做项目级 resume；多 active change 时必须显式选择 change_id。
+3. 保持 `.governance/local/current-state.md` 与 active change 对齐。
+4. 使用 `ocw resume` recommended read set 中的 contract.yaml 作为执行边界。
+5. 使用 `ocw resume` recommended read set 中的 bindings.yaml 作为 owner 映射。
 6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。
 7. verify、review 或 archive 前先记录客观 evidence。
 8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
