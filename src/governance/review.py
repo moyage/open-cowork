@@ -42,9 +42,6 @@ def write_review_decision(
     warnings = _reviewer_warnings(paths, change_id, reviewer)
     if warnings and not allow_reviewer_mismatch:
         raise ValueError(warnings[0])
-    from .human_gates import require_step_approval
-
-    require_step_approval(root, change_id=change_id, step=8)
     if warnings and allow_reviewer_mismatch:
         missing = []
         if not bypass_reason.strip():
@@ -73,7 +70,6 @@ def write_review_decision(
     review_path = paths.change_file(change_id, "review.yaml")
     existing = load_yaml(review_path) if review_path.exists() else {}
     payload = {
-        **existing,
         "schema": existing.get("schema", "review-decision/v1"),
         "change_id": change_id,
         "reviewers": [{"role": "reviewer", "id": reviewer}],
@@ -81,7 +77,9 @@ def write_review_decision(
         "conditions": existing.get("conditions", {"must_before_next_step": [], "followups": []}),
         "trace": {
             **existing.get("trace", {"evidence_refs": [], "verify_refs": ["verify.yaml"]}),
+            "step8_human_acceptance_required": True,
             "step8_approval_ref": f".governance/changes/{change_id}/human-gates.yaml#approvals.8",
+            "step8_acceptance_ref": f".governance/changes/{change_id}/human-gates.yaml#approvals.8",
         },
     }
     runtime_evidence = {
@@ -106,6 +104,15 @@ def write_review_decision(
             "evidence_ref": bypass_evidence_ref,
         }
     write_yaml(review_path, payload)
+    _append_review_lifecycle(
+        paths,
+        change_id,
+        decision=decision,
+        reviewer=reviewer,
+        rationale=rationale,
+        runtime_evidence=runtime_evidence,
+        review_artifact_ref=review_artifact_ref,
+    )
 
     next_status = _status_for_decision(decision)
     manifest = update_manifest(root, change_id, status=next_status, current_step=8)
@@ -126,6 +133,63 @@ def write_review_decision(
     })
     set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
     return payload
+
+
+def _append_review_lifecycle(
+    paths: GovernancePaths,
+    change_id: str,
+    *,
+    decision: str,
+    reviewer: str,
+    rationale: str,
+    runtime_evidence: dict,
+    review_artifact_ref: str,
+) -> dict:
+    path = paths.change_file(change_id, "review-lifecycle.yaml")
+    payload = load_yaml(path) if path.exists() else {
+        "schema": "review-lifecycle/v1",
+        "change_id": change_id,
+        "status": "not-started",
+        "rounds": [],
+        "rework_rounds": [],
+    }
+    rounds = payload.setdefault("rounds", [])
+    lifecycle_decision = "request_changes" if decision == "revise" else decision
+    round_payload = {
+        "round": len(rounds) + 1,
+        "reviewer": reviewer,
+        "decision": lifecycle_decision,
+        "rationale": rationale,
+        "blocking_findings": _blocking_findings(rationale) if decision == "revise" else [],
+        "fix_evidence_required": _fix_evidence_required(rationale) if decision == "revise" else [],
+        "runtime_evidence": runtime_evidence,
+    }
+    if review_artifact_ref:
+        round_payload["review_artifact_ref"] = review_artifact_ref
+    rounds.append(round_payload)
+    payload["status"] = "changes-requested" if decision == "revise" else f"review-{decision}"
+    write_yaml(path, payload)
+    return payload
+
+
+def _blocking_findings(rationale: str) -> list[dict]:
+    text = (rationale or "").strip()
+    if not text:
+        return []
+    body = text
+    lowered = text.lower()
+    for prefix in ("blocking:", "request_changes:", "revise:"):
+        if lowered.startswith(prefix):
+            body = text[len(prefix):].strip()
+            break
+    return [{"id": "finding-1", "severity": "blocking", "body": body}]
+
+
+def _fix_evidence_required(rationale: str) -> list[dict]:
+    findings = _blocking_findings(rationale)
+    if not findings:
+        return []
+    return [{"id": "fix-evidence-1", "finding_id": findings[0]["id"], "label": "Evidence that the requested review change was addressed."}]
 
 
 def _status_for_decision(decision: str) -> str:

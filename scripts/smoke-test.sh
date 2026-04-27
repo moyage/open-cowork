@@ -35,6 +35,9 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
   --confirmed-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" change status --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" step report --change-id smoke-human-control --step 5 >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 2 --approved-by human-sponsor >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 3 --approved-by human-sponsor >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 4 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 5 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" run \
   --change-id smoke-human-control \
@@ -42,12 +45,12 @@ trap 'rm -rf "$SMOKE_ROOT"' EXIT
   --test-output "smoke tests passed" \
   --modified "src/smoke.py" >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" verify --change-id smoke-human-control >/dev/null
-"$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 8 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" review \
   --change-id smoke-human-control \
   --decision approve \
   --reviewer independent-reviewer \
   --rationale "Smoke lifecycle accepted" >/dev/null
+"$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 8 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" step approve --change-id smoke-human-control --step 9 --approved-by human-sponsor >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" archive --change-id smoke-human-control >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" status --sync-current-state >/dev/null

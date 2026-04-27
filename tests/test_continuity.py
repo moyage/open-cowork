@@ -1734,7 +1734,7 @@ class ContinuityTests(unittest.TestCase):
                 "change_id": change_id,
                 "state_anchor": {
                     "current_status": "step7-verified",
-                    "next_decision": "Step 8 / Review and decide",
+                    "next_decision": "Step 8 / 独立审查 / Independent review",
                 },
                 "refs": {
                     "runtime_timeline": ".governance/runtime/timeline/events-202604.yaml",
@@ -2475,8 +2475,8 @@ class ContinuityTests(unittest.TestCase):
                 "current_status": "step7-verified",
                 "overall_progress": {"completed_steps": [1, 2, 3, 4, 5, 6, 7], "remaining_steps": [8, 9]},
                 "gate_posture": {
-                    "waiting_on": "Step 8 / Review and decide",
-                    "next_decision": "Step 8 / Review and decide",
+                    "waiting_on": "Step 8 / 独立审查 / Independent review",
+                    "next_decision": "Step 8 / 独立审查 / Independent review",
                     "human_intervention_required": True,
                 },
                 "current_owner": "wrong-owner",
@@ -2582,7 +2582,7 @@ class ContinuityTests(unittest.TestCase):
             self.assertTrue(payload["predecessor_archive_baseline"]["archive_executed"])
             self.assertTrue(payload["launch_readiness"]["review_to_archive_to_launch_chain_explicit"])
             self.assertEqual(payload["decision_summary"]["current_phase"], "Phase 2 / 方案与准备")
-            self.assertEqual(payload["decision_summary"]["next_decision"], "Step 5 / Approve the start")
+            self.assertEqual(payload["decision_summary"]["next_decision"], "Step 5 / 批准开工 / Approve execution")
             self.assertIn("validation_focus", payload["decision_summary"]["current_summary"])
             self.assertTrue(any("manifest.yaml" in item for item in payload["decision_summary"]["next_input_suggestion"]))
 

@@ -1,5 +1,38 @@
 # 变更日志
 
+## 0.3.4
+
+- 将标准 9 步名称改为中文动作名 + 英文锚点，降低 Step 1-9 的理解成本。
+- 增加 `activate` 项目级激活入口，输出 active change、当前步骤、推荐读取集和跨 Agent 接续指令，并落盘 `.governance/PROJECT_ACTIVATION.yaml`。
+- 重写 README 的人类入口，明确人只需要对 Agent 说什么、CLI 是 Agent 内部工具，并加入流程图和最小操作面。
+- 增加 `docs/glossary.md`、`docs/specs/README.md`，并收束 `docs/README.md` / `docs/archive/README.md` 的阅读分层，区分当前规格、Agent 执行面和历史证据。
+- 基于 xSearch v0.3.3 dogfood 反馈继续收束 v0.3.4：Step report 统一投影 contract / intent 权威事实，Step 3/4/5 展示 design、tasks、scope、verification commands，避免 `scope_in: none` 造成报告与执行不一致。
+- 修正 human gate 语义：`intent confirm` 自动满足 Step 1 approval；非 gate step 可记录 acknowledgement；Step 8 允许先记录 reviewer decision，再由人决定是否接受该 decision，archive 前仍强制 Step 8/9 human approval。
+- 增加连续迭代 baseline separation：`change prepare` 写入 `baseline.yaml`，记录 parent archived change 和 dirty worktree，帮助 reviewer 区分历史归档基线、本轮增量和无关噪声。
+- 扩展 `ocw verify`：默认明确记录 `state-only`，也可用 `--run-commands` 执行 contract verification commands 并写入 `product_verification`。
+- 允许 `change prepare` 在缺少 `--goal` 时复用既有 intent / contract 目标；只有完全没有 goal 来源时才阻断。
+- 清理仓库文档树：移除历史 plans、reports 和旧规格中间稿，只保留当前 README、上手指南、Agent 文档、术语表和 5 份当前规格。
+- 增加 Codex session log 诊断：`diagnose-session` / `session-recovery-packet` 可识别 remote compact stream disconnected，并在恢复包中记录最后 token 计数和错误事件。
+- 增加 v0.3.4 回归覆盖，锁定 Step 名称、项目 activation、文档地图、术语表和 README 的 CLI-first 降噪。
+
+## 0.3.3
+
+- 增加 strict step gate：human-gated step 只能按当前状态和下一待确认 gate 顺序批准，避免 Agent 批量推进或一次性请求多个 step approval。
+- 增加可选 approval token policy；配置 `approval-policy.yaml` 后，`ocw step approve` 必须提供 sponsor-held token，否则只记录 untrusted attempt，不写入有效 approval。
+- 为 `change prepare` 增加 scope overlap preflight，遇到 `.governance/**` 等冲突时输出人类可读恢复建议，不再暴露 Python traceback。
+- 将 Step report 升级为 decision-grade panel：所有 step 投影 confirmed intent，关键 step 展示 design / tasks / contract / review / archive 摘要，并消除 Python dict repr 泄漏。
+- 分离 Step 8 review entry gate 与 review decision 文案，降低“批准进入 review”和“review approve”混淆。
+- 增加 `review-lifecycle.yaml`，结构化记录 request_changes、blocking findings、fix evidence requirement、rework round 和 re-review 链路，并让 `ocw revise` 自动带入 reviewer findings。
+- 收束 Step 9 archived report：archive 后显示 closeout / archive preview，不再保留等待 human confirmation 的尾部提示。
+- 更新 v0.3.3 回归覆盖，纳入 memorix 与 xSearch 真实 dogfood 暴露的 strict gate、签批真实性、report 摘要和 review lifecycle 问题。
+
+## 0.3.2
+
+- 统一 Step 5 approval 后的运行时状态投影，进入 Step 6 时同步 manifest validation objects，避免 `ocw status` 因旧验证对象产生误阻断。
+- 扩展 `participants list`，显示 change bindings 中的 participant type、runtime availability、runtime reviewer 和 fallback reviewer，使真实本地 Agent 职责与 human approver 分层更清楚。
+- 为 archive closeout 增加短 `FINAL_STATUS_SNAPSHOT.yaml` 引用，并让 `status --last-archive` 输出更短的归档摘要，降低长会话收束和上下文压缩风险。
+- 更新 v0.3.2 回归覆盖，验证状态投影一致性、真实 participant 分层、archive final snapshot 和版本报告。
+
 ## 0.3.1
 
 - 将 Step 1 设为新 change package 的默认起点，避免 `change create` / `change prepare` 在人类可见确认前让 Step 1-5 看起来已经完成。

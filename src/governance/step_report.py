@@ -20,6 +20,7 @@ from .step_matrix import (
 def materialize_step_report(root: str | Path, *, change_id: str, step: int | None = None) -> dict:
     package = read_change_package(root, change_id)
     intent = _load_optional_yaml(package.path / "intent-confirmation.yaml")
+    contract = _load_optional_yaml(package.path / "contract.yaml")
     try:
         matrix = render_step_matrix(root, change_id)
     except ContractValidationError:
@@ -56,17 +57,19 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         "objective": ACTION_PURPOSES[selected_step],
         "inputs": _inputs_for_step(selected_step, change_id),
         "outputs": _outputs_for_step(selected_step, change_id),
-        "intent_summary": _intent_summary(selected_step, intent),
+        "intent_summary": _intent_summary(intent, contract),
+        "artifact_summary": _artifact_summary(package.path, selected_step),
         "evidence": _evidence_summary(package.path, selected_step),
+        "review_gate_vs_decision": _review_gate_vs_decision(package.path, approval_state, gate_state) if selected_step == 8 else {},
         "done_criteria": _done_criteria(selected_step, intent),
         "next_entry_criteria": _next_entry_criteria(selected_step),
         "blockers": matrix.get("blockers", []),
         "framework_controls": _framework_controls(selected_step, gate_type),
         "agent_actions_done": _agent_actions_done(selected_step, package.path),
-        "agent_actions_expected": _agent_actions_expected(selected_step, step_binding),
+        "agent_actions_expected": _agent_actions_expected(selected_step, step_binding, payload_status := _status_for_step(selected_step, matrix), approval_state),
         "human_decisions_required": _human_decisions(selected_step, step_binding, intent),
         "human_confirmation_options": _human_confirmation_options(step_binding),
-        "recommended_next_action": _recommended_next_action(selected_step, step_binding, intent),
+        "recommended_next_action": _recommended_next_action(selected_step, step_binding, intent, payload_status, approval_state),
         "generated_at": _now_utc(),
     }
     report_dir = package.path / "step-reports"
@@ -211,20 +214,112 @@ def _agent_actions_done(step: int, change_dir: Path) -> list[str]:
     return actions
 
 
-def _intent_summary(step: int, intent: dict) -> dict:
-    if step not in {1, 2} or not intent:
+def _intent_summary(intent: dict, contract: dict) -> dict:
+    if not intent and not contract:
         return {}
+    source = "intent-confirmation" if intent else "contract"
+    scope_in = intent.get("scope_in", []) if intent else contract.get("scope_in", [])
+    scope_out = intent.get("scope_out", []) if intent else contract.get("scope_out", [])
+    acceptance = intent.get("acceptance_criteria", []) if intent else (contract.get("verification") or {}).get("checks", [])
+    conflicts = []
+    if intent and contract:
+        contract_scope_in = list(contract.get("scope_in", []))
+        contract_scope_out = list(contract.get("scope_out", []))
+        if intent.get("scope_in", []) and intent.get("scope_in", []) != contract_scope_in:
+            conflicts.append("intent scope_in differs from contract scope_in")
+        if intent.get("scope_out", []) and intent.get("scope_out", []) != contract_scope_out:
+            conflicts.append("intent scope_out differs from contract scope_out")
     return {
         "status": intent.get("status"),
-        "project_intent": intent.get("project_intent"),
+        "facts_source": source,
+        "project_intent": intent.get("project_intent") or contract.get("objective"),
         "requirements": intent.get("requirements", []),
         "optimizations": intent.get("optimizations", []),
         "bugs": intent.get("bugs", []),
-        "scope_in": intent.get("scope_in", []),
-        "scope_out": intent.get("scope_out", []),
-        "acceptance_criteria": intent.get("acceptance_criteria", []),
+        "scope_in": scope_in,
+        "scope_out": scope_out,
+        "acceptance_criteria": acceptance,
         "risks": intent.get("risks", []),
         "open_questions": intent.get("open_questions", []),
+        "fact_conflicts": conflicts,
+    }
+
+
+def _artifact_summary(change_dir: Path, step: int) -> dict:
+    if step == 3:
+        return {
+            "design_summary": _first_non_heading_line(change_dir / "design.md"),
+            **_contract_summary(change_dir),
+        }
+    if step == 4:
+        return {
+            "tasks": _markdown_bullets(change_dir / "tasks.md"),
+            **_contract_summary(change_dir),
+        }
+    if step == 5:
+        return _contract_summary(change_dir)
+    if step == 8:
+        lifecycle = _load_optional_yaml(change_dir / "review-lifecycle.yaml")
+        review = _load_optional_yaml(change_dir / "review.yaml")
+        baseline = _load_optional_yaml(change_dir / "baseline.yaml")
+        summary = {
+            "review_decision": (review.get("decision") or {}).get("status"),
+            "review_lifecycle_status": lifecycle.get("status"),
+            "review_rounds": len(lifecycle.get("rounds", [])) if lifecycle else 0,
+        }
+        if baseline:
+            summary["baseline_dirty"] = baseline.get("dirty")
+            summary["baseline_ref"] = "baseline.yaml"
+        if lifecycle:
+            latest_round = (lifecycle.get("rounds") or [])[-1] if lifecycle.get("rounds") else {}
+            summary["latest_review_findings"] = latest_round.get("blocking_findings", [])
+        return summary
+    if step == 7:
+        verify = _load_optional_yaml(change_dir / "verify.yaml")
+        product = verify.get("product_verification") or {}
+        return {"product_verification_mode": product.get("mode"), "product_verification_commands": product.get("commands", [])} if product else {}
+    if step == 9:
+        review = _load_optional_yaml(change_dir / "review.yaml")
+        verify = _load_optional_yaml(change_dir / "verify.yaml")
+        return {
+            "archive_destination": str(change_dir).replace("/.governance/changes/", "/.governance/archive/"),
+            "review_decision": (review.get("decision") or {}).get("status"),
+            "verify_status": (verify.get("summary") or {}).get("status"),
+        }
+    return {}
+
+
+def _contract_summary(change_dir: Path) -> dict:
+    contract = _load_optional_yaml(change_dir / "contract.yaml")
+    return {
+        "contract_scope_in": contract.get("scope_in", []),
+        "contract_scope_out": contract.get("scope_out", []),
+        "verification_commands": (contract.get("verification") or {}).get("commands", []),
+    } if contract else {}
+
+
+def _first_non_heading_line(path: Path) -> str:
+    if not path.exists():
+        return "missing"
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            return stripped
+    return "empty"
+
+
+def _markdown_bullets(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    return [line.strip()[2:] for line in path.read_text(encoding="utf-8").splitlines() if line.strip().startswith("- ")]
+
+
+def _review_gate_vs_decision(change_dir: Path, approval_state: str, gate_state: str) -> dict:
+    review = _load_optional_yaml(change_dir / "review.yaml")
+    return {
+        "review_entry_gate": approval_state,
+        "review_decision": (review.get("decision") or {}).get("status") or "none",
+        "note": "review entry approval allows independent review to run; it is not the review decision",
     }
 
 
@@ -276,7 +371,11 @@ def _evidence_summary(change_dir: Path, step: int) -> list[dict]:
     return items
 
 
-def _agent_actions_expected(step: int, binding: dict) -> list[str]:
+def _agent_actions_expected(step: int, binding: dict, status: str = "", approval_state: str = "") -> list[str]:
+    if step == 9 and status == "archived":
+        return ["Archive is complete; carry forward followups into the next active change."]
+    if binding.get("human_gate") and approval_state == "approved" and step == 8:
+        return ["Use the recorded review decision to choose Step 9 archive or revision work."]
     if binding.get("human_gate"):
         return ["Wait for a human approve / revise / reject action before advancing."]
     if step < 9:
@@ -284,9 +383,13 @@ def _agent_actions_expected(step: int, binding: dict) -> list[str]:
     return ["Carry forward archive followups into the next active change."]
 
 
-def _recommended_next_action(step: int, binding: dict, intent: dict) -> str:
+def _recommended_next_action(step: int, binding: dict, intent: dict, status: str = "", approval_state: str = "") -> str:
+    if step == 9 and status == "archived":
+        return "Archive is complete; carry forward followups into the next change."
     if step <= 5 and intent.get("status") != "confirmed":
         return "Capture and confirm intent before allowing execution."
+    if step == 8 and binding.get("human_gate") and approval_state == "approved":
+        return "Continue based on the review decision: archive approved work or open a revision loop."
     if binding.get("human_gate"):
         return "Pause for human confirmation before advancing."
     if step < 9:
@@ -325,6 +428,12 @@ def _format_report(payload: dict) -> str:
         "",
         "## Intent summary",
         *_format_mapping(payload.get("intent_summary", {})),
+        "",
+        "## Artifact summary",
+        *_format_mapping(payload.get("artifact_summary", {})),
+        "",
+        "## Review gate vs decision",
+        *_format_mapping(payload.get("review_gate_vs_decision", {})),
         "",
         "## Evidence",
         *_format_evidence(payload.get("evidence", [])),
@@ -376,7 +485,18 @@ def _format_mapping(payload: dict) -> list[str]:
     for key, value in payload.items():
         if isinstance(value, list):
             lines.append(f"- {key}:")
-            lines.extend([f"  - {item}" for item in value] or ["  - none"])
+            if value:
+                for item in value:
+                    lines.extend(_format_nested_value(item, indent="  - "))
+            else:
+                lines.append("  - none")
+        elif isinstance(value, dict):
+            lines.append(f"- {key}:")
+            if value:
+                for nested_key, nested_value in value.items():
+                    lines.extend(_format_nested_value({nested_key: nested_value}, indent="  - "))
+            else:
+                lines.append("  - none")
         else:
             lines.append(f"- {key}: {value}")
     return lines
@@ -393,17 +513,28 @@ def _format_evidence(items: list[dict]) -> list[str]:
                 continue
             if isinstance(value, list):
                 lines.append(f"  - {key}:")
-                lines.extend([f"    - {entry}" for entry in value] or ["    - none"])
+                if value:
+                    for entry in value:
+                        lines.extend(_format_nested_value(entry, indent="    - "))
+                else:
+                    lines.append("    - none")
             elif isinstance(value, dict):
                 lines.append(f"  - {key}:")
                 if value:
                     for nested_key, nested_value in value.items():
-                        lines.append(f"    - {nested_key}: {nested_value}")
+                        lines.extend(_format_nested_value({nested_key: nested_value}, indent="    - "))
                 else:
                     lines.append("    - none")
             else:
                 lines.append(f"  - {key}: {value}")
     return lines
+
+
+def _format_nested_value(value, *, indent: str) -> list[str]:
+    if isinstance(value, dict):
+        summary = ", ".join(f"{key}={nested}" for key, nested in value.items())
+        return [f"{indent}{summary}"]
+    return [f"{indent}{value}"]
 
 
 def _participant_responsibilities(binding: dict) -> list[str]:

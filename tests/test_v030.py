@@ -23,7 +23,7 @@ class V030HumanParticipationTests(unittest.TestCase):
             snapshot = render_status_snapshot(root, "CHG-V030-STATUS")
 
             self.assertEqual(snapshot["current_step"], 5)
-            self.assertEqual(snapshot["next_decision"], "Step 5 / Approve the start")
+            self.assertEqual(snapshot["next_decision"], "Step 5 / 批准开工 / Approve execution")
             step5 = next(item for item in snapshot["step_progress"] if item["step"] == 5)
             self.assertEqual(step5["gate_type"], "approval-required")
             self.assertEqual(step5["gate_state"], "waiting-approval")
@@ -44,7 +44,7 @@ class V030HumanParticipationTests(unittest.TestCase):
 
             snapshot = render_status_snapshot(root, "CHG-V030-STEP9-NEXT")
 
-            self.assertEqual(snapshot["next_decision"], "Step 9 / Archive and carry forward")
+            self.assertEqual(snapshot["next_decision"], "Step 9 / 归档接续 / Archive and handoff")
             step8 = next(item for item in snapshot["step_progress"] if item["step"] == 8)
             self.assertEqual(step8["gate_state"], "approved")
             self.assertEqual(step8["approval_state"], "approved")
@@ -73,7 +73,7 @@ class V030HumanParticipationTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             output = stdout.getvalue()
-            self.assertIn("Step 5 / Approve the start", output)
+            self.assertIn("Step 5 / 批准开工 / Approve execution", output)
             self.assertIn("framework_controls", output)
             self.assertIn("agent_actions_done", output)
             self.assertIn("agent_actions_expected", output)

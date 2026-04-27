@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from .defaults import DEFAULT_SCOPE_OUT
+from .step_matrix import STEP_LABELS
 
 
 DEFAULT_RECOMMENDED_READ_SET = [
@@ -169,7 +170,7 @@ def _current_state(change_id: str, title: str, goal: str, profile: str, bindings
         f"Title: {title}",
         f"Profile: {profile}",
         "Current phase: Phase 1 / 定义与对齐",
-        "Current step: Step 1 / Clarify the goal",
+        f"Current step: Step 1 / {STEP_LABELS[1]}",
         "Current owner: human-sponsor",
         "Next recommended action: discuss and confirm the input sources, problem boundary, risks, and open questions before Step 2.",
         "Need human decision: confirm or revise Step 1 input framing before scope is locked.",

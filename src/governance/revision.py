@@ -24,9 +24,12 @@ def open_revision(root: str | Path, change_id: str, *, reason: str, recorded_by:
         "recorded_at": datetime.now(timezone.utc).isoformat(),
         "from_status": "review-revise",
         "to_status": "revision-open",
+        "findings": _latest_review_findings(paths, change_id),
+        "fix_evidence_required": _latest_fix_evidence_required(paths, change_id),
     }
     revisions.append(revision)
     write_yaml(history_path, history)
+    _append_rework_round(paths, change_id, revision)
 
     manifest = update_manifest(
         root,
@@ -49,3 +52,46 @@ def open_revision(root: str | Path, change_id: str, *, reason: str, recorded_by:
     upsert_change_entry(root, entry)
     set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
     return {"change_id": change_id, "revision": revision, "history_ref": str(history_path.relative_to(paths.root)), "status": manifest.get("status"), "current_step": manifest.get("current_step")}
+
+
+def _latest_review_findings(paths: GovernancePaths, change_id: str) -> list[dict]:
+    latest = _latest_lifecycle_round(paths, change_id)
+    findings = latest.get("blocking_findings", []) if latest else []
+    return [{**finding, "source": "review-lifecycle.yaml"} for finding in findings]
+
+
+def _latest_fix_evidence_required(paths: GovernancePaths, change_id: str) -> list[dict]:
+    latest = _latest_lifecycle_round(paths, change_id)
+    return latest.get("fix_evidence_required", []) if latest else []
+
+
+def _latest_lifecycle_round(paths: GovernancePaths, change_id: str) -> dict:
+    path = paths.change_file(change_id, "review-lifecycle.yaml")
+    if not path.exists():
+        return {}
+    lifecycle = load_yaml(path)
+    rounds = lifecycle.get("rounds", [])
+    return rounds[-1] if rounds else {}
+
+
+def _append_rework_round(paths: GovernancePaths, change_id: str, revision: dict) -> None:
+    path = paths.change_file(change_id, "review-lifecycle.yaml")
+    lifecycle = load_yaml(path) if path.exists() else {
+        "schema": "review-lifecycle/v1",
+        "change_id": change_id,
+        "status": "changes-requested",
+        "rounds": [],
+        "rework_rounds": [],
+    }
+    rework_rounds = lifecycle.setdefault("rework_rounds", [])
+    rework_rounds.append({
+        "round": revision["revision_round"],
+        "status": "revision-open",
+        "reason": revision["reason"],
+        "recorded_by": revision["recorded_by"],
+        "recorded_at": revision["recorded_at"],
+        "findings": revision.get("findings", []),
+        "fix_evidence_required": revision.get("fix_evidence_required", []),
+    })
+    lifecycle["status"] = "rework-open"
+    write_yaml(path, lifecycle)

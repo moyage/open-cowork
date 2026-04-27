@@ -9,15 +9,15 @@ from .state_consistency import evaluate_state_consistency
 
 STEP_MATRIX_TOTAL_STEPS = 9
 STEP_LABELS = {
-    1: "Clarify the goal",
-    2: "Lock the scope",
-    3: "Shape the approach",
-    4: "Assemble the change",
-    5: "Approve the start",
-    6: "Execute the change",
-    7: "Verify the result",
-    8: "Review and decide",
-    9: "Archive and carry forward",
+    1: "明确意图 / Clarify intent",
+    2: "确定范围 / Lock scope",
+    3: "方案设计 / Shape approach",
+    4: "组装变更包 / Assemble change package",
+    5: "批准开工 / Approve execution",
+    6: "执行变更 / Execute change",
+    7: "验证结果 / Verify result",
+    8: "独立审查 / Independent review",
+    9: "归档接续 / Archive and handoff",
 }
 FLOW_SECTIONS = {
     1: "Define goal",
@@ -223,7 +223,7 @@ def write_step_matrix_view(root: str | Path, change_id: str | None = None, outpu
 def _goal_summary(tasks_text: str, contract: dict) -> str:
     for line in tasks_text.splitlines():
         stripped = line.strip()
-        if stripped and not stripped.startswith("#"):
+        if stripped and not stripped.startswith("#") and not stripped.startswith("- [ ]"):
             return stripped
     return contract.get("objective") or "bounded governance execution"
 

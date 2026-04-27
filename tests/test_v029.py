@@ -103,20 +103,26 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
                     "--allow-reviewer-mismatch",
                 ])
             self.assertEqual(blocked_mismatch_exit, 1)
-            self.assertIn("Step 8 human gate approval is required", blocked_mismatch_bypass.getvalue())
+            self.assertIn("reviewer mismatch bypass requires", blocked_mismatch_bypass.getvalue())
             gates = load_yaml(root / ".governance/changes/CHG-GATES/human-gates.yaml")
             self.assertEqual(gates.get("bypasses", []), [])
 
-            missing_step8 = io.StringIO()
-            with contextlib.redirect_stdout(missing_step8):
+            review_stdout = io.StringIO()
+            with contextlib.redirect_stdout(review_stdout):
                 review_exit = main([
                     "--root", str(root), "review",
                     "--change-id", "CHG-GATES",
                     "--decision", "approve",
                     "--reviewer", "review-agent",
-                    "--rationale", "Needs Step 8 approval",
+                    "--rationale", "Reviewer decision arrives before human acceptance",
                 ])
-            self.assertEqual(review_exit, 1)
+            self.assertEqual(review_exit, 0)
+            self.assertIn("Review recorded", review_stdout.getvalue())
+
+            missing_step8 = io.StringIO()
+            with contextlib.redirect_stdout(missing_step8):
+                archive_exit = main(["--root", str(root), "archive", "--change-id", "CHG-GATES"])
+            self.assertEqual(archive_exit, 1)
             self.assertIn("Step 8 human gate approval is required", missing_step8.getvalue())
 
             with contextlib.redirect_stdout(io.StringIO()):
@@ -127,13 +133,6 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
                     "--approved-by", "human-sponsor",
                     "--recorded-by", "orchestrator-agent",
                     "--evidence-ref", "meeting-notes/step8.md",
-                ])
-                main([
-                    "--root", str(root), "review",
-                    "--change-id", "CHG-GATES",
-                    "--decision", "approve",
-                    "--reviewer", "review-agent",
-                    "--rationale", "Correct reviewer approved",
                 ])
 
             missing_step9 = io.StringIO()
@@ -207,7 +206,8 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
                 "--scope-in", "tests/**",
             ])
             main(["--root", str(root), "intent", "confirm", "--change-id", change_id, "--confirmed-by", "human-sponsor"])
-            main(["--root", str(root), "step", "approve", "--change-id", change_id, "--step", "5", "--approved-by", "human-sponsor"])
+            for step in (1, 2, 3, 5):
+                main(["--root", str(root), "step", "approve", "--change-id", change_id, "--step", str(step), "--approved-by", "human-sponsor"])
             main([
                 "--root", str(root), "run",
                 "--change-id", change_id,

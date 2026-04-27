@@ -27,6 +27,7 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         raise ValueError(f"change '{change_id}' must have an approved review before archive")
     from .human_gates import require_step_approval
 
+    require_step_approval(root, change_id=change_id, step=8)
     require_step_approval(root, change_id=change_id, step=9)
     archive_dir.mkdir(parents=True, exist_ok=True)
 
@@ -64,6 +65,7 @@ def archive_change(root: str | Path, change_id: str) -> dict:
             "manifest": str(paths.archived_change_file(change_id, "manifest.yaml").relative_to(paths.root)),
             "final_step_report": str(paths.archived_change_file(change_id, "step-reports/step-9.yaml").relative_to(paths.root)),
             "final_state_consistency": str(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml").relative_to(paths.root)),
+            "final_status_snapshot": str(paths.archived_change_file(change_id, "FINAL_STATUS_SNAPSHOT.yaml").relative_to(paths.root)),
         },
         "residual_followups": [],
     }
@@ -82,6 +84,19 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         ],
     }
     write_yaml(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml"), final_snapshot)
+    write_yaml(paths.archived_change_file(change_id, "FINAL_STATUS_SNAPSHOT.yaml"), {
+        "schema": "final-status-snapshot/v1",
+        "change_id": change_id,
+        "final_status": "archived",
+        "archived_at": archived_at,
+        "review_decision": review_payload.get("decision", {}).get("status"),
+        "final_consistency": final_snapshot["status"],
+        "human_gate_summary": final_snapshot["human_gate_summary"],
+        "refs": {
+            "archive_receipt": str(paths.archived_change_file(change_id, "archive-receipt.yaml").relative_to(paths.root)),
+            "final_state_consistency": str(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml").relative_to(paths.root)),
+        },
+    })
     receipt_path = paths.archived_change_file(change_id, "archive-receipt.yaml")
     write_yaml(receipt_path, receipt)
 

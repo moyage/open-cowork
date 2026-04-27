@@ -62,6 +62,8 @@ def _requirement_satisfied(requirement: str, written: dict, refs: list[str]) -> 
     if requirement in written and Path(written[requirement]).exists():
         return True
     normalized = requirement.lower()
+    if _has_named_evidence_ref(refs, normalized):
+        return True
     if "stateconsistencycheck" in normalized:
         return _ref_contains(refs, "STATE_CONSISTENCY_CHECK")
     if "stepmatrixview" in normalized:
@@ -74,6 +76,21 @@ def _requirement_satisfied(requirement: str, written: dict, refs: list[str]) -> 
         return _has_manual_report_ref(refs)
     if "first_instruction" in normalized or "first instruction" in normalized:
         return _has_first_instruction_dogfood_ref(refs)
+    return False
+
+
+def _has_named_evidence_ref(refs: list[str], normalized_requirement: str) -> bool:
+    candidates = {
+        normalized_requirement,
+        normalized_requirement.replace("_", "-"),
+        normalized_requirement.replace("-", "_"),
+    }
+    for ref in refs:
+        lowered = ref.lower()
+        path = Path(lowered)
+        stem = path.stem
+        if stem in candidates or lowered.endswith(tuple(f"/{candidate}.yaml" for candidate in candidates)):
+            return Path(ref).exists()
     return False
 
 

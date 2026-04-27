@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -16,6 +17,7 @@ def diagnose_hermes_execution_stall(
     root: str | Path,
     context_budget_tokens: int = DEFAULT_CONTEXT_BUDGET_TOKENS,
     change_id: str | None = None,
+    session_log_path: str | Path | None = None,
 ) -> dict:
     paths = GovernancePaths(Path(root))
     current_change = load_yaml(paths.current_change_file()) if paths.current_change_file().exists() else {}
@@ -30,6 +32,7 @@ def diagnose_hermes_execution_stall(
     recommended_read_set = _recommended_read_set(paths, lifecycle_phase, target_change_id, active_change_id)
     full_scan_estimate = _estimate_scan_tokens(_default_full_scan_files(paths))
     recommended_estimate = _estimate_scan_tokens([paths.root / item["path"] for item in recommended_read_set])
+    runtime_failure = _diagnose_runtime_failure(session_log_path)
 
     root_causes = []
     if lifecycle_phase == "idle_post_close":
@@ -61,6 +64,18 @@ def diagnose_hermes_execution_stall(
                 "full_scan_estimated_tokens": full_scan_estimate["estimated_tokens"],
             },
         })
+    if runtime_failure.get("status") == "remote_compact_stream_disconnected":
+        root_causes.append({
+            "id": "RC4_REMOTE_COMPACT_STREAM_DISCONNECTED",
+            "summary": "Codex remote context compact request disconnected before completion, leaving no final agent message.",
+            "evidence": {
+                "session_log": runtime_failure.get("session_log"),
+                "last_error_at": runtime_failure.get("last_error_at"),
+                "message": runtime_failure.get("last_error_message"),
+                "last_token_count": runtime_failure.get("last_token_count"),
+                "task_completed_without_agent_message": runtime_failure.get("task_completed_without_agent_message"),
+            },
+        })
     if not root_causes:
         root_causes.append({
             "id": "RC0_NO_HARD_BLOCKER_FOUND",
@@ -80,6 +95,7 @@ def diagnose_hermes_execution_stall(
             "archive_entry": archive_entry,
         },
         "duplicate_surface": duplicate_surface,
+        "runtime_failure": runtime_failure,
         "context_budget": {
             "budget_tokens": int(context_budget_tokens),
             "full_scan_estimated_tokens": full_scan_estimate["estimated_tokens"],
@@ -98,8 +114,14 @@ def materialize_hermes_recovery_packet(
     context_budget_tokens: int = DEFAULT_CONTEXT_BUDGET_TOKENS,
     change_id: str | None = None,
     output_path: str | Path | None = None,
+    session_log_path: str | Path | None = None,
 ) -> str:
-    payload = diagnose_hermes_execution_stall(root, context_budget_tokens=context_budget_tokens, change_id=change_id)
+    payload = diagnose_hermes_execution_stall(
+        root,
+        context_budget_tokens=context_budget_tokens,
+        change_id=change_id,
+        session_log_path=session_log_path,
+    )
     paths = GovernancePaths(Path(root))
     target = Path(output_path) if output_path else paths.index_dir / DEFAULT_RECOVERY_PACKET_NAME
     write_yaml(target, payload)
@@ -275,6 +297,73 @@ def _estimate_scan_tokens(files: list[Path]) -> dict:
         "chars": chars,
         "words": words,
         "estimated_tokens": estimated_tokens,
+    }
+
+
+def _diagnose_runtime_failure(session_log_path: str | Path | None) -> dict:
+    if not session_log_path:
+        return {"status": "not-provided"}
+    path = Path(session_log_path)
+    if not path.exists() or not path.is_file():
+        return {"status": "session-log-missing", "session_log": str(path)}
+
+    last_token_count: dict = {}
+    last_error: dict = {}
+    task_completed_without_agent_message = False
+    try:
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            payload = event.get("payload") if isinstance(event, dict) else {}
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("type") == "token_count":
+                info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
+                usage = info.get("last_token_usage") if isinstance(info.get("last_token_usage"), dict) else {}
+                last_token_count = dict(usage)
+                if "model_context_window" in info:
+                    last_token_count["model_context_window"] = info.get("model_context_window")
+            if payload.get("type") == "error":
+                last_error = {
+                    "timestamp": event.get("timestamp"),
+                    "message": payload.get("message"),
+                    "codex_error_info": payload.get("codex_error_info"),
+                }
+            if payload.get("type") == "task_complete" and not payload.get("last_agent_message"):
+                task_completed_without_agent_message = True
+    except OSError as exc:
+        return {"status": "session-log-unreadable", "session_log": str(path), "error": str(exc)}
+
+    message = str(last_error.get("message") or "")
+    if "Error running remote compact task" in message and "stream disconnected before completion" in message:
+        return {
+            "status": "remote_compact_stream_disconnected",
+            "session_log": str(path),
+            "last_error_at": last_error.get("timestamp"),
+            "last_error_message": message,
+            "codex_error_info": last_error.get("codex_error_info"),
+            "last_token_count": last_token_count,
+            "task_completed_without_agent_message": task_completed_without_agent_message,
+        }
+    if last_error:
+        return {
+            "status": "codex-runtime-error",
+            "session_log": str(path),
+            "last_error_at": last_error.get("timestamp"),
+            "last_error_message": message,
+            "codex_error_info": last_error.get("codex_error_info"),
+            "last_token_count": last_token_count,
+            "task_completed_without_agent_message": task_completed_without_agent_message,
+        }
+    return {
+        "status": "no-runtime-error-detected",
+        "session_log": str(path),
+        "last_token_count": last_token_count,
+        "task_completed_without_agent_message": task_completed_without_agent_message,
     }
 
 

@@ -7,7 +7,10 @@ from .change_package import read_change_package, update_manifest
 from .index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
 from .simple_yaml import load_yaml, write_yaml
 from .agent_adoption import write_agent_adoption_pack
+from .baseline import materialize_baseline
 from .defaults import DEFAULT_SCOPE_OUT
+from .contract import ScopeConflictError, scope_conflicts
+from .step_matrix import STEP_LABELS
 
 REQUIRED_FORBIDDEN_ACTIONS = [
     "no_truth_source_pollution",
@@ -36,6 +39,9 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
     title = request.title or package.manifest.get("title") or request.change_id
     scope_in = request.scope_in or ["src/**", "tests/**"]
     scope_out = _merge_scope_out(request.scope_out)
+    conflicts = scope_conflicts(scope_in, scope_out)
+    if conflicts:
+        raise ScopeConflictError(conflicts, change_id=request.change_id)
     verify_commands = request.verify_commands or []
 
     source_docs = list(request.source_docs or [])
@@ -45,6 +51,7 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
     bindings = _preserve_participant_bindings(existing_bindings, _build_bindings(request.change_id, request.profile))
     write_yaml(package.path / "contract.yaml", contract)
     write_yaml(package.path / "bindings.yaml", bindings)
+    baseline = materialize_baseline(root, request.change_id)
     write_agent_adoption_pack(
         root,
         change_id=request.change_id,
@@ -82,7 +89,13 @@ def prepare_change_package(request: PrepareChangeRequest) -> dict:
         current_change_active=manifest.get("status"),
         current_change_id=request.change_id,
     )
-    return {"change_id": request.change_id, "path": str(package.path), "contract": contract, "bindings": bindings}
+    return {
+        "change_id": request.change_id,
+        "path": str(package.path),
+        "contract": contract,
+        "bindings": bindings,
+        "baseline": baseline,
+    }
 
 
 def _merge_scope_out(scope_out: list[str]) -> list[str]:
@@ -186,11 +199,11 @@ def _write_markdown_files(
         "\n".join([
             f"# Tasks for {change_id}",
             "",
-            "- [ ] Step 5: Confirm contract.yaml and bindings.yaml are acceptable.",
-            "- [ ] Step 6: Execute inside scope and record evidence.",
-            "- [ ] Step 7: Run verification and record verify.yaml.",
-            "- [ ] Step 8: Request independent review and record review.yaml.",
-            "- [ ] Step 9: Archive and carry forward continuity context.",
+            f"- [ ] Step 5: {STEP_LABELS[5]} contract.yaml and bindings.yaml.",
+            f"- [ ] Step 6: {STEP_LABELS[6]} inside scope and record evidence.",
+            f"- [ ] Step 7: {STEP_LABELS[7]} and record verify.yaml.",
+            f"- [ ] Step 8: {STEP_LABELS[8]} and record review.yaml.",
+            f"- [ ] Step 9: {STEP_LABELS[9]} continuity context.",
             "",
         ]),
         encoding="utf-8",

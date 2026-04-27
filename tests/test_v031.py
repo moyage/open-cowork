@@ -280,11 +280,11 @@ class V031HumanRuntimeTests(unittest.TestCase):
             for expected in [".git/**", ".omx/**", ".venv/**", "node_modules/**", "dist/**", ".release/**", ".governance/archive/**", ".governance/runtime/**"]:
                 self.assertIn(expected, contract["scope_out"])
 
-    def test_version_reports_v031(self):
+    def test_version_reports_current_release(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = self._run_cli(root, "version")
-            self.assertIn("open-cowork 0.3.1", output)
+            self.assertIn("open-cowork 0.3.4", output)
 
     def _prepare_change(self, root: Path, change_id: str) -> None:
         with contextlib.redirect_stdout(io.StringIO()):

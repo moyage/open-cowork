@@ -587,6 +587,19 @@ class CliTests(unittest.TestCase):
             self.assertIn("Contract valid", stdout.getvalue())
 
             with contextlib.redirect_stdout(io.StringIO()):
+                for step in (1, 2, 3):
+                    main([
+                        "--root",
+                        str(root),
+                        "step",
+                        "approve",
+                        "--change-id",
+                        "CHG-CLI-2",
+                        "--step",
+                        str(step),
+                        "--approved-by",
+                        "human-sponsor",
+                    ])
                 main([
                     "--root",
                     str(root),
@@ -660,6 +673,30 @@ class CliTests(unittest.TestCase):
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
+                main([
+                    "--root",
+                    str(root),
+                    "step",
+                    "approve",
+                    "--change-id",
+                    "CHG-CLI-2",
+                    "--step",
+                    "8",
+                    "--approved-by",
+                    "human-sponsor",
+                ])
+                main([
+                    "--root",
+                    str(root),
+                    "step",
+                    "approve",
+                    "--change-id",
+                    "CHG-CLI-2",
+                    "--step",
+                    "9",
+                    "--approved-by",
+                    "human-sponsor",
+                ])
                 archive_exit = main(["--root", str(root), "archive", "--change-id", "CHG-CLI-2"])
             self.assertEqual(archive_exit, 0)
 
@@ -1099,7 +1136,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("current_phase: Phase 3 / 执行与验证", output)
             self.assertIn("current_owner: executor-agent", output)
             self.assertIn("waiting_on: Step 7 verify outputs and review-ready decision", output)
-            self.assertIn("next_decision: Step 8 / Review and decide", output)
+            self.assertIn("next_decision: Step 8 / 独立审查 / Independent review", output)
             self.assertIn("project_summary: Deliver a human-readable progress snapshot.", output)
             self.assertTrue((change_dir / "STATUS_SNAPSHOT.yaml").exists())
 
@@ -1345,7 +1382,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.3.1", output)
+        self.assertIn("open-cowork 0.3.4", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)
@@ -1418,7 +1455,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("continuity-launch-input.yaml", stdout.getvalue())
             launch_payload = load_yaml(root / f".governance/changes/{current_change}/continuity-launch-input.yaml")
             self.assertEqual(launch_payload["decision_summary"]["current_phase"], "Phase 1 / 定义与对齐")
-            self.assertEqual(launch_payload["decision_summary"]["next_decision"], "Step 1 / Clarify the goal")
+            self.assertEqual(launch_payload["decision_summary"]["next_decision"], "Step 1 / 明确意图 / Clarify intent")
             self.assertTrue(launch_payload["decision_summary"]["next_input_suggestion"])
 
             stdout = io.StringIO()

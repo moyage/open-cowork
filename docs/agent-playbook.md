@@ -28,11 +28,14 @@
 4. 优先确认 participants profile，让人看到 9 步 owner、assistant、reviewer 和 human gate。
 5. 在 Step 6 前确认 intent：需求、优化、Bug、范围、非目标、风险和验收标准。
 6. 关键步骤使用 `ocw step report` 生成阶段报告，再向人汇报 owner、输入、输出、完成标准、下一步门槛和需要决策的事项。
-7. 进入 Step 6 前确认 Step 5 human gate approval 已记录；不要把 human gate 当成仅展示字段。
-8. 保持 `.governance/current-state.md` 对下一个 Agent 可读；archive 后确认它已经回到 idle / archived 状态。
-9. evidence 要客观，review 要尽量独立。
-10. 只有目标、边界、风险、取舍或批准需要判断时，才让人介入。
-11. 用 `ocw hygiene` / `ocw doctor` 区分 runtime generated、pending docs、cold archive docs、状态一致性和建议提交内容。
+7. 如果人确认了非阻塞 step，例如 Step 4 任务拆解，记录 acknowledgement，不要把它挪成 Step 5 approval。
+8. 进入 Step 6 前确认 Step 5 human gate approval 已记录；不要把 human gate 当成仅展示字段。
+9. Step 8 先记录独立 reviewer decision，再让人决定接受、修订或拒绝；不要要求人先批准才能写入 review 结论。
+10. 连续迭代时读取 `baseline.yaml`，区分 parent archived dirty baseline、本轮 evidence delta 和无关工作区噪声。
+11. 保持 `.governance/current-state.md` 对下一个 Agent 可读；archive 后确认它已经回到 idle / archived 状态。
+12. evidence 要客观，review 要尽量独立。
+13. 只有目标、边界、风险、取舍或批准需要判断时，才让人介入。
+14. 用 `ocw hygiene` / `ocw doctor` 区分 runtime generated、pending docs、cold archive docs、状态一致性和建议提交内容。
 
 ## 交接规则
 

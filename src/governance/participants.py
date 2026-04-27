@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .change_package import read_change_package
 from .simple_yaml import load_yaml, write_yaml
+from .step_matrix import STEP_LABELS
 
 
 DEFAULT_PERSONAL_PARTICIPANTS = [
@@ -20,7 +21,7 @@ DEFAULT_PERSONAL_PARTICIPANTS = [
 
 STEP_OWNER_MATRIX = {
     1: {
-        "label": "Clarify the goal",
+        "label": STEP_LABELS[1],
         "primary_owner": "human-sponsor",
         "assistants": ["analyst-agent", "orchestrator-agent"],
         "reviewer": "human-sponsor",
@@ -28,7 +29,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     2: {
-        "label": "Lock the scope",
+        "label": STEP_LABELS[2],
         "primary_owner": "analyst-agent",
         "assistants": ["orchestrator-agent"],
         "reviewer": "human-sponsor",
@@ -36,7 +37,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     3: {
-        "label": "Shape the approach",
+        "label": STEP_LABELS[3],
         "primary_owner": "architect-agent",
         "assistants": ["analyst-agent"],
         "reviewer": "human-sponsor",
@@ -44,7 +45,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     4: {
-        "label": "Assemble the change",
+        "label": STEP_LABELS[4],
         "primary_owner": "orchestrator-agent",
         "assistants": ["architect-agent"],
         "reviewer": "human-sponsor",
@@ -52,7 +53,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     5: {
-        "label": "Approve the start",
+        "label": STEP_LABELS[5],
         "primary_owner": "human-sponsor",
         "assistants": ["orchestrator-agent"],
         "reviewer": "human-sponsor",
@@ -60,7 +61,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     6: {
-        "label": "Execute the change",
+        "label": STEP_LABELS[6],
         "primary_owner": "executor-agent",
         "assistants": [],
         "reviewer": "verifier-agent",
@@ -68,7 +69,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     7: {
-        "label": "Verify the result",
+        "label": STEP_LABELS[7],
         "primary_owner": "verifier-agent",
         "assistants": [],
         "reviewer": "independent-reviewer",
@@ -76,7 +77,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     8: {
-        "label": "Review and decide",
+        "label": STEP_LABELS[8],
         "primary_owner": "independent-reviewer",
         "assistants": ["human-sponsor"],
         "reviewer": "independent-reviewer",
@@ -84,7 +85,7 @@ STEP_OWNER_MATRIX = {
         "final_decision_owner": "human-sponsor",
     },
     9: {
-        "label": "Archive and carry forward",
+        "label": STEP_LABELS[9],
         "primary_owner": "maintainer-agent",
         "assistants": ["orchestrator-agent"],
         "reviewer": "human-sponsor",

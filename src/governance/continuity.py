@@ -8,7 +8,7 @@ from .index import read_changes_index, read_current_change
 from .paths import GovernancePaths
 from .runtime_status import materialize_runtime_status
 from .simple_yaml import load_yaml, write_yaml
-from .step_matrix import render_status_snapshot
+from .step_matrix import STEP_LABELS, render_status_snapshot
 
 CONTINUITY_LAUNCH_INPUT_SCHEMA = "continuity-launch-input/v1"
 ROUND_ENTRY_INPUT_SUMMARY_SCHEMA = "round-entry-input-summary/v1"
@@ -1417,26 +1417,15 @@ def _decision_point_for_step(step) -> str:
     if isinstance(step, str) and step.isdigit():
         step = int(step)
     if not isinstance(step, int):
-        return "Step 1 / Clarify the goal"
+        return f"Step 1 / {STEP_LABELS[1]}"
     if step in {1, 2, 3, 5, 8, 9}:
         return f"Step {step} / {_step_label(step)}"
     if step < 5:
         return f"Step {step + 1} / {_step_label(step + 1)}"
     if step in {6, 7}:
-        return "Step 8 / Review and decide"
+        return f"Step 8 / {STEP_LABELS[8]}"
     return "none"
 
 
 def _step_label(step: int) -> str:
-    labels = {
-        1: "Clarify the goal",
-        2: "Lock the scope",
-        3: "Shape the approach",
-        4: "Assemble the change",
-        5: "Approve the start",
-        6: "Execute the change",
-        7: "Verify the result",
-        8: "Review and decide",
-        9: "Archive and carry forward",
-    }
-    return labels.get(step, str(step))
+    return STEP_LABELS.get(step, str(step))

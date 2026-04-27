@@ -85,6 +85,13 @@ class V028HumanGatesTests(unittest.TestCase):
 
             approved = io.StringIO()
             with contextlib.redirect_stdout(approved):
+                for step in (1, 2, 3):
+                    main([
+                        "--root", str(root), "step", "approve",
+                        "--change-id", "CHG-GATE",
+                        "--step", str(step),
+                        "--approved-by", "human-sponsor",
+                    ])
                 approve_exit = main([
                     "--root", str(root), "step", "approve",
                     "--change-id", "CHG-GATE",
@@ -220,10 +227,11 @@ class V028HumanGatesTests(unittest.TestCase):
                     "--goal", "Archive with final state audit",
                 ])
                 main(["--root", str(root), "participants", "setup", "--change-id", "CHG-ARCHIVE"])
-                main([
-                    "--root", str(root), "step", "approve",
-                    "--change-id", "CHG-ARCHIVE", "--step", "5", "--approved-by", "human-sponsor",
-                ])
+                for step in (1, 2, 3, 5):
+                    main([
+                        "--root", str(root), "step", "approve",
+                        "--change-id", "CHG-ARCHIVE", "--step", str(step), "--approved-by", "human-sponsor",
+                    ])
                 main([
                     "--root", str(root), "run",
                     "--change-id", "CHG-ARCHIVE",
@@ -254,6 +262,10 @@ class V028HumanGatesTests(unittest.TestCase):
             self.assertIn("reviewer does not match Step 8 binding", review_stdout.getvalue())
 
             with contextlib.redirect_stdout(io.StringIO()):
+                main([
+                    "--root", str(root), "step", "approve",
+                    "--change-id", "CHG-ARCHIVE", "--step", "8", "--approved-by", "human-sponsor",
+                ])
                 main([
                     "--root", str(root), "step", "approve",
                     "--change-id", "CHG-ARCHIVE", "--step", "9", "--approved-by", "human-sponsor",

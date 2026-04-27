@@ -35,30 +35,72 @@ def cmd_change_create(args):
 
 def cmd_change_prepare(args):
     from governance.change_prepare import PrepareChangeRequest, prepare_change_package
+    from governance.contract import ScopeConflictError
 
-    if not (args.goal or "").strip():
+    goal = _resolve_change_prepare_goal(args.root, args.change_id, args.goal)
+    if not goal.strip():
         print("--goal is required for 'ocw change prepare'.")
+        print("No existing goal was found in intent-confirmation.yaml or contract.yaml.")
         return 1
     lifecycle_error = _active_change_lifecycle_error(args.root, args.change_id, getattr(args, "active_policy", None))
     if lifecycle_error:
         print(lifecycle_error)
         return 1
 
-    payload = prepare_change_package(PrepareChangeRequest(
-        root=args.root,
-        change_id=args.change_id,
-        title=args.title or "",
-        goal=args.goal,
-        scope_in=list(args.scope_in or []),
-        scope_out=list(args.scope_out or []),
-        verify_commands=list(args.verify_command or []),
-        source_docs=list(args.source_doc or []),
-        profile=args.profile,
-    ))
+    try:
+        payload = prepare_change_package(PrepareChangeRequest(
+            root=args.root,
+            change_id=args.change_id,
+            title=args.title or "",
+            goal=goal,
+            scope_in=list(args.scope_in or []),
+            scope_out=list(args.scope_out or []),
+            verify_commands=list(args.verify_command or []),
+            source_docs=list(args.source_doc or []),
+            profile=args.profile,
+        ))
+    except ScopeConflictError as exc:
+        print("Cannot prepare change because scope_in overlaps scope_out.")
+        print("")
+        print("Conflicts:")
+        for conflict in exc.conflicts:
+            print(f"- {conflict}")
+        print("")
+        print("Recommended recovery:")
+        if any(conflict.startswith(".governance/** overlaps") for conflict in exc.conflicts):
+            print(f"- Replace `.governance/**` with `.governance/changes/{args.change_id}/**` for change-package work.")
+        print("- Keep `.governance/index/**`, `.governance/archive/**`, and `.governance/runtime/**` out of normal execution scope.")
+        print("- Re-run `ocw change prepare` after narrowing scope_in.")
+        return 1
     print(f"Change prepared: {payload['change_id']}")
     print("")
     print(_format_agent_handoff(payload["change_id"]))
     return 0
+
+
+def _resolve_change_prepare_goal(root: str | Path, change_id: str, explicit_goal: str) -> str:
+    if (explicit_goal or "").strip():
+        return explicit_goal.strip()
+    from governance.change_package import read_change_package
+    from governance.simple_yaml import load_yaml
+
+    try:
+        package = read_change_package(root, change_id)
+    except Exception:
+        return ""
+    for filename, keys in (
+        ("intent-confirmation.yaml", ("project_intent",)),
+        ("contract.yaml", ("objective",)),
+    ):
+        path = package.path / filename
+        if not path.exists():
+            continue
+        payload = load_yaml(path)
+        for key in keys:
+            value = str(payload.get(key) or "").strip()
+            if value:
+                return value
+    return ""
 
 
 def _format_agent_handoff(change_id: str) -> str:
@@ -360,6 +402,22 @@ def cmd_adopt(args):
     return 0
 
 
+def cmd_activate(args):
+    from governance.activation import build_project_activation, format_project_activation
+
+    payload = build_project_activation(args.root)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(format_project_activation(payload), end="")
+    return 0
+
+
 def cmd_hygiene(args):
     from governance.hygiene import build_hygiene_report
 
@@ -486,12 +544,21 @@ def cmd_intent_confirm(args):
     from governance.intent import confirm_intent
 
     payload = confirm_intent(args.root, change_id=args.change_id, confirmed_by=args.confirmed_by, note=args.note or "")
+    from governance.human_gates import record_intent_confirmation_approval
+
+    record_intent_confirmation_approval(
+        args.root,
+        change_id=args.change_id,
+        confirmed_by=args.confirmed_by,
+        note=args.note or "",
+    )
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
     print(f"Intent confirmed: {payload['change_id']}")
     print(f"- confirmed_by: {payload['human_confirmation']['confirmed_by']}")
     print(f"- ref: .governance/changes/{args.change_id}/intent-confirmation.yaml")
+    print(f"- Step 1 approval source: .governance/changes/{args.change_id}/human-gates.yaml#approvals.1")
     return 0
 
 
@@ -665,22 +732,36 @@ def _print_evidence(items: list[dict]) -> None:
 def cmd_step_approve(args):
     from governance.human_gates import approve_step
 
-    payload = approve_step(
-        args.root,
-        change_id=args.change_id,
-        step=args.step,
-        approved_by=args.approved_by,
-        note=args.note or "",
-        recorded_by=args.recorded_by or "",
-        evidence_ref=args.evidence_ref or "",
-    )
+    try:
+        payload = approve_step(
+            args.root,
+            change_id=args.change_id,
+            step=args.step,
+            approved_by=args.approved_by,
+            note=args.note or "",
+            recorded_by=args.recorded_by or "",
+            evidence_ref=args.evidence_ref or "",
+            approval_token=args.approval_token or "",
+        )
+    except ValueError as exc:
+        print(f"Step approval failed: {exc}")
+        return 1
     if args.step == 5:
         _mark_step5_approved_for_step6(args.root, args.change_id)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
+    approvals = payload.get("approvals", {})
+    approval = approvals.get(args.step) or approvals.get(str(args.step))
+    if not approval:
+        acknowledgements = payload.get("acknowledgements", [])
+        latest = acknowledgements[-1] if acknowledgements else {}
+        print(f"Step {args.step} acknowledged: {args.change_id}")
+        print(f"- acknowledged_by: {latest.get('acknowledged_by')}")
+        print(f"- ref: .governance/changes/{args.change_id}/human-gates.yaml#acknowledgements")
+        return 0
     print(f"Step {args.step} approved: {args.change_id}")
-    print(f"- approved_by: {payload['approvals'][args.step]['approved_by']}")
+    print(f"- approved_by: {approval['approved_by']}")
     print(f"- ref: .governance/changes/{args.change_id}/human-gates.yaml")
     return 0
 
@@ -688,6 +769,7 @@ def cmd_step_approve(args):
 def _mark_step5_approved_for_step6(root: str | Path, change_id: str) -> None:
     from governance.change_package import read_change_package, update_manifest
     from governance.index import read_current_change, set_current_change, set_maintenance_status, upsert_change_entry
+    from governance.simple_yaml import load_yaml
 
     package = read_change_package(root, change_id)
     readiness = dict(package.manifest.get("readiness") or {})
@@ -696,7 +778,14 @@ def _mark_step5_approved_for_step6(root: str | Path, change_id: str) -> None:
         item for item in readiness.get("missing_items", [])
         if item not in {"intent_confirmation", "step1_confirmation", "step5_approval", "step5_confirmation"}
     ]
-    manifest = update_manifest(root, change_id, status="step6-in-progress", current_step=6, readiness=readiness)
+    updates = {"status": "step6-in-progress", "current_step": 6, "readiness": readiness}
+    contract_path = package.path / "contract.yaml"
+    if contract_path.exists():
+        contract = load_yaml(contract_path)
+        validation_objects = list(contract.get("validation_objects", []))
+        if validation_objects:
+            updates["target_validation_objects"] = validation_objects
+    manifest = update_manifest(root, change_id, **updates)
     current = read_current_change(root).get("current_change") or {}
     entry = {
         **current,
@@ -719,10 +808,16 @@ def cmd_verify(args):
     from governance.runtime_events import append_runtime_event
 
     try:
-        payload = write_verify_result(args.root, args.change_id)
+        payload = write_verify_result(
+            args.root,
+            args.change_id,
+            run_commands=args.run_commands,
+            timeout_seconds=args.timeout_seconds,
+        )
         from governance.step_report import materialize_step_report
         materialize_step_report(args.root, change_id=args.change_id, step=7)
         print(f"Verify recorded: {payload['change_id']} -> {payload['summary']['status']}")
+        print(f"- product_verification: {payload.get('product_verification', {}).get('mode')}")
         print(f"- Step 7 report: .governance/changes/{args.change_id}/step-reports/step-7.md")
         return 0
     except Exception as exc:
@@ -1064,6 +1159,8 @@ def _format_draft_status_view(root: str | Path, current: dict, contract_error: s
     current_status = current.get("status") or nested_current.get("status") or manifest.get("status") or "drafting"
     current_step = current.get("current_step") or nested_current.get("current_step") or manifest.get("current_step") or 5
     owner = manifest.get("owner") or "orchestrator"
+    from governance.step_matrix import STEP_LABELS
+
     lines = [
         "# open-cowork status",
         "",
@@ -1074,7 +1171,7 @@ def _format_draft_status_view(root: str | Path, current: dict, contract_error: s
         f"- current_status: {current_status}",
         f"- current_owner: {owner}",
         "- waiting_on: contract.yaml and bindings.yaml",
-        "- next_decision: Step 5 / Approve the start",
+        f"- next_decision: Step 5 / {STEP_LABELS[5]}",
         "- human_intervention_required: true",
         f"- project_summary: {title}",
         "",
@@ -1436,6 +1533,7 @@ def cmd_diagnose_session(args):
             args.root,
             context_budget_tokens=args.context_budget,
             change_id=args.change_id,
+            session_log_path=getattr(args, "session_log", None),
         )
         print("# Session Execution Diagnosis")
         print("")
@@ -1447,6 +1545,10 @@ def cmd_diagnose_session(args):
         print(f"- recommended_set_estimated_tokens: {budget.get('recommended_set_estimated_tokens')}")
         duplicate = diagnosis.get("duplicate_surface", {})
         print(f"- duplicate_identical_files: {duplicate.get('identical_count')}")
+        runtime = diagnosis.get("runtime_failure", {})
+        print(f"- runtime_failure: {runtime.get('status')}")
+        if runtime.get("last_error_at"):
+            print(f"- runtime_failure_at: {runtime.get('last_error_at')}")
         print("")
         print("## Root causes")
         for item in diagnosis.get("root_causes", []):
@@ -1472,6 +1574,7 @@ def cmd_session_recovery_packet(args):
             context_budget_tokens=args.context_budget,
             change_id=args.change_id,
             output_path=args.output,
+            session_log_path=getattr(args, "session_log", None),
         )
         print(f"Session recovery packet written: {output_path}")
     except Exception as e:
@@ -1486,6 +1589,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("init", help="Initialize minimum governance directory")
     subparsers.add_parser("propose", help="Create an intent draft")
     subparsers.add_parser("version", help="Show open-cowork version and command paths")
+    p_activate = subparsers.add_parser("activate", help="Show project-scoped activation and handoff state")
+    p_activate.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     for command_name in ("onboard", "setup"):
         p_onboard = subparsers.add_parser(command_name, help="Run interactive or scripted onboarding")
@@ -1578,6 +1683,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_step_approve.add_argument("--approved-by", required=True, help="Human or sponsor approving the step")
     p_step_approve.add_argument("--recorded-by", default="", help="Agent or participant recording the approval")
     p_step_approve.add_argument("--evidence-ref", default="", help="Evidence reference for the approval")
+    p_step_approve.add_argument("--approval-token", default="", help="Sponsor-held approval token when this change requires trusted approval")
     p_step_approve.add_argument("--note", default="", help="Approval note")
     p_step_approve.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
@@ -1613,8 +1719,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_verify = subparsers.add_parser("verify", help="Verify execution results")
     p_verify.add_argument("--change-id", required=True, help="Target change id")
+    p_verify.add_argument("--run-commands", action="store_true", help="Run contract verification commands in addition to governance state checks")
+    p_verify.add_argument("--timeout-seconds", type=int, default=120, help="Timeout for each verification command")
 
-    p_review = subparsers.add_parser("review", help="Review and decide on change")
+    p_review = subparsers.add_parser("review", help="Record independent review decision")
     p_review.add_argument("--change-id", required=True, help="Target change id")
     p_review.add_argument("--decision", choices=["approve", "reject", "revise"], required=True, help="Review decision")
     p_review.add_argument("--reviewer", required=True, help="Reviewer identifier")
@@ -1728,17 +1836,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_diag = subparsers.add_parser("diagnose-session", help="Diagnose session compression / provider drop root causes")
     p_diag.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
+    p_diag.add_argument("--session-log", default=None, help="Optional Codex session jsonl path for runtime failure diagnosis")
     p_packet = subparsers.add_parser("session-recovery-packet", help="Write session recovery diagnosis packet YAML")
     p_packet.add_argument("--change-id", default=None, help="Optional target change id override")
     p_packet.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
     p_packet.add_argument("--output", default=None, help="Optional output yaml path")
+    p_packet.add_argument("--session-log", default=None, help="Optional Codex session jsonl path for runtime failure diagnosis")
     p_diag_alias = subparsers.add_parser("diagnose-hermes", help="Alias of diagnose-session")
     p_diag_alias.add_argument("--change-id", default=None, help="Optional target change id override")
     p_diag_alias.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
+    p_diag_alias.add_argument("--session-log", default=None, help="Optional Codex session jsonl path for runtime failure diagnosis")
     p_packet_alias = subparsers.add_parser("hermes-recovery-packet", help="Alias of session-recovery-packet")
     p_packet_alias.add_argument("--change-id", default=None, help="Optional target change id override")
     p_packet_alias.add_argument("--context-budget", type=int, default=12000, help="Context budget in tokens")
     p_packet_alias.add_argument("--output", default=None, help="Optional output yaml path")
+    p_packet_alias.add_argument("--session-log", default=None, help="Optional Codex session jsonl path for runtime failure diagnosis")
     return parser
 
 
@@ -1755,6 +1867,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_pilot(args)
     elif args.command == "adopt":
         return cmd_adopt(args)
+    elif args.command == "activate":
+        return cmd_activate(args)
     elif args.command in {"hygiene", "doctor"}:
         return cmd_hygiene(args)
     elif args.command == "participants" and args.subcmd == "setup":

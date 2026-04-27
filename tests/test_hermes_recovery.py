@@ -14,6 +14,35 @@ from governance.simple_yaml import load_yaml, write_yaml
 
 
 class HermesRecoveryTests(unittest.TestCase):
+    def test_diagnosis_includes_remote_compact_failure_from_codex_session_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index_dir = root / ".governance/index"
+            index_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(index_dir / "current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "idle",
+                "current_change": None,
+            })
+            session_log = root / "session.jsonl"
+            session_log.write_text(
+                "\n".join([
+                    '{"timestamp":"2026-04-27T11:49:13.953Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":194922,"output_tokens":1999,"total_tokens":196921},"model_context_window":237500}}}',
+                    '{"timestamp":"2026-04-27T11:54:19.325Z","type":"event_msg","payload":{"type":"error","message":"Error running remote compact task: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses/compact)","codex_error_info":"other"}}',
+                    '{"timestamp":"2026-04-27T11:54:19.325Z","type":"event_msg","payload":{"type":"task_complete","last_agent_message":null}}',
+                ]),
+                encoding="utf-8",
+            )
+
+            diagnosis = diagnose_hermes_execution_stall(root, session_log_path=session_log)
+
+            runtime = diagnosis["runtime_failure"]
+            self.assertEqual(runtime["status"], "remote_compact_stream_disconnected")
+            self.assertEqual(runtime["last_error_at"], "2026-04-27T11:54:19.325Z")
+            self.assertEqual(runtime["last_token_count"]["total_tokens"], 196921)
+            self.assertEqual(runtime["last_token_count"]["model_context_window"], 237500)
+            self.assertTrue(any(item["id"] == "RC4_REMOTE_COMPACT_STREAM_DISCONNECTED" for item in diagnosis["root_causes"]))
+
     def test_idle_post_close_diagnosis_and_packet_materialization(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

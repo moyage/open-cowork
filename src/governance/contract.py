@@ -27,6 +27,13 @@ class ContractValidationError(ValueError):
     pass
 
 
+class ScopeConflictError(ContractValidationError):
+    def __init__(self, conflicts: list[str], *, change_id: str = ""):
+        self.conflicts = conflicts
+        self.change_id = change_id
+        super().__init__("scope_in conflicts with scope_out: " + ", ".join(conflicts))
+
+
 def load_contract(path: str | Path) -> dict:
     contract = load_yaml(path)
     errors = validate_contract(contract)
@@ -73,6 +80,10 @@ def validate_contract(contract: dict) -> list[str]:
     if role_constraints is not None and not isinstance(role_constraints, dict):
         errors.append("role_constraints must be a mapping when present")
     return errors
+
+
+def scope_conflicts(scope_in: list[str], scope_out: list[str]) -> list[str]:
+    return _scope_conflicts(scope_in, scope_out)
 
 
 def _scope_conflicts(scope_in: list[str], scope_out: list[str]) -> list[str]:
