@@ -347,6 +347,7 @@ class CliTests(unittest.TestCase):
                     "--goal",
                     "Show a human-visible step report",
                 ])
+                main(["--root", str(root), "intent", "confirm", "--change-id", "CHG-STEP", "--confirmed-by", "human-sponsor"])
                 main(["--root", str(root), "participants", "setup", "--change-id", "CHG-STEP"])
 
             stdout = io.StringIO()
@@ -369,7 +370,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(report["schema"], "step-report/v1")
             self.assertEqual(report["owner"], "human-sponsor")
             self.assertTrue(report["human_gate"])
-            self.assertIn("Confirm project intent", " ".join(report["human_decisions_required"]))
+            self.assertIn("Human gate is marked for this step", " ".join(report["human_decisions_required"]))
             self.assertIn("Human decisions required", report_text)
 
     def test_adopt_dry_run_outputs_agent_first_plan_without_mutation(self):
@@ -1382,7 +1383,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.3.8", output)
+        self.assertIn("open-cowork 0.3.9", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)

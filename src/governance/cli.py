@@ -780,6 +780,203 @@ def cmd_participants_list(args):
     return 0
 
 
+def _print_structured(payload: dict, fmt: str, text: str) -> int:
+    if fmt == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if fmt == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+        return 0
+    print(text, end="" if text.endswith("\n") else "\n")
+    return 0
+
+
+def cmd_team(args):
+    from governance.team_loop import format_team_digest, format_team_status, team_digest, team_status
+
+    if args.subcmd == "status":
+        payload = team_status(args.root)
+        return _print_structured(payload, args.format, format_team_status(payload))
+    if args.subcmd == "digest":
+        payload = team_digest(args.root, period=args.period)
+        return _print_structured(payload, args.format, format_team_digest(payload))
+    return 1
+
+
+def cmd_participant(args):
+    from governance.team_loop import (
+        assignment_set,
+        format_item_list,
+        participant_assign,
+        participant_discover,
+        participant_list,
+        participant_register,
+        participant_update,
+    )
+
+    try:
+        if args.subcmd == "discover":
+            payload = participant_discover(args.root, recorded_by=args.recorded_by)
+            return _print_structured(payload, args.format, format_item_list("Participant candidates", payload.get("discovered_candidates", [])))
+        if args.subcmd == "register":
+            payload = participant_register(
+                args.root,
+                participant_id=args.participant_id,
+                participant_type=args.type,
+                domain=args.domain,
+                entrypoint=args.entrypoint,
+                capability=list(args.capability or []),
+                default_role=list(args.default_role or []),
+                step=list(args.step or []),
+                recorded_by=args.recorded_by,
+                remote=args.remote,
+            )
+            return _print_structured(payload, args.format, format_item_list("Participants", payload.get("participants", [])))
+        if args.subcmd == "list":
+            payload = participant_list(args.root)
+            return _print_structured(payload, args.format, format_item_list("Participants", payload.get("participants", [])))
+        if args.subcmd == "assign":
+            payload = participant_assign(
+                args.root,
+                change_id=args.change_id,
+                step=args.step,
+                role=args.role,
+                actor=args.participant_id,
+                recorded_by=args.recorded_by,
+                note=args.note or "",
+            )
+            return _print_structured(payload, args.format, format_item_list("Assignments", payload.get("assignments", [])))
+        if args.subcmd == "update":
+            updates = {
+                "domain": args.domain,
+                "entrypoint": args.entrypoint,
+                "capabilities": list(args.capability or []),
+                "default_roles": list(args.default_role or []),
+                "eligible_steps": list(args.step or []),
+                "remote": args.remote if args.remote else None,
+            }
+            payload = participant_update(args.root, participant_id=args.participant_id, updates=updates, recorded_by=args.recorded_by)
+            return _print_structured(payload, args.format, format_item_list("Participants", payload.get("participants", [])))
+    except ValueError as exc:
+        print(f"Participant command failed: {exc}")
+        return 1
+    return 1
+
+
+def cmd_assignment(args):
+    from governance.team_loop import assignment_set, format_item_list
+
+    try:
+        payload = assignment_set(
+            args.root,
+            change_id=args.change_id,
+            step=args.step,
+            role=args.role,
+            actor=args.actor,
+            recorded_by=args.recorded_by,
+            note=args.note or "",
+        )
+    except ValueError as exc:
+        print(f"Assignment failed: {exc}")
+        return 1
+    return _print_structured(payload, args.format, format_item_list("Assignments", payload.get("assignments", [])))
+
+
+def cmd_blocked(args):
+    from governance.team_loop import blocked_clear, blocked_set, format_item_list
+
+    try:
+        if args.subcmd == "set":
+            payload = blocked_set(
+                args.root,
+                change_id=args.change_id,
+                reason=args.reason,
+                waiting_on=args.waiting_on,
+                next_decision=args.next_decision,
+                recorded_by=args.recorded_by,
+            )
+        elif args.subcmd == "clear":
+            payload = blocked_clear(args.root, block_id=args.block_id, recorded_by=args.recorded_by, resolution=args.resolution or "")
+        else:
+            return 1
+    except ValueError as exc:
+        print(f"Blocked command failed: {exc}")
+        return 1
+    return _print_structured(payload, args.format, format_item_list("Blocked", payload.get("blocks", [])))
+
+
+def cmd_reviewer(args):
+    from governance.team_loop import format_item_list, reviewer_queue
+
+    try:
+        payload = reviewer_queue(
+            args.root,
+            change_id=args.change_id,
+            reviewer=args.reviewer or "",
+            priority=args.priority,
+            recorded_by=args.recorded_by or "",
+        )
+    except ValueError as exc:
+        print(f"Reviewer queue failed: {exc}")
+        return 1
+    return _print_structured(payload, args.format, format_item_list("Reviewer queue", payload.get("queue", []), id_key="change_id"))
+
+
+def cmd_recurring_intent(args):
+    from governance.team_loop import format_item_list, recurring_intent_add, recurring_intent_trigger
+
+    try:
+        if args.subcmd == "add":
+            payload = recurring_intent_add(args.root, intent_id=args.intent_id, summary=args.summary, cadence=args.cadence, recorded_by=args.recorded_by)
+            return _print_structured(payload, args.format, format_item_list("Recurring intents", payload.get("intents", [])))
+        if args.subcmd == "trigger":
+            payload = recurring_intent_trigger(args.root, intent_id=args.intent_id, change_id=args.change_id, recorded_by=args.recorded_by)
+            return _print_structured(payload, args.format, f"Recurring intent triggered: {payload['intent_id']} -> {payload['change_id']}\n- current_step: {payload['current_step']}\n- status: {payload['status']}\n")
+    except ValueError as exc:
+        print(f"Recurring intent failed: {exc}")
+        return 1
+    return 1
+
+
+def cmd_carry_forward(args):
+    from governance.team_loop import carry_forward_add, carry_forward_list, carry_forward_promote, format_item_list
+
+    try:
+        if args.subcmd == "add":
+            payload = carry_forward_add(args.root, item_id=args.item_id, summary=args.summary, source_change_id=args.source_change_id, recorded_by=args.recorded_by)
+        elif args.subcmd == "list":
+            payload = carry_forward_list(args.root)
+        elif args.subcmd == "promote":
+            payload = carry_forward_promote(args.root, item_id=args.item_id, change_id=args.change_id, recorded_by=args.recorded_by)
+        else:
+            return 1
+    except ValueError as exc:
+        print(f"Carry-forward failed: {exc}")
+        return 1
+    return _print_structured(payload, args.format, format_item_list("Carry-forward", payload.get("items", [])))
+
+
+def cmd_retrospective(args):
+    from governance.team_loop import format_item_list, retrospective_add, retrospective_list
+
+    if args.subcmd == "add":
+        payload = retrospective_add(
+            args.root,
+            retrospective_id=args.retrospective_id,
+            change_id=args.change_id,
+            summary=args.summary,
+            learning=list(args.learning or []),
+            recorded_by=args.recorded_by,
+        )
+        return _print_structured(payload, args.format, f"Retrospective recorded: {payload['id']}\n- change_id: {payload['change_id']}\n")
+    if args.subcmd == "list":
+        payload = retrospective_list(args.root)
+        return _print_structured(payload, args.format, format_item_list("Retrospectives", payload.get("retrospectives", [])))
+    return 1
+
+
 def cmd_intent_capture(args):
     from governance.intent import capture_intent
 
@@ -805,7 +1002,10 @@ def cmd_intent_capture(args):
     print(f"- ref: .governance/changes/{args.change_id}/intent-confirmation.yaml")
     print(f"- project_intent: {payload['project_intent']}")
     print(f"- Step 1 report: .governance/changes/{args.change_id}/step-reports/step-1.md")
-    print(f"- Step 2 report: .governance/changes/{args.change_id}/step-reports/step-2.md")
+    if payload.get("status") == "confirmed":
+        print(f"- Step 2 report: .governance/changes/{args.change_id}/step-reports/step-2.md")
+    else:
+        print("- Next: confirm Step 1 before generating future step reports.")
     return 0
 
 
@@ -865,6 +1065,49 @@ def cmd_change_status(args):
         return 0
     print(render_change_status(payload), end="")
     return 0
+
+
+def cmd_preflight(args):
+    from governance.preflight import (
+        check_execution_preflight,
+        format_execution_preflight,
+        record_flow_bypass_recovery,
+    )
+
+    if args.subcmd == "check":
+        payload = check_execution_preflight(args.root, args.change_id, list(args.path or []))
+        if args.format == "json":
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        elif args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(payload), end="")
+        else:
+            print(format_execution_preflight(payload), end="")
+        return 0 if payload.get("can_execute") else 1
+    if args.subcmd == "recovery":
+        payload = record_flow_bypass_recovery(
+            args.root,
+            change_id=args.change_id,
+            reason=args.reason,
+            modified_files=list(args.modified or []),
+            missing_items=list(args.missing or []),
+            recovery_actions=list(args.action or []),
+            recorded_by=args.recorded_by,
+        )
+        if args.format == "json":
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        elif args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(payload), end="")
+        else:
+            print(f"Flow bypass recovery recorded: {args.change_id}")
+            print(f"- ref: .governance/changes/{args.change_id}/recovery/bypass-records.yaml")
+            print("- classification: flow_bypass_recovery")
+            print("- normal_evidence: false")
+        return 0
+    return 1
 
 
 def cmd_step_report(args):
@@ -1413,6 +1656,7 @@ def cmd_status(args):
             snapshot_path = write_status_snapshot(args.root, args.change_id)
             snapshot = load_yaml(snapshot_path)
             print(format_status_snapshot_view(snapshot))
+            _print_status_preflight(args.root, args.change_id)
             return
         current = read_current_change(args.root)
         nested_current = current.get("current_change", {})
@@ -1436,16 +1680,34 @@ def cmd_status(args):
                     print("")
                     print(render_last_archive_summary(last_archive_summary(args.root)), end="")
             print("- next_action: create or set an active change before running step matrix view")
+            _print_status_preflight(args.root, None)
             return
         snapshot_path = write_status_snapshot(args.root)
         snapshot = load_yaml(snapshot_path)
         print(format_status_snapshot_view(snapshot))
+        _print_status_preflight(args.root, snapshot.get("change_id"))
     except ContractValidationError as e:
         current = read_current_change(args.root)
         print(_format_draft_status_view(args.root, current, str(e)))
+        _print_status_preflight(args.root, None)
     except Exception as e:
         print(f"Status check failed: {e}")
         print("Tip: Have you run 'ocw init' or set a current change?")
+
+
+def _print_status_preflight(root: str | Path, change_id: str | None) -> None:
+    from governance.preflight import check_execution_preflight
+
+    payload = check_execution_preflight(root, change_id)
+    print("## Execution preflight")
+    print(f"- can_modify_project_files: {str(payload.get('can_execute')).lower()}")
+    print(f"- reason: {payload.get('reason')}")
+    print(f"- required_action: {payload.get('required_action')}")
+    if payload.get("contract_ref"):
+        print(f"- contract_ref: {payload.get('contract_ref')}")
+    if payload.get("evidence_ref"):
+        print(f"- evidence_ref: {payload.get('evidence_ref')}")
+    print("")
 
 
 def _format_draft_status_view(root: str | Path, current: dict, contract_error: str) -> str:
@@ -1981,6 +2243,127 @@ def build_parser() -> argparse.ArgumentParser:
     p_participants_list.add_argument("--change-id", default=None, help="Optional change id whose bindings.yaml should be included")
     p_participants_list.add_argument("--format", choices=["human", "text", "yaml", "json"], default="human", help="Output format")
 
+    p_team = subparsers.add_parser("team", help="Team operating loop status and digest")
+    p_team_sub = p_team.add_subparsers(dest="subcmd")
+    p_team_status = p_team_sub.add_parser("status", help="Show team operating status")
+    p_team_status.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_team_digest = p_team_sub.add_parser("digest", help="Show team digest")
+    p_team_digest.add_argument("--period", choices=["daily", "weekly"], default="daily", help="Digest period")
+    p_team_digest.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_participant = subparsers.add_parser("participant", help="Discover, register, list, update, and assign collaboration participants")
+    p_participant_sub = p_participant.add_subparsers(dest="subcmd")
+    p_participant_discover = p_participant_sub.add_parser("discover", help="Discover local personal-domain Agent candidates")
+    p_participant_discover.add_argument("--recorded-by", default="agent", help="Actor recording discovery")
+    p_participant_discover.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_participant_register = p_participant_sub.add_parser("register", help="Register a local or remote participant")
+    p_participant_register.add_argument("--participant-id", required=True, help="Participant id")
+    p_participant_register.add_argument("--type", choices=["human", "agent"], default="agent", help="Participant type")
+    p_participant_register.add_argument("--domain", choices=["personal-local", "team-remote", "team-local"], default="personal-local", help="Participant domain")
+    p_participant_register.add_argument("--entrypoint", default="", help="CLI, URL, declared contact, or remote invitation ref")
+    p_participant_register.add_argument("--capability", action="append", default=[], help="Capability")
+    p_participant_register.add_argument("--default-role", action="append", default=[], help="Default role")
+    p_participant_register.add_argument("--step", type=int, action="append", default=[], help="Eligible step")
+    p_participant_register.add_argument("--remote", action="store_true", help="Participant is remote and declarative, not locally callable")
+    p_participant_register.add_argument("--recorded-by", required=True, help="Actor recording registration")
+    p_participant_register.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_participant_list = p_participant_sub.add_parser("list", help="List team participants")
+    p_participant_list.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_participant_assign = p_participant_sub.add_parser("assign", help="Assign a participant to a change step")
+    p_participant_assign.add_argument("--participant-id", required=True, help="Participant id")
+    p_participant_assign.add_argument("--change-id", required=True, help="Target change id")
+    p_participant_assign.add_argument("--step", type=int, required=True, help="Step number")
+    p_participant_assign.add_argument("--role", choices=["owner", "executor", "reviewer", "participant"], required=True, help="Role")
+    p_participant_assign.add_argument("--recorded-by", required=True, help="Actor recording assignment")
+    p_participant_assign.add_argument("--note", default="", help="Assignment note")
+    p_participant_assign.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_participant_update = p_participant_sub.add_parser("update", help="Update a participant")
+    p_participant_update.add_argument("--participant-id", required=True, help="Participant id")
+    p_participant_update.add_argument("--domain", default=None, help="Updated domain")
+    p_participant_update.add_argument("--entrypoint", default=None, help="Updated entrypoint")
+    p_participant_update.add_argument("--capability", action="append", default=[], help="Replacement capability")
+    p_participant_update.add_argument("--default-role", action="append", default=[], help="Replacement default role")
+    p_participant_update.add_argument("--step", type=int, action="append", default=[], help="Replacement eligible step")
+    p_participant_update.add_argument("--remote", action="store_true", help="Mark as remote")
+    p_participant_update.add_argument("--recorded-by", required=True, help="Actor recording update")
+    p_participant_update.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_assignment = subparsers.add_parser("assignment", help="Set team assignments")
+    p_assignment.add_argument("subcmd", choices=["set"], help="Assignment action")
+    p_assignment.add_argument("--change-id", required=True, help="Target change id")
+    p_assignment.add_argument("--step", type=int, required=True, help="Step number")
+    p_assignment.add_argument("--role", choices=["owner", "executor", "reviewer", "participant"], required=True, help="Role")
+    p_assignment.add_argument("--actor", required=True, help="Assigned actor")
+    p_assignment.add_argument("--recorded-by", required=True, help="Actor recording assignment")
+    p_assignment.add_argument("--note", default="", help="Assignment note")
+    p_assignment.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_blocked = subparsers.add_parser("blocked", help="Set or clear team blockers")
+    p_blocked_sub = p_blocked.add_subparsers(dest="subcmd")
+    p_blocked_set = p_blocked_sub.add_parser("set", help="Set a blocker")
+    p_blocked_set.add_argument("--change-id", required=True, help="Target change id")
+    p_blocked_set.add_argument("--reason", required=True, help="Block reason")
+    p_blocked_set.add_argument("--waiting-on", required=True, help="Who or what is blocking")
+    p_blocked_set.add_argument("--next-decision", required=True, help="Next decision")
+    p_blocked_set.add_argument("--recorded-by", required=True, help="Actor recording blocker")
+    p_blocked_set.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_blocked_clear = p_blocked_sub.add_parser("clear", help="Clear a blocker")
+    p_blocked_clear.add_argument("--block-id", required=True, help="Block id")
+    p_blocked_clear.add_argument("--recorded-by", required=True, help="Actor clearing blocker")
+    p_blocked_clear.add_argument("--resolution", default="", help="Resolution note")
+    p_blocked_clear.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_reviewer = subparsers.add_parser("reviewer", help="Manage reviewer queue")
+    p_reviewer_sub = p_reviewer.add_subparsers(dest="subcmd")
+    p_reviewer_queue = p_reviewer_sub.add_parser("queue", help="List or enqueue reviewer work")
+    p_reviewer_queue.add_argument("--change-id", default=None, help="Target change id to enqueue; omit to list")
+    p_reviewer_queue.add_argument("--reviewer", default="", help="Reviewer id")
+    p_reviewer_queue.add_argument("--priority", choices=["low", "normal", "high", "urgent"], default="normal", help="Priority")
+    p_reviewer_queue.add_argument("--recorded-by", default="", help="Actor recording queue entry")
+    p_reviewer_queue.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_recurring = subparsers.add_parser("recurring-intent", help="Manage recurring intents")
+    p_recurring_sub = p_recurring.add_subparsers(dest="subcmd")
+    p_recurring_add = p_recurring_sub.add_parser("add", help="Add recurring intent")
+    p_recurring_add.add_argument("--intent-id", required=True, help="Intent id")
+    p_recurring_add.add_argument("--summary", required=True, help="Intent summary")
+    p_recurring_add.add_argument("--cadence", required=True, help="Cadence")
+    p_recurring_add.add_argument("--recorded-by", required=True, help="Actor recording intent")
+    p_recurring_add.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_recurring_trigger = p_recurring_sub.add_parser("trigger", help="Trigger recurring intent into a governed change draft")
+    p_recurring_trigger.add_argument("--intent-id", required=True, help="Intent id")
+    p_recurring_trigger.add_argument("--change-id", required=True, help="New change id")
+    p_recurring_trigger.add_argument("--recorded-by", required=True, help="Actor recording trigger")
+    p_recurring_trigger.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_carry = subparsers.add_parser("carry-forward", help="Manage carry-forward candidates")
+    p_carry_sub = p_carry.add_subparsers(dest="subcmd")
+    p_carry_list = p_carry_sub.add_parser("list", help="List carry-forward candidates")
+    p_carry_list.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_carry_add = p_carry_sub.add_parser("add", help="Add carry-forward candidate")
+    p_carry_add.add_argument("--item-id", required=True, help="Item id")
+    p_carry_add.add_argument("--summary", required=True, help="Summary")
+    p_carry_add.add_argument("--source-change-id", required=True, help="Source change id")
+    p_carry_add.add_argument("--recorded-by", required=True, help="Actor recording item")
+    p_carry_add.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_carry_promote = p_carry_sub.add_parser("promote", help="Promote carry-forward candidate into a governed change draft")
+    p_carry_promote.add_argument("--item-id", required=True, help="Item id")
+    p_carry_promote.add_argument("--change-id", required=True, help="New change id")
+    p_carry_promote.add_argument("--recorded-by", required=True, help="Actor recording promotion")
+    p_carry_promote.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
+    p_retro = subparsers.add_parser("retrospective", help="Manage team retrospectives")
+    p_retro_sub = p_retro.add_subparsers(dest="subcmd")
+    p_retro_add = p_retro_sub.add_parser("add", help="Add team retrospective")
+    p_retro_add.add_argument("--retrospective-id", required=True, help="Retrospective id")
+    p_retro_add.add_argument("--change-id", required=True, help="Change id")
+    p_retro_add.add_argument("--summary", required=True, help="Summary")
+    p_retro_add.add_argument("--learning", action="append", default=[], help="Learning")
+    p_retro_add.add_argument("--recorded-by", required=True, help="Actor recording retrospective")
+    p_retro_add.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_retro_list = p_retro_sub.add_parser("list", help="List team retrospectives")
+    p_retro_list.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
     p_intent = subparsers.add_parser("intent", help="Capture and confirm project intent")
     p_intent_sub = p_intent.add_subparsers(dest="subcmd")
     p_intent_capture = p_intent_sub.add_parser("capture", help="Write human-visible intent confirmation materials")
@@ -2046,6 +2429,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_contract_validate = p_contract_sub.add_parser("validate", help="Validate contract for a change")
     p_contract_validate.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
     p_contract_validate.add_argument("--path", default=None, help="Optional explicit contract path")
+
+    p_preflight = subparsers.add_parser("preflight", help="Check execution readiness before modifying project files")
+    p_preflight_sub = p_preflight.add_subparsers(dest="subcmd")
+    p_preflight_check = p_preflight_sub.add_parser("check", help="Check whether project files may be modified")
+    p_preflight_check.add_argument("--change-id", default=None, help="Target change id (defaults to current active change)")
+    p_preflight_check.add_argument("--path", action="append", default=[], help="Project file path intended for modification; repeat to check multiple paths against contract scope")
+    p_preflight_check.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+    p_preflight_recovery = p_preflight_sub.add_parser("recovery", help="Record an exceptional recovery for bypassed governance flow")
+    p_preflight_recovery.add_argument("--change-id", required=True, help="Target change id")
+    p_preflight_recovery.add_argument("--reason", required=True, help="Why normal preflight was bypassed")
+    p_preflight_recovery.add_argument("--modified", action="append", default=[], help="File modified before governance preflight")
+    p_preflight_recovery.add_argument("--missing", action="append", default=[], help="Missing governance item, e.g. contract/evidence/review")
+    p_preflight_recovery.add_argument("--action", action="append", default=[], help="Recovery action taken or required")
+    p_preflight_recovery.add_argument("--recorded-by", required=True, help="Actor recording the recovery")
+    p_preflight_recovery.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
     p_run = subparsers.add_parser("run", help="Execute change adapter")
     p_run.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
@@ -2274,6 +2672,22 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_participants_setup(args)
     elif args.command == "participants" and args.subcmd == "list":
         return cmd_participants_list(args)
+    elif args.command == "team":
+        return cmd_team(args)
+    elif args.command == "participant":
+        return cmd_participant(args)
+    elif args.command == "assignment":
+        return cmd_assignment(args)
+    elif args.command == "blocked":
+        return cmd_blocked(args)
+    elif args.command == "reviewer":
+        return cmd_reviewer(args)
+    elif args.command == "recurring-intent":
+        return cmd_recurring_intent(args)
+    elif args.command == "carry-forward":
+        return cmd_carry_forward(args)
+    elif args.command == "retrospective":
+        return cmd_retrospective(args)
     elif args.command == "intent" and args.subcmd == "capture":
         return cmd_intent_capture(args)
     elif args.command == "intent" and args.subcmd == "confirm":
@@ -2296,6 +2710,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_status(args)
     elif args.command == "contract" and args.subcmd == "validate":
         return cmd_contract_validate(args)
+    elif args.command == "preflight":
+        return cmd_preflight(args)
     elif args.command == "run":
         return cmd_run(args)
     elif args.command == "runtime":

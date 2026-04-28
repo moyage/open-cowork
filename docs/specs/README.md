@@ -14,5 +14,6 @@
 | `05-deterministic-resume-and-merge-safe-governance.md` | v0.3.6 确定性接续入口与可合并 `.governance/` 布局设计。 |
 | `06-team-adoption-and-context-pack.md` | v0.3.7 团队协作模式、成员职责边界、接手资料索引、接手摘要。 |
 | `07-v038-runtime-evidence-and-closeout.md` | v0.3.8 运行证据适配、运行事件接入、步骤报告可见性和最终闭环报告要求。 |
+| `08-v039-team-operating-loop.md` | v0.3.9 团队操作循环：参与者、分派、阻塞、审查队列、周期性意图、团队摘要、carry-forward 和复盘资产。 |
 
 普通使用者不需要先读本目录。Agent、维护者和 reviewer 在审计协议行为时按需读取。

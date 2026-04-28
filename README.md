@@ -113,6 +113,8 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 - 并行需求管理：同一项目可以同时存在多个正在推进的 change，接手时先选择要继续的需求。
 - 执行边界：通过 contract 明确允许范围、禁止动作、验证要求和证据要求。
 - 完整实现约束：已确认的需求、范围和验收标准默认要求完整实现；未经人明确批准，Agent 不得自行降级为最小实现、部分实现或延期实现。
+- 执行前检查：已启用 open-cowork 的项目，Agent 修改项目文件前必须先确认 active change、contract、scope、Step 5 approval 和 Step 6 readiness；事后补录只能作为 recovery，不能伪装成正常 evidence。
+- 团队操作循环：维护 `.governance/team/**` 中的参与者、分派、阻塞、审查队列、周期性意图、团队摘要、carry-forward 和复盘资产，让个人域 Agent 与远程团队成员 Agent 能围绕同一项目事实协作。
 - 证据与审查：执行结果、测试输出、review decision 和 human gate 都可追溯。
 - 低侵入协同：不强制统一 IDE、Agent runtime、工作台或团队成员的个人域工具组合。
 
@@ -135,6 +137,7 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 | 当前状态摘要 | `.governance/local/current-state.md` | 人 + Agent |
 | 项目索引 | `.governance/index/*.yaml` | Agent |
 | 协作模式与成员职责边界 | `.governance/profiles/adoption.yaml`、`.governance/participants/*.yaml` | Agent + 团队 |
+| 团队操作循环事实 | `.governance/team/*.yaml`、`.governance/team/retrospectives/` | Agent + 团队 |
 | 当前变更包 | `.governance/changes/<change-id>/` | Agent + Reviewer |
 | 执行边界与角色绑定 | `contract.yaml`、`bindings.yaml` | Agent + 人 |
 | 接手材料 | `context/context-pack.yaml`、`context/handoff-compact.md` | 新会话 Agent + Reviewer |

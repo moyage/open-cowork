@@ -23,6 +23,7 @@ venv/
 .governance/changes/
 .governance/archive/
 .governance/runtime/
+.governance/team/
 
 # Keep templates committed
 !.governance/templates/

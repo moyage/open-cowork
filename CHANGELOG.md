@@ -1,5 +1,17 @@
 # 变更日志
 
+## 0.3.9
+
+- 增加 Team Operating Loop：`ocw team status` / `ocw team digest` 聚合 active changes、分派、阻塞、审查队列、周期性意图、carry-forward 和复盘资产。
+- 增加团队参与者命令：`ocw participant discover/register/list/assign/update`，支持本地个人域 Agent 候选探测、远程团队成员 Agent 声明式登记和步骤参与者调整。
+- 增加分派、阻塞和审查队列：`ocw assignment set`、`ocw blocked set/clear`、`ocw reviewer queue`，并阻断 reviewer 自审风险。
+- 增加周期性意图与 carry-forward 候选池：`ocw recurring-intent add/trigger`、`ocw carry-forward list/add/promote`；触发和提升只创建 Step 1 草稿，不进入 Step 6。
+- 增加团队复盘资产：`ocw retrospective add/list` 写入 `.governance/team/retrospectives/`，并被 team digest 引用。
+- 增加执行前治理 guard：`ocw preflight check` 在已启用 open-cowork 的项目中校验 active change、contract、Step 5 批准、Step 6 readiness，并支持 `--path` 对待修改文件执行 `scope_in` / `scope_out` 范围校验。
+- 增加绕过流程后的 recovery 记录：`ocw preflight recovery` 只能作为异常恢复路径，记录 bypass reason、已修改文件、缺失证据和恢复动作，不能伪装成正常 evidence。
+- 收紧多 Agent 协作安全：Agent 登记参与者默认进入待人工审阅状态；reviewer 自审阻断会同时读取 team assignment 与 change package bindings 中既有 Step 6 executor / owner。
+- 将 v0.3.9 规格、README、版本号和回归测试更新到完整实现状态，覆盖团队操作循环、参与者接入、执行前 guard、恢复路径、步骤边界和发布清理。
+
 ## 0.3.8
 
 - 增加完整实现治理约束：需求、`scope_in`、任务完成定义和验收标准默认要求完整实现，未经人明确批准不得降级为最小实现、部分实现或延期实现；验证阶段会阻断未批准的未完成任务。

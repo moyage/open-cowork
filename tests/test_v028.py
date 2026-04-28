@@ -126,8 +126,9 @@ class V028HumanGatesTests(unittest.TestCase):
                 ])
 
             change_dir = root / ".governance/changes/CHG-REPORTS"
-            for step in (3, 4, 5):
-                self.assertTrue((change_dir / f"step-reports/step-{step}.yaml").exists())
+            self.assertTrue((change_dir / "step-reports/step-1.yaml").exists())
+            for step in (2, 3, 4, 5):
+                self.assertFalse((change_dir / f"step-reports/step-{step}.yaml").exists())
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -138,9 +139,9 @@ class V028HumanGatesTests(unittest.TestCase):
                 ])
             self.assertEqual(capture_exit, 0)
             self.assertIn("Step 1", stdout.getvalue())
-            self.assertIn("Step 2", stdout.getvalue())
-            for step in (1, 2):
-                self.assertTrue((change_dir / f"step-reports/step-{step}.yaml").exists())
+            self.assertIn("confirm Step 1 before generating future step reports", stdout.getvalue())
+            self.assertTrue((change_dir / "step-reports/step-1.yaml").exists())
+            self.assertFalse((change_dir / "step-reports/step-2.yaml").exists())
             manifest = load_yaml(change_dir / "manifest.yaml")
             self.assertFalse(manifest["readiness"]["step6_entry_ready"])
 

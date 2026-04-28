@@ -98,7 +98,9 @@ def _materialize_intent_step_reports(root: str | Path, change_id: str) -> None:
     from .contract import ContractValidationError
     from .step_report import materialize_step_report
 
-    for step in (1, 2):
+    intent = load_yaml(Path(root) / ".governance" / "changes" / change_id / "intent-confirmation.yaml")
+    steps = (1, 2) if intent.get("status") == "confirmed" else (1,)
+    for step in steps:
         try:
             materialize_step_report(root, change_id=change_id, step=step)
         except ContractValidationError:

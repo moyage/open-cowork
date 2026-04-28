@@ -28,6 +28,8 @@ class V029ReviewArchiveGateTests(unittest.TestCase):
                 ])
             self.assertEqual(prepare_exit, 0)
             self.assertIn("Step 5 approval is required before Step 6 execution", prepare_stdout.getvalue())
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "intent", "confirm", "--change-id", "CHG-HANDOFF", "--confirmed-by", "human-sponsor"])
 
             report_stdout = io.StringIO()
             with contextlib.redirect_stdout(report_stdout):

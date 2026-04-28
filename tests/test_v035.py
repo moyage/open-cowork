@@ -124,12 +124,11 @@ class V035ProjectActivationTests(unittest.TestCase):
                 "python3 -c 'print(\"ok\")'",
             )
 
-            report = load_yaml(root / ".governance/changes/CHG-V035-FACTS/step-reports/step-3.yaml")
+            report = load_yaml(root / ".governance/changes/CHG-V035-FACTS/step-reports/step-1.yaml")
 
             self.assertEqual(report["intent_summary"]["project_intent"], "Decision facts")
             self.assertIn("src/**", report["intent_summary"]["scope_in"])
             self.assertEqual(report["intent_summary"]["facts_source"], "contract")
-            self.assertIn("python3 -c 'print(\"ok\")'", report["artifact_summary"]["verification_commands"])
 
     def test_step_reports_fall_back_to_contract_when_intent_scope_is_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -316,6 +315,7 @@ class V035ProjectActivationTests(unittest.TestCase):
             "05-deterministic-resume-and-merge-safe-governance.md",
             "06-team-adoption-and-context-pack.md",
             "07-v038-runtime-evidence-and-closeout.md",
+            "08-v039-team-operating-loop.md",
             "README.md",
         ])
 

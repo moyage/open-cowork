@@ -16,6 +16,7 @@
 
 Deterministic protocol trigger: run `ocw resume` before continuing project work. Natural language is only a request to run the command, not the protocol trigger.
 Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, archive, and continuity.
+Before modifying project files, run execution preflight through open-cowork. If preflight says project files cannot be modified, stop and report the missing active change, gate, contract, scope, or readiness item. Do not complete implementation first and then ask whether to backfill open-cowork.
 
 ## 硬边界
 
@@ -25,3 +26,4 @@ Do not ask the human to memorize ocw commands. Use `ocw` only as an internal too
 - review 通过前不要 archive。
 - 不要在执行过程中暗中改写 contract 或 bindings。
 - 不要把完整需求自行降级为最小实现、部分实现或后续再补。
+- 不要把事后补录伪装成正常 Step 6 evidence；绕过流程只能记录为 recovery。

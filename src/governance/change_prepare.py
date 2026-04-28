@@ -132,8 +132,7 @@ def _preserve_participant_bindings(existing: dict, generated: dict) -> dict:
 def _materialize_prepare_step_reports(root: str | Path, change_id: str) -> None:
     from .step_report import materialize_step_report
 
-    for step in (1, 2, 3, 4, 5):
-        materialize_step_report(root, change_id=change_id, step=step)
+    materialize_step_report(root, change_id=change_id, step=1)
 
 
 def _write_markdown_files(

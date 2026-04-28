@@ -30,6 +30,7 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
     selected_step = step or matrix["current_step"]
     if not isinstance(selected_step, int) or selected_step < 1 or selected_step > 9:
         raise ValueError("step must be an integer from 1 to 9")
+    _ensure_future_step_report_allowed(selected_step, matrix, intent, package.path)
     report_dir = package.path / "step-reports"
     existing_report = _load_optional_yaml(report_dir / f"step-{selected_step}.yaml")
     timing = _timing_for_report(existing_report, _status_for_step(selected_step, matrix))
@@ -107,6 +108,14 @@ def _approval_for_step(human_gates: dict, step: int) -> dict:
     if not isinstance(approvals, dict):
         return {}
     return approvals.get(step) or approvals.get(str(step)) or approvals.get(f"'{step}'") or {}
+
+
+def _ensure_future_step_report_allowed(selected_step: int, matrix: dict, intent: dict, change_dir: Path) -> None:
+    current_step = matrix.get("current_step")
+    if not isinstance(current_step, int) or selected_step <= current_step:
+        return
+    if current_step == 1 and intent.get("status") != "confirmed":
+        raise ContractValidationError("Step 1 must be confirmed before future step reports are generated")
 
 
 def _phase_index(step: int) -> int:

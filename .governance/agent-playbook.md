@@ -12,10 +12,12 @@
 4. 使用 `ocw resume` recommended read set 中的 contract.yaml 作为执行边界。
 5. 使用 `ocw resume` recommended read set 中的 bindings.yaml 作为 owner 映射。
 6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。
-7. verify、review 或 archive 前先记录客观 evidence。
-8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
-9. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。
-10. 所有已确认需求都按完整实现推进；如需降级、拆分或延期，先停下记录影响并取得人的明确批准。
+7. 修改项目文件前先运行 execution preflight；preflight 未通过时停止执行并汇报缺失 gate、contract、scope 或 readiness。
+8. verify、review 或 archive 前先记录客观 evidence。
+9. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
+10. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。
+11. 所有已确认需求都按完整实现推进；如需降级、拆分或延期，先停下记录影响并取得人的明确批准。
+12. 如果发现已有实现绕过 open-cowork，只能记录 flow bypass recovery，再补齐治理链路；不要把 recovery 当成正常 Step 6 evidence。
 
 ## Human update template
 

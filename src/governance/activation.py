@@ -124,6 +124,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
                 "waiting_on": "contract.yaml and bindings.yaml",
                 "next_decision": f"Step {current_step} / {STEP_LABELS.get(current_step, current_step)}",
             },
+            "execution_preflight": _execution_preflight(paths.root, str(change_id)),
             "recommended_read_set": [
                 ".governance/AGENTS.md",
                 _current_state_path(paths),
@@ -164,6 +165,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
             "waiting_on": snapshot.get("waiting_on"),
             "next_decision": snapshot.get("next_decision"),
         },
+        "execution_preflight": _execution_preflight(paths.root, str(change_id)),
         "recommended_read_set": active_read_set,
         "agent_instructions": [
             "continue the active change; do not reinstall unless .governance is missing.",
@@ -173,6 +175,7 @@ def _activation_for_change(paths: GovernancePaths, activation: dict, change_id: 
                 if context_reads else []
             ),
             "Respect the active contract scope and the current single-step gate.",
+            "Run execution preflight before modifying project files; do not treat open-cowork evidence as optional backfill.",
             "Report goal, current step, owner, blockers, next action, and human decision needed.",
         ],
     })
@@ -200,6 +203,15 @@ def format_project_activation(payload: dict) -> str:
             f"- waiting_on: {active.get('waiting_on')}",
             f"- next_decision: {active.get('next_decision')}",
         ])
+    preflight = payload.get("execution_preflight") or {}
+    if preflight:
+        lines.extend([
+            "",
+            "Execution preflight:",
+            f"- can_modify_project_files: {str(preflight.get('can_execute')).lower()}",
+            f"- reason: {preflight.get('reason')}",
+            f"- required_action: {preflight.get('required_action')}",
+        ])
     active_changes = payload.get("active_changes") or []
     if active_changes:
         lines.extend(["", "Active changes:"])
@@ -223,6 +235,20 @@ def format_project_activation(payload: dict) -> str:
 def _write_activation(paths: GovernancePaths, payload: dict) -> None:
     paths.local_dir.mkdir(parents=True, exist_ok=True)
     write_yaml(paths.project_activation_file(), payload)
+
+
+def _execution_preflight(root: str | Path, change_id: str) -> dict:
+    try:
+        from .preflight import check_execution_preflight
+
+        return check_execution_preflight(root, change_id)
+    except Exception as exc:
+        return {
+            "schema": "execution-preflight/v1",
+            "can_execute": False,
+            "reason": "preflight_unavailable",
+            "required_action": f"resolve preflight error before modifying project files: {exc}",
+        }
 
 
 def _current_state_path(paths: GovernancePaths) -> str:
