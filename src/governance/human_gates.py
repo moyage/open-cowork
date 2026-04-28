@@ -33,6 +33,10 @@ def approve_step(
     _require_strict_step_gate(package, payload, step)
     _require_trusted_approval(package, payload, step, approved_by, recorded_by, approval_token)
     approvals = payload.setdefault("approvals", {})
+    payload["writer"] = {
+        "tool": "ocw step approve",
+        "source": "governance.human_gates.approve_step",
+    }
     approvals[step] = {
         "status": "approved",
         "approved_by": approved_by,
@@ -63,6 +67,10 @@ def record_intent_confirmation_approval(
     existing = approvals.get(1) or approvals.get("1")
     if existing and existing.get("status") == "approved":
         return payload
+    payload["writer"] = {
+        "tool": "ocw intent confirm",
+        "source": "governance.human_gates.record_intent_confirmation_approval",
+    }
     approvals[1] = {
         "status": "approved",
         "approved_by": confirmed_by,
@@ -90,6 +98,10 @@ def record_bypass(
     path = package.path / "human-gates.yaml"
     payload = load_yaml(path) if path.exists() else {"schema": "human-gates/v1", "change_id": change_id, "approvals": {}}
     bypasses = payload.setdefault("bypasses", [])
+    payload["writer"] = {
+        "tool": "ocw review",
+        "source": "governance.human_gates.record_bypass",
+    }
     bypasses.append({
         "step": step,
         "reason": reason,

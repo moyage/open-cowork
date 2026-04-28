@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import subprocess
 
 from .change_package import update_manifest
@@ -13,6 +14,11 @@ from .step_matrix import write_step_matrix_view
 
 def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool = False, timeout_seconds: int = 120) -> dict:
     paths = GovernancePaths(Path(root))
+    from .audit import audit_failures_for_gate, run_governance_audit
+
+    audit = run_governance_audit(paths.root, change_id)
+    if audit_failures_for_gate(audit, "verify"):
+        raise ValueError(f"change '{change_id}' has fail-level governance audit findings before verify")
     manifest_before = load_yaml(paths.change_file(change_id, "manifest.yaml"))
     allowed_retry = manifest_before.get("current_step") == 7 and manifest_before.get("status") in {"step7-blocked", "step7-verified"}
     allowed_first_verify = manifest_before.get("current_step") == 6 and manifest_before.get("status") == "step6-executed-pre-step7"
@@ -46,11 +52,21 @@ def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool 
     payload = {
         "schema": "verify-result/v1",
         "change_id": change_id,
+        "writer": {
+            "tool": "ocw verify",
+            "canonical_artifact": "VERIFY_REPORT.md",
+            "source": "governance.verify.write_verify_result",
+        },
         "summary": {
             "status": summary_status,
             "blocker_count": state_consistency.get("summary", {}).get("blocker_count", 0),
         },
         "checks": [
+            {
+                "name": "governance-audit",
+                "status": audit.get("status"),
+                "summary": audit.get("summary", {}),
+            },
             {
                 "name": "state-consistency",
                 "status": state_consistency.get("status"),
@@ -74,6 +90,7 @@ def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool 
         ] + downgrade_issues,
     }
     write_yaml(verify_path, payload)
+    _write_verify_report(paths, change_id, payload)
 
     next_status = "step7-verified" if summary_status == "pass" else "step7-blocked"
     manifest = update_manifest(root, change_id, status=next_status, current_step=7)
@@ -99,6 +116,56 @@ def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool 
         current_change_id=change_id,
     )
     return payload
+
+
+def _write_verify_report(paths: GovernancePaths, change_id: str, payload: dict) -> Path:
+    report_path = paths.change_file(change_id, "VERIFY_REPORT.md")
+    summary = payload.get("summary") or {}
+    checks = payload.get("checks") or []
+    commands = (payload.get("product_verification") or {}).get("commands") or []
+    lines = [
+        "---",
+        "schema: verify-report/v1",
+        f"change_id: {change_id}",
+        "canonical_artifact: true",
+        "source_facts: verify.yaml",
+        f"source_digest: sha256:{_sha256(paths.change_file(change_id, 'verify.yaml'))}",
+        "---",
+        "",
+        "# Step 7 Verification Report",
+        "",
+        f"- status: {summary.get('status')}",
+        f"- blocker_count: {summary.get('blocker_count', 0)}",
+        "",
+        "## Checks",
+    ]
+    for check in checks:
+        lines.append(f"- {check.get('name')}: {check.get('status')}")
+    lines.append("")
+    lines.append("## Product Verification")
+    if commands:
+        for item in commands:
+            lines.append(f"- {item.get('command')}: {item.get('status')}")
+    else:
+        lines.append("- no product commands declared")
+    issues = payload.get("issues") or []
+    lines.append("")
+    lines.append("## Issues")
+    if issues:
+        for issue in issues:
+            lines.append(f"- {issue}")
+    else:
+        lines.append("- none")
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return report_path
+
+
+def _sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def _product_verification(root: Path, *, commands: list[str], run_commands: bool, timeout_seconds: int) -> dict:
@@ -151,11 +218,7 @@ def _unapproved_downgrade_issues(paths: GovernancePaths, change_id: str, contrac
     tasks_path = paths.change_file(change_id, "tasks.md")
     if not tasks_path.exists():
         return []
-    unchecked = [
-        line.strip()[6:].strip()
-        for line in tasks_path.read_text(encoding="utf-8").splitlines()
-        if line.strip().startswith("- [ ]")
-    ]
+    unchecked = _unchecked_in_scope_tasks(tasks_path.read_text(encoding="utf-8"))
     if not unchecked:
         return []
     revision_path = paths.change_file(change_id, "scope-revisions.yaml")
@@ -167,3 +230,19 @@ def _unapproved_downgrade_issues(paths: GovernancePaths, change_id: str, contrac
     }
     blockers = [item for item in unchecked if item not in approved]
     return [f"unapproved incomplete task - {item}" for item in blockers]
+
+
+def _unchecked_in_scope_tasks(text: str) -> list[str]:
+    unchecked: list[str] = []
+    in_out_of_scope = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip().lower()
+            in_out_of_scope = heading in {"out of scope", "scope out", "非范围", "范围外"}
+            continue
+        if in_out_of_scope:
+            continue
+        if stripped.startswith("- [ ]"):
+            unchecked.append(stripped[6:].strip())
+    return unchecked

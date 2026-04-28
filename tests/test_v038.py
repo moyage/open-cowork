@@ -180,6 +180,25 @@ class V038RuntimeEvidenceCloseoutTests(unittest.TestCase):
             verify = load_yaml(root / ".governance/changes/CHG-V038-FULL/verify.yaml")
             self.assertIn("unapproved incomplete task - Required complete task", verify["issues"])
 
+    def test_full_implementation_gate_ignores_out_of_scope_checklist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._run_cli(root, "init")
+            self._prepare(root, "CHG-V038-SCOPE-OUT", "Full implementation with exclusions")
+            contract_path = root / ".governance/changes/CHG-V038-SCOPE-OUT/contract.yaml"
+            contract = load_yaml(contract_path)
+            contract.setdefault("forbidden_actions", []).append("downgrade_or_partial_implementation_without_human_approval")
+            write_yaml(contract_path, contract)
+            (root / ".governance/changes/CHG-V038-SCOPE-OUT/tasks.md").write_text(
+                "- [x] Required complete task\n\n## OUT OF SCOPE\n\n- [ ] Excluded platform work\n",
+                encoding="utf-8",
+            )
+            self._run_cli(root, "run", "--change-id", "CHG-V038-SCOPE-OUT", "--modified", "docs/full.md")
+            output = self._run_cli(root, "verify", "--change-id", "CHG-V038-SCOPE-OUT")
+            self.assertIn("-> pass", output)
+            verify = load_yaml(root / ".governance/changes/CHG-V038-SCOPE-OUT/verify.yaml")
+            self.assertEqual([], verify["issues"])
+
     def _prepare(self, root: Path, change_id: str, goal: str) -> None:
         self._run_cli(root, "change", "create", change_id, "--title", goal)
         self._run_cli(

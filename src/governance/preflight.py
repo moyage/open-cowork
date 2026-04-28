@@ -83,6 +83,18 @@ def check_execution_preflight(root: str | Path, change_id: str | None = None, pa
             "reason": "step6_readiness_required",
             "required_action": "mark Step 6 readiness from the approved change package before modifying project files",
         }
+    from .audit import audit_failures_for_gate, run_governance_audit
+
+    audit = run_governance_audit(paths.root, resolved_change_id)
+    audit_failures = audit_failures_for_gate(audit, "preflight")
+    if audit_failures:
+        return {
+            **base,
+            "reason": "governance_audit_required",
+            "required_action": "resolve fail-level governance audit findings before modifying project files",
+            "audit_ref": f".governance/changes/{resolved_change_id}/",
+            "audit_failures": _audit_failures(audit_failures),
+        }
     scope_result = _scope_check(contract_path, list(paths_to_modify or []))
     if not scope_result["allowed"]:
         return {
@@ -248,6 +260,18 @@ def _step5_is_approved(change_dir: Path) -> bool:
     approvals = gates.get("approvals", {}) if isinstance(gates, dict) else {}
     approval = approvals.get(5) or approvals.get("5") or approvals.get("'5'")
     return isinstance(approval, dict) and approval.get("status") == "approved"
+
+
+def _audit_failures(failures: list[dict]) -> list[dict]:
+    return [
+        {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "message": item.get("message"),
+            "required_action": item.get("required_action"),
+        }
+        for item in failures
+    ]
 
 
 def _now_utc() -> str:

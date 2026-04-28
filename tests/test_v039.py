@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -51,6 +53,22 @@ class V039PreflightGuardTests(unittest.TestCase):
             self.assertEqual(payload["reason"], "ready_for_step6")
             self.assertEqual(payload["contract_ref"], ".governance/changes/CHG-V039-READY/contract.yaml")
             self.assertEqual(payload["evidence_ref"], ".governance/changes/CHG-V039-READY/evidence/")
+
+    def test_preflight_blocks_baseline_required_change_without_digest_binding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            V039GovernanceAuditTests()._write_audited_change(
+                root,
+                "CHG-V039-PREFLIGHT-AUDIT",
+                step5_note="approved baseline without digest",
+            )
+
+            output = self._run_cli(root, "preflight", "check", "--change-id", "CHG-V039-PREFLIGHT-AUDIT", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            self.assertFalse(payload["can_execute"])
+            self.assertEqual(payload["reason"], "governance_audit_required")
+            self.assertEqual(payload["audit_failures"][0]["name"], "step5_baseline_approval_binding")
 
     def test_preflight_checks_paths_against_contract_scope(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -178,6 +196,7 @@ class V039PreflightGuardTests(unittest.TestCase):
                 "step6_entry_ready": step5_approved,
                 "missing_items": [] if step5_approved else ["step5_approval"],
             },
+            "target_validation_objects": ["foundation/components/**"],
         })
         write_yaml(change_dir / "contract.yaml", {
             "change_id": change_id,
@@ -185,7 +204,12 @@ class V039PreflightGuardTests(unittest.TestCase):
             "scope_in": ["foundation/components/**"],
             "scope_out": [".governance/archive/**"],
             "allowed_actions": ["edit_files", "run_commands"],
-            "forbidden_actions": ["no_step6_before_step5_ready"],
+            "forbidden_actions": [
+                "no_truth_source_pollution",
+                "no_executor_reviewer_merge",
+                "no_executor_stable_write_authority",
+                "no_step6_before_step5_ready",
+            ],
             "validation_objects": ["foundation/components/**"],
             "verification": {"commands": ["python3 -m unittest"], "checks": ["v039"]},
             "evidence_expectations": {"required": ["test_output"]},
@@ -194,6 +218,8 @@ class V039PreflightGuardTests(unittest.TestCase):
             "steps": {
                 "5": {"owner": "human-sponsor", "gate": "approval-required", "human_gate": True},
                 "6": {"owner": "executor-agent", "gate": "auto-pass-to-step7", "human_gate": False},
+                "7": {"owner": "verifier-agent", "gate": "review-required", "human_gate": False},
+                "8": {"owner": "reviewer-agent", "reviewer": "reviewer-agent", "gate": "approval-required", "human_gate": True},
             },
         })
         approvals = {}
@@ -221,6 +247,465 @@ class V039PreflightGuardTests(unittest.TestCase):
             "current_change_active": status,
             "current_change_id": change_id,
         })
+
+    def _run_cli(self, root: Path, *args: str, expect: int = 0) -> str:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            exit_code = main(["--root", str(root), *args])
+        output = stdout.getvalue()
+        self.assertEqual(exit_code, expect, output)
+        return output
+
+
+class V039GovernanceAuditTests(unittest.TestCase):
+    def test_audit_fails_when_baseline_digest_binding_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(root, "CHG-AUDIT-BASELINE", step5_note="approved baseline without digest")
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-BASELINE", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            self.assertEqual(payload["status"], "fail")
+            check = self._check(payload, "step5_baseline_approval_binding")
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("baseline digest", check["message"])
+
+    def test_audit_accepts_canonical_baseline_with_digest_binding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-PASS",
+                step5_note="APPROVED_BASELINE_DIGEST",
+            )
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-PASS", "--format", "json")
+            payload = json.loads(output)
+
+            self.assertNotEqual(payload["status"], "fail")
+            self.assertEqual(self._check(payload, "baseline_canonical_artifact")["status"], "pass")
+            self.assertEqual(self._check(payload, "step5_baseline_approval_binding")["status"], "pass")
+
+    def test_audit_fails_when_required_step_output_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-EMPTY-DESIGN",
+                current_step=5,
+                status="step5-approved",
+                step5_note="APPROVED_BASELINE_DIGEST",
+            )
+            (root / ".governance/changes/CHG-AUDIT-EMPTY-DESIGN/design.md").write_text("TODO\n", encoding="utf-8")
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-EMPTY-DESIGN", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            check = self._check(payload, "step_3_required_output")
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("empty or template-like", check["message"])
+
+    def test_archive_blocks_unresolved_flow_bypass_recovery(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-RECOVERY",
+                current_step=8,
+                status="review-approved",
+                step5_note="APPROVED_BASELINE_DIGEST",
+                with_review=True,
+                archive_gates=True,
+            )
+            self._run_cli(
+                root,
+                "preflight",
+                "recovery",
+                "--change-id",
+                "CHG-AUDIT-RECOVERY",
+                "--reason",
+                "implemented before preflight",
+                "--modified",
+                "src/governance/cli.py",
+                "--missing",
+                "evidence",
+                "--action",
+                "review as exceptional recovery",
+                "--recorded-by",
+                "orchestrator-agent",
+            )
+
+            output = self._run_cli(root, "archive", "--change-id", "CHG-AUDIT-RECOVERY", expect=1)
+
+            self.assertIn("governance audit did not pass", output)
+            self.assertIn("flow_bypass_recovery", output)
+            self.assertFalse((root / ".governance/archive/CHG-AUDIT-RECOVERY/archive-receipt.yaml").exists())
+
+    def test_audit_reads_step9_required_output_from_archive_for_archived_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            change_id = "CHG-AUDIT-ARCHIVED"
+            self._write_audited_change(
+                root,
+                change_id,
+                current_step=9,
+                status="archived",
+                step5_note="APPROVED_BASELINE_DIGEST",
+                with_review=True,
+                archive_gates=True,
+            )
+            change_dir = root / ".governance/changes" / change_id
+            archive_dir = root / ".governance/archive" / change_id
+            shutil.copytree(change_dir, archive_dir)
+            review = load_yaml(archive_dir / "review.yaml")
+            review["writer"] = {"tool": "ocw review", "source": "governance.review.write_review_decision"}
+            write_yaml(archive_dir / "review.yaml", review)
+            write_yaml(archive_dir / "FINAL_STATE_CONSISTENCY_CHECK.yaml", {
+                "schema": "governance/final-state-consistency-check/v1",
+                "change_id": change_id,
+                "status": "pass",
+            })
+            write_yaml(archive_dir / "archive-receipt.yaml", {
+                "schema": "archive-receipt/v1",
+                "change_id": change_id,
+                "archive_executed": True,
+                "traceability": {
+                    "final_round_report": f".governance/archive/{change_id}/FINAL_ROUND_REPORT.md",
+                    "final_state_consistency": f".governance/archive/{change_id}/FINAL_STATE_CONSISTENCY_CHECK.yaml",
+                },
+            })
+            (archive_dir / "FINAL_ROUND_REPORT.md").write_text(
+                f"# 最终闭环报告：{change_id}\n\n## 初始需求\nArchived requirement.\n\n## 最终结论\n- 是否归档：是\n\n## 四阶段九步过程简报\nArchived final report.\n",
+                encoding="utf-8",
+            )
+            write_yaml(root / ".governance/index/current-change.yaml", {
+                "schema": "current-change/v1",
+                "status": "idle",
+                "current_change_id": None,
+                "current_step": None,
+                "current_change": {"change_id": None, "status": "idle", "current_step": None},
+            })
+            write_yaml(root / ".governance/index/maintenance-status.yaml", {
+                "schema": "maintenance-status/v1",
+                "status": "idle",
+                "current_change_active": "none",
+                "current_change_id": None,
+                "last_archived_change": change_id,
+            })
+
+            output = self._run_cli(root, "audit", "--change-id", change_id, "--format", "json")
+            payload = json.loads(output)
+
+            self.assertNotEqual(payload["status"], "fail")
+            self.assertEqual(self._check(payload, "state_consistency")["status"], "pass")
+            self.assertEqual(self._check(payload, "step_9_required_output")["status"], "pass")
+            self.assertIn(".governance/archive", self._check(payload, "step_9_required_output")["ref"])
+
+    def test_verify_blocks_fail_level_audit_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-VERIFY",
+                status="step6-executed-pre-step7",
+                step5_note="approved baseline without digest",
+            )
+            evidence_dir = root / ".governance/changes/CHG-AUDIT-VERIFY/evidence"
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(evidence_dir / "execution-summary.yaml", {"schema": "execution-summary/v1", "status": "completed"})
+
+            output = self._run_cli(root, "verify", "--change-id", "CHG-AUDIT-VERIFY", expect=1)
+
+            self.assertIn("fail-level governance audit findings", output)
+
+    def test_review_blocks_fail_level_audit_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-REVIEW",
+                current_step=7,
+                status="step7-verified",
+                step5_note="approved baseline without digest",
+            )
+            write_yaml(root / ".governance/changes/CHG-AUDIT-REVIEW/verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": "CHG-AUDIT-REVIEW",
+                "summary": {"status": "pass"},
+            })
+
+            output = self._run_cli(
+                root,
+                "review",
+                "--change-id",
+                "CHG-AUDIT-REVIEW",
+                "--decision",
+                "approve",
+                "--reviewer",
+                "reviewer-agent",
+                expect=1,
+            )
+
+            self.assertIn("fail-level governance audit findings", output)
+
+    def test_verify_and_review_write_canonical_markdown_reports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-REPORTS",
+                status="step6-executed-pre-step7",
+                step5_note="APPROVED_BASELINE_DIGEST",
+            )
+            evidence_dir = root / ".governance/changes/CHG-AUDIT-REPORTS/evidence"
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(evidence_dir / "execution-summary.yaml", {"schema": "execution-summary/v1", "status": "completed"})
+
+            self._run_cli(root, "verify", "--change-id", "CHG-AUDIT-REPORTS")
+            verify_report = root / ".governance/changes/CHG-AUDIT-REPORTS/VERIFY_REPORT.md"
+            self.assertTrue(verify_report.exists())
+            self.assertIn("canonical_artifact: true", verify_report.read_text(encoding="utf-8"))
+
+            self._run_cli(
+                root,
+                "review",
+                "--change-id",
+                "CHG-AUDIT-REPORTS",
+                "--decision",
+                "approve",
+                "--reviewer",
+                "reviewer-agent",
+                "--rationale",
+                "ready",
+            )
+            review_report = root / ".governance/changes/CHG-AUDIT-REPORTS/REVIEW_REPORT.md"
+            self.assertTrue(review_report.exists())
+            self.assertIn("source_facts: review.yaml", review_report.read_text(encoding="utf-8"))
+
+    def test_audit_reconciles_acknowledgement_that_became_human_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(root, "CHG-AUDIT-GATE-ACK", step5_note="APPROVED_BASELINE_DIGEST")
+            gates_path = root / ".governance/changes/CHG-AUDIT-GATE-ACK/human-gates.yaml"
+            gates = load_yaml(gates_path)
+            gates["acknowledgements"] = [{"step": 4, "status": "acknowledged", "acknowledged_by": "human-sponsor"}]
+            write_yaml(gates_path, gates)
+            bindings_path = root / ".governance/changes/CHG-AUDIT-GATE-ACK/bindings.yaml"
+            bindings = load_yaml(bindings_path)
+            bindings["steps"]["4"] = {"owner": "human-sponsor", "human_gate": True}
+            write_yaml(bindings_path, bindings)
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-GATE-ACK", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            check = self._check(payload, "human_gate_reconciliation")
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("acknowledgement exists", check["message"])
+
+    def test_audit_fails_manual_review_without_writer_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-MANUAL-REVIEW",
+                current_step=8,
+                status="review-approved",
+                step5_note="APPROVED_BASELINE_DIGEST",
+                with_review=True,
+            )
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-MANUAL-REVIEW", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            check = self._check(payload, "writer_metadata")
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("review.yaml", check["message"])
+
+    def test_audit_fails_canonical_report_source_digest_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(
+                root,
+                "CHG-AUDIT-DIGEST-MISMATCH",
+                current_step=7,
+                status="step7-verified",
+                step5_note="APPROVED_BASELINE_DIGEST",
+            )
+            report = root / ".governance/changes/CHG-AUDIT-DIGEST-MISMATCH/VERIFY_REPORT.md"
+            report.write_text(
+                "---\nschema: verify-report/v1\ncanonical_artifact: true\nsource_facts: verify.yaml\nsource_digest: sha256:"
+                + "0" * 64
+                + "\n---\n\n# Verify\n\nVerification completed.\n",
+                encoding="utf-8",
+            )
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-DIGEST-MISMATCH", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            check = self._check(payload, "canonical_artifact_consistency")
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("source_digest mismatch", check["message"])
+
+    def test_audit_fails_malformed_project_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(root, "CHG-AUDIT-RULE", step5_note="APPROVED_BASELINE_DIGEST")
+            policy_dir = root / ".governance/policies"
+            policy_dir.mkdir(parents=True, exist_ok=True)
+            write_yaml(policy_dir / "rules.yaml", {"rules": [{"id": "project-rule-without-fallback", "applies_to_steps": [7], "severity": "blocking", "evidence_required": ["audit"]}]})
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-RULE", "--format", "json", expect=1)
+            payload = json.loads(output)
+
+            check = self._check(payload, "rule_sources")
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("project-rule-without-fallback", check["message"])
+
+    def test_scope_violation_requires_explicit_scope_expansion_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_audited_change(root, "CHG-AUDIT-SCOPE", step5_note="APPROVED_BASELINE_DIGEST")
+            evidence_dir = root / ".governance/changes/CHG-AUDIT-SCOPE/evidence"
+            write_yaml(evidence_dir / "changed-files-manifest.yaml", {
+                "schema": "changed-files-manifest/v1",
+                "files": ["src/governance/audit.py", ".governance/changes/CHG-AUDIT-SCOPE/tasks.md"],
+            })
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-SCOPE", "--format", "json", expect=1)
+            payload = json.loads(output)
+            self.assertEqual(self._check(payload, "changed_files_scope")["status"], "fail")
+
+            write_yaml(evidence_dir / "scope-expansion-approval.yaml", {
+                "schema": "scope-expansion-approval/v1",
+                "change_id": "CHG-AUDIT-SCOPE",
+                "approved_by": "human-sponsor",
+                "approved_paths": [".governance/changes/CHG-AUDIT-SCOPE/tasks.md"],
+                "approval_text": "Human explicitly asked the executor to complete all task items.",
+            })
+
+            output = self._run_cli(root, "audit", "--change-id", "CHG-AUDIT-SCOPE", "--format", "json")
+            payload = json.loads(output)
+            self.assertEqual(self._check(payload, "changed_files_scope")["status"], "pass")
+
+    def _write_audited_change(
+        self,
+        root: Path,
+        change_id: str,
+        *,
+        current_step: int = 6,
+        status: str = "step6-in-progress",
+        step5_note: str,
+        with_review: bool = False,
+        archive_gates: bool = False,
+    ) -> None:
+        ensure_governance_index(root)
+        change_dir = root / ".governance/changes" / change_id
+        (change_dir / "step-reports").mkdir(parents=True, exist_ok=True)
+        (change_dir / "evidence").mkdir(parents=True, exist_ok=True)
+        for step in range(1, current_step + 1):
+            (change_dir / f"step-reports/step-{step}.md").write_text(f"# Step {step}\n\nMaterialized output.\n", encoding="utf-8")
+        (change_dir / "BASELINE_REVIEW.md").write_text(
+            "---\nschema: baseline-review/v1\ncanonical_artifact: true\n---\n\n# Baseline\n\nReviewable baseline.\n",
+            encoding="utf-8",
+        )
+        baseline_digest = hashlib.sha256((change_dir / "BASELINE_REVIEW.md").read_bytes()).hexdigest()
+        if step5_note == "APPROVED_BASELINE_DIGEST":
+            step5_note = f"Approved BASELINE_REVIEW.md digest sha256:{baseline_digest} for Step 6 authority."
+        (change_dir / "intent-confirmation.yaml").write_text("schema: intent-confirmation/v1\nstatus: confirmed\n", encoding="utf-8")
+        (change_dir / "requirements.md").write_text("# Requirements\n\nReviewable requirements for audit coverage.\n", encoding="utf-8")
+        (change_dir / "design.md").write_text("# Design\n\nReviewable design for audit coverage.\n", encoding="utf-8")
+        (change_dir / "tasks.md").write_text("# Tasks\n\nReviewable tasks for audit coverage.\n", encoding="utf-8")
+        if current_step >= 6:
+            write_yaml(change_dir / "evidence/execution-summary.yaml", {"schema": "execution-summary/v1", "status": "completed"})
+        if current_step >= 7:
+            write_yaml(change_dir / "verify.yaml", {
+                "schema": "verify-result/v1",
+                "change_id": change_id,
+                "writer": {
+                    "tool": "ocw verify",
+                    "canonical_artifact": "VERIFY_REPORT.md",
+                    "source": "governance.verify.write_verify_result",
+                },
+                "summary": {"status": "pass"},
+            })
+            (change_dir / "VERIFY_REPORT.md").write_text(
+                "---\nschema: verify-report/v1\ncanonical_artifact: true\nsource_facts: verify.yaml\n---\n\n# Verify\n\nVerification completed.\n",
+                encoding="utf-8",
+            )
+        if current_step >= 8:
+            (change_dir / "REVIEW_REPORT.md").write_text(
+                "---\nschema: review-report/v1\ncanonical_artifact: true\n---\n\n# Review\n\nReview completed.\n",
+                encoding="utf-8",
+            )
+        validation_objects = ["src/governance/**", "tests/**", f".governance/changes/{change_id}/BASELINE_REVIEW.md"]
+        write_yaml(change_dir / "manifest.yaml", {
+            "change_id": change_id,
+            "status": status,
+            "current_step": current_step,
+            "readiness": {"step6_entry_ready": True, "missing_items": []},
+            "target_validation_objects": validation_objects,
+        })
+        write_yaml(change_dir / "contract.yaml", {
+            "change_id": change_id,
+            "objective": "Audit governance invariants",
+            "scope_in": ["src/governance/**", "tests/**"],
+            "scope_out": [".governance/archive/**"],
+            "allowed_actions": ["edit_files", "run_commands"],
+            "forbidden_actions": [
+                "no_truth_source_pollution",
+                "no_executor_reviewer_merge",
+                "no_executor_stable_write_authority",
+                "no_step6_before_step5_ready",
+            ],
+            "validation_objects": validation_objects,
+            "verification": {"commands": ["python3 -m unittest"], "checks": ["audit"]},
+            "evidence_expectations": {"required": ["baseline_review"]},
+        })
+        write_yaml(change_dir / "bindings.yaml", {
+            "steps": {
+                "6": {"owner": "executor-agent", "gate": "auto-pass-to-step7", "human_gate": False},
+                "7": {"owner": "verifier-agent", "gate": "review-required", "human_gate": False},
+                "8": {"owner": "reviewer-agent", "reviewer": "reviewer-agent", "gate": "approval-required", "human_gate": True},
+            },
+        })
+        approvals = {
+            5: {"status": "approved", "approved_by": "human-sponsor", "note": step5_note},
+        }
+        if archive_gates:
+            approvals[8] = {"status": "approved", "approved_by": "human-sponsor"}
+            approvals[9] = {"status": "approved", "approved_by": "human-sponsor"}
+        write_yaml(change_dir / "human-gates.yaml", {"schema": "human-gates/v1", "change_id": change_id, "approvals": approvals})
+        if with_review:
+            write_yaml(change_dir / "review.yaml", {
+                "schema": "review-decision/v1",
+                "change_id": change_id,
+                "decision": {"status": "approve"},
+                "reviewers": [{"role": "reviewer", "id": "reviewer-agent"}],
+                "trace": {"evidence_refs": [], "verify_refs": ["verify.yaml"]},
+            })
+        self._write_indexes(root, change_id, current_step, status)
+
+    def _write_indexes(self, root: Path, change_id: str, current_step: int, status: str) -> None:
+        entry = {"change_id": change_id, "path": f".governance/changes/{change_id}", "status": status, "current_step": current_step}
+        write_yaml(root / ".governance/index/current-change.yaml", {
+            "schema": "current-change/v1",
+            "status": status,
+            "current_change_id": change_id,
+            "current_step": current_step,
+            "current_change": entry,
+        })
+        write_yaml(root / ".governance/index/changes-index.yaml", {"schema": "changes-index/v1", "changes": [entry]})
+        write_yaml(root / ".governance/index/active-changes.yaml", {"schema": "active-changes/v1", "changes": [entry]})
+        write_yaml(root / ".governance/index/maintenance-status.yaml", {
+            "schema": "maintenance-status/v1",
+            "status": status,
+            "current_change_active": status,
+            "current_change_id": change_id,
+        })
+
+    def _check(self, payload: dict, name: str) -> dict:
+        return next(item for item in payload["checks"] if item["name"] == name)
 
     def _run_cli(self, root: Path, *args: str, expect: int = 0) -> str:
         stdout = io.StringIO()

@@ -1110,6 +1110,21 @@ def cmd_preflight(args):
     return 1
 
 
+def cmd_audit(args):
+    from governance.audit import format_governance_audit, run_governance_audit
+
+    payload = run_governance_audit(args.root, args.change_id)
+    if args.format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(payload), end="")
+    else:
+        print(format_governance_audit(payload), end="")
+    return 1 if payload.get("status") == "fail" else 0
+
+
 def cmd_step_report(args):
     from governance.contract import ContractValidationError
     from governance.step_report import materialize_step_report
@@ -1435,9 +1450,15 @@ def cmd_review_invocation(args):
 
 def cmd_archive(args):
     from governance.archive import archive_change
+    from governance.audit import format_governance_audit, run_governance_audit
     from governance.runtime_events import append_runtime_event
 
     try:
+        audit = run_governance_audit(args.root, args.change_id)
+        if audit.get("status") == "fail":
+            print("Archive failed: governance audit did not pass")
+            print(format_governance_audit(audit), end="")
+            return 1
         receipt = archive_change(args.root, args.change_id)
         print(f"Archived change {receipt['change_id']} at {receipt['archived_at']}")
         return 0
@@ -2445,6 +2466,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_preflight_recovery.add_argument("--recorded-by", required=True, help="Actor recording the recovery")
     p_preflight_recovery.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
 
+    p_audit = subparsers.add_parser("audit", help="Audit governance invariants before verify, review, or archive")
+    p_audit.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
+    p_audit.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
+
     p_run = subparsers.add_parser("run", help="Execute change adapter")
     p_run.add_argument("--change-id", default=None, help="Target change id (defaults to current change)")
     p_run.add_argument("--timeout-seconds", type=int, default=60, help="Execution timeout in seconds")
@@ -2712,6 +2737,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_contract_validate(args)
     elif args.command == "preflight":
         return cmd_preflight(args)
+    elif args.command == "audit":
+        return cmd_audit(args)
     elif args.command == "run":
         return cmd_run(args)
     elif args.command == "runtime":

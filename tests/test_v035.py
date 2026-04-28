@@ -316,6 +316,7 @@ class V035ProjectActivationTests(unittest.TestCase):
             "06-team-adoption-and-context-pack.md",
             "07-v038-runtime-evidence-and-closeout.md",
             "08-v039-team-operating-loop.md",
+            "09-v0310-governance-enforcement.md",
             "README.md",
         ])
 
@@ -414,6 +415,11 @@ class V035ProjectActivationTests(unittest.TestCase):
                 "8": {"owner": "hermes-agent", "reviewer": "hermes-agent", "human_gate": True, "gate": "review-acceptance"},
                 "9": {"owner": "maintainer-agent", "reviewer": "human-sponsor", "human_gate": True, "gate": "archive"},
             }
+        })
+        write_yaml(change_dir / "human-gates.yaml", {
+            "schema": "human-gates/v1",
+            "change_id": change_id,
+            "approvals": {5: {"status": "approved", "approved_by": "human-sponsor"}},
         })
         write_yaml(root / ".governance/index/current-change.yaml", {
             "schema": "current-change/v1",

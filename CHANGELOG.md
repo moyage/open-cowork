@@ -1,5 +1,14 @@
 # 变更日志
 
+## 0.3.10
+
+- 增加治理强约束层：`ocw audit` 检查 Step 1-9 required outputs、状态一致性、human gate reconciliation、writer metadata、canonical artifact digest、scope drift、flow bypass recovery 和 reviewer independence。
+- 将 preflight、verify、review、archive 接入 gate-specific audit filtering，在缺少基线、必需产物、合法 human approval、执行 evidence 或独立 review 时阻断继续推进。
+- 增加 Step Output Contract 与 canonical artifacts：Step 7/8 同步生成 `VERIFY_REPORT.md` / `REVIEW_REPORT.md` 与结构化 YAML，并用 `source_digest` 防止人类可读报告和机器事实漂移。
+- 强化 Step 5 baseline binding、人类审批溯源、acknowledgement/approval 区分，以及未解决 bypass recovery 对 review/archive 的阻断。
+- 增加规则源校验与 recovery 审计，支持内置规则包、项目 policy、change-local rules 和 skill adapter 声明的可审查加载。
+- 更新 Agent-first 入口、v0.3.10 规格、governance playbook 和回归测试，覆盖审计命令、required output、canonical writer、防手写事实绕过、review/archive gate 与发布前清理验证。
+
 ## 0.3.9
 
 - 增加 Team Operating Loop：`ocw team status` / `ocw team digest` 聚合 active changes、分派、阻塞、审查队列、周期性意图、carry-forward 和复盘资产。

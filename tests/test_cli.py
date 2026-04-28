@@ -851,6 +851,11 @@ class CliTests(unittest.TestCase):
                     "8": {"owner": "reviewer-agent", "gate": "independent-review-required"},
                 },
             })
+            write_yaml(change_dir / "human-gates.yaml", {
+                "schema": "human-gates/v1",
+                "change_id": "CHG-VERIFY-RETRY",
+                "approvals": {},
+            })
             manifest = load_yaml(change_dir / "manifest.yaml")
             manifest["status"] = "step7-blocked"
             manifest["current_step"] = 7
@@ -1383,7 +1388,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.3.9", output)
+        self.assertIn("open-cowork 0.3.10", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)

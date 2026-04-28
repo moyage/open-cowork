@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from .change_package import update_manifest
@@ -28,6 +29,11 @@ def write_review_decision(
     review_artifact_ref: str = "",
 ) -> dict:
     paths = GovernancePaths(Path(root))
+    from .audit import audit_failures_for_gate, run_governance_audit
+
+    audit = run_governance_audit(paths.root, change_id)
+    if audit_failures_for_gate(audit, "review"):
+        raise ValueError(f"change '{change_id}' has fail-level governance audit findings before review")
     require_transition_state(
         root,
         change_id,
@@ -75,6 +81,11 @@ def write_review_decision(
     payload = {
         "schema": existing.get("schema", "review-decision/v1"),
         "change_id": change_id,
+        "writer": {
+            "tool": "ocw review",
+            "canonical_artifact": "REVIEW_REPORT.md",
+            "source": "governance.review.write_review_decision",
+        },
         "reviewers": [{"role": "reviewer", "id": reviewer}],
         "decision": {"status": decision, "rationale": rationale},
         "conditions": existing.get("conditions", {"must_before_next_step": [], "followups": []}),
@@ -110,6 +121,7 @@ def write_review_decision(
             "evidence_ref": bypass_evidence_ref,
         }
     write_yaml(review_path, payload)
+    _write_review_report(paths, change_id, payload)
     _append_review_lifecycle(
         paths,
         change_id,
@@ -139,6 +151,53 @@ def write_review_decision(
     })
     set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
     return payload
+
+
+def _write_review_report(paths: GovernancePaths, change_id: str, payload: dict) -> Path:
+    report_path = paths.change_file(change_id, "REVIEW_REPORT.md")
+    decision = payload.get("decision") or {}
+    reviewers = payload.get("reviewers") or []
+    conditions = payload.get("conditions") or {}
+    lines = [
+        "---",
+        "schema: review-report/v1",
+        f"change_id: {change_id}",
+        "canonical_artifact: true",
+        "source_facts: review.yaml",
+        f"source_digest: sha256:{_sha256(paths.change_file(change_id, 'review.yaml'))}",
+        "---",
+        "",
+        "# Step 8 Review Report",
+        "",
+        f"- decision: {decision.get('status')}",
+        f"- rationale: {decision.get('rationale', '')}",
+        "",
+        "## Reviewers",
+    ]
+    for reviewer in reviewers:
+        lines.append(f"- {reviewer.get('id')} ({reviewer.get('role')})")
+    lines.append("")
+    lines.append("## Conditions")
+    must_before_next = conditions.get("must_before_next_step") or []
+    followups = conditions.get("followups") or []
+    if must_before_next:
+        for item in must_before_next:
+            lines.append(f"- must before next step: {item}")
+    if followups:
+        for item in followups:
+            lines.append(f"- follow-up: {item}")
+    if not must_before_next and not followups:
+        lines.append("- none")
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return report_path
+
+
+def _sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def _runtime_evidence_sources(paths: GovernancePaths, change_id: str) -> dict:
