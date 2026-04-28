@@ -30,6 +30,7 @@ def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool 
     state_consistency = load_yaml(state_consistency_path)
     summary_status = "pass" if state_consistency.get("status") == "pass" else "blocker"
     contract = load_yaml(paths.change_file(change_id, "contract.yaml"))
+    downgrade_issues = _unapproved_downgrade_issues(paths, change_id, contract)
     product_verification = _product_verification(
         paths.root,
         commands=(contract.get("verification") or {}).get("commands", []),
@@ -37,6 +38,8 @@ def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool 
         timeout_seconds=timeout_seconds,
     )
     if run_commands and any(item.get("status") != "pass" for item in product_verification["commands"]):
+        summary_status = "blocker"
+    if downgrade_issues:
         summary_status = "blocker"
 
     verify_path = paths.change_file(change_id, "verify.yaml")
@@ -68,7 +71,7 @@ def write_verify_result(root: str | Path, change_id: str, *, run_commands: bool 
             f"verification command failed: {item.get('command')}"
             for item in product_verification["commands"]
             if item.get("status") == "fail"
-        ],
+        ] + downgrade_issues,
     }
     write_yaml(verify_path, payload)
 
@@ -140,3 +143,27 @@ def _product_verification(root: Path, *, commands: list[str], run_commands: bool
                 "stderr": (exc.stderr or "").strip() if isinstance(exc.stderr, str) else "",
             })
     return {"mode": "commands-executed", "commands": results}
+
+
+def _unapproved_downgrade_issues(paths: GovernancePaths, change_id: str, contract: dict) -> list[str]:
+    if "downgrade_or_partial_implementation_without_human_approval" not in contract.get("forbidden_actions", []):
+        return []
+    tasks_path = paths.change_file(change_id, "tasks.md")
+    if not tasks_path.exists():
+        return []
+    unchecked = [
+        line.strip()[6:].strip()
+        for line in tasks_path.read_text(encoding="utf-8").splitlines()
+        if line.strip().startswith("- [ ]")
+    ]
+    if not unchecked:
+        return []
+    revision_path = paths.change_file(change_id, "scope-revisions.yaml")
+    revision = load_yaml(revision_path) if revision_path.exists() else {}
+    approved = {
+        item.get("task")
+        for item in revision.get("approved_deferrals", [])
+        if item.get("approved_by")
+    }
+    blockers = [item for item in unchecked if item not in approved]
+    return [f"unapproved incomplete task - {item}" for item in blockers]

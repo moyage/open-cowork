@@ -25,6 +25,9 @@ class AdapterRequest:
     artifacts: dict = field(default_factory=lambda: {"created": [], "modified": []})
     evidence_refs: list[str] = field(default_factory=list)
     status: str = "success"
+    runtime_id: str = "generic-local-command"
+    authority: str = "evidence_input"
+    step: int = 6
 
 
 @dataclass
@@ -84,6 +87,7 @@ def run_change(root: str | Path, request: AdapterRequest) -> AdapterResponse:
 
     response = run_generic_file_command(request.__dict__)
     evidence_dir = GovernancePaths(Path(root)).evidence_dir(request.change_id)
+    response["evidence_target"] = str(evidence_dir)
     written = write_evidence_bundle(evidence_dir, response)
     ensure_required_evidence(list(contract["evidence_expectations"]["required"]), written, list(response.get("evidence_refs", [])))
     evidence_refs = response["evidence_refs"] + sorted(str(Path(path).relative_to(evidence_dir.parent)) for path in written.values())

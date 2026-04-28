@@ -29,6 +29,10 @@ def archive_change(root: str | Path, change_id: str) -> dict:
 
     require_step_approval(root, change_id=change_id, step=8)
     require_step_approval(root, change_id=change_id, step=9)
+    from .context_pack import create_context_pack, write_compact_handoff
+
+    context_pack_info = create_context_pack(root, change_id, level="standard")
+    handoff_info = write_compact_handoff(root, change_id)
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = update_manifest(root, change_id, status="archived", current_step=9)
@@ -66,6 +70,9 @@ def archive_change(root: str | Path, change_id: str) -> dict:
             "final_step_report": str(paths.archived_change_file(change_id, "step-reports/step-9.yaml").relative_to(paths.root)),
             "final_state_consistency": str(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml").relative_to(paths.root)),
             "final_status_snapshot": str(paths.archived_change_file(change_id, "FINAL_STATUS_SNAPSHOT.yaml").relative_to(paths.root)),
+            "final_round_report": str(paths.archived_change_file(change_id, "FINAL_ROUND_REPORT.md").relative_to(paths.root)),
+            "context_pack": context_pack_info["context_pack"].replace(".governance/changes/", ".governance/archive/", 1),
+            "compact_handoff": handoff_info["handoff"].replace(".governance/changes/", ".governance/archive/", 1),
         },
         "residual_followups": [],
     }
@@ -95,10 +102,16 @@ def archive_change(root: str | Path, change_id: str) -> dict:
         "refs": {
             "archive_receipt": str(paths.archived_change_file(change_id, "archive-receipt.yaml").relative_to(paths.root)),
             "final_state_consistency": str(paths.archived_change_file(change_id, "FINAL_STATE_CONSISTENCY_CHECK.yaml").relative_to(paths.root)),
+            "final_round_report": str(paths.archived_change_file(change_id, "FINAL_ROUND_REPORT.md").relative_to(paths.root)),
+            "context_pack": context_pack_info["context_pack"].replace(".governance/changes/", ".governance/archive/", 1),
+            "compact_handoff": handoff_info["handoff"].replace(".governance/changes/", ".governance/archive/", 1),
         },
     })
     receipt_path = paths.archived_change_file(change_id, "archive-receipt.yaml")
     write_yaml(receipt_path, receipt)
+    from .round_report import write_final_round_report
+
+    write_final_round_report(root, change_id, archived=True)
 
     archive_map = load_yaml(paths.archive_map_file())
     archives = archive_map.setdefault("archives", [])

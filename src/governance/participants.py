@@ -9,13 +9,13 @@ from .step_matrix import STEP_LABELS
 
 
 DEFAULT_PERSONAL_PARTICIPANTS = [
-    {"id": "human-sponsor", "type": "human", "strengths": ["final-decision", "intent-confirmation"]},
+    {"id": "human-sponsor", "type": "human", "strengths": ["final-decision", "intent-confirmation"], "responsibility_boundary": "human_agent_pair"},
     {"id": "orchestrator-agent", "type": "agent", "strengths": ["coordination", "change-package"]},
     {"id": "analyst-agent", "type": "agent", "strengths": ["requirements", "scope-analysis"]},
     {"id": "architect-agent", "type": "agent", "strengths": ["design", "risk-analysis"]},
-    {"id": "executor-agent", "type": "agent", "strengths": ["implementation", "evidence"]},
+    {"id": "executor-agent", "type": "agent", "strengths": ["implementation", "evidence"], "responsibility_boundary": "human_agent_pair"},
     {"id": "verifier-agent", "type": "agent", "strengths": ["tests", "acceptance"]},
-    {"id": "independent-reviewer", "type": "agent", "strengths": ["review", "decision-check"]},
+    {"id": "independent-reviewer", "type": "agent", "strengths": ["review", "decision-check"], "responsibility_boundary": "reviewer"},
     {"id": "maintainer-agent", "type": "agent", "strengths": ["archive", "continuity"]},
 ]
 
@@ -122,7 +122,9 @@ def setup_participants_profile(
         "schema": "participants-profile/v1",
         "profile": profile,
         "participants": participants,
+        "templates": _participant_templates(),
         "step_owner_matrix": matrix,
+        "validation": _validate_participants(participants, matrix),
         "warnings": [f"unassigned participant: {item}" for item in unassigned],
         "generated_at": _now_utc(),
     }
@@ -147,6 +149,7 @@ def _participants_from_specs(specs: list[str]) -> list[dict]:
             "id": actor_id.strip(),
             "type": "human" if actor_id.strip().startswith("human") else "agent",
             "strengths": strengths or ["participant"],
+            "responsibility_boundary": _boundary_from_strengths(strengths),
         })
     return participants
 
@@ -156,6 +159,14 @@ def _merge_participants(defaults: list[dict], overrides: list[dict]) -> list[dic
     for item in overrides:
         merged[item["id"]] = item
     return list(merged.values())
+
+
+def _boundary_from_strengths(strengths: list[str]) -> str:
+    if "reviewer" in strengths or "review" in strengths:
+        return "reviewer"
+    if "runtime" in strengths or "runtime-owner" in strengths:
+        return "runtime_owner"
+    return "human_agent_pair"
 
 
 def _build_step_matrix(
@@ -239,7 +250,8 @@ def _format_matrix(payload: dict) -> str:
     ]
     for participant in payload["participants"]:
         strengths = ", ".join(participant.get("strengths", []))
-        lines.append(f"- {participant['id']} ({participant['type']}): {strengths}")
+        boundary = participant.get("responsibility_boundary", "human_agent_pair")
+        lines.append(f"- {participant['id']} ({participant['type']}): {strengths}; boundary={boundary}")
     lines.extend(["", "## 9-step owner matrix", ""])
     for item in payload["step_owner_matrix"]:
         assistants = ", ".join(item["assistants"]) or "none"
@@ -249,6 +261,39 @@ def _format_matrix(payload: dict) -> str:
             f"human_gate={str(item['human_gate']).lower()}; final_decision={item['final_decision_owner']}"
         )
     return "\n".join(lines) + "\n"
+
+
+def _participant_templates() -> dict:
+    return {
+        "human_agent_pair": {
+            "minimum_fields": ["id", "type", "strengths", "responsibility_boundary"],
+            "authority": ["intent", "scope", "step5_approval"],
+            "working_boundaries": ["active_contract", "human_decision_points"],
+        },
+        "reviewer": {
+            "minimum_fields": ["id", "type", "strengths", "responsibility_boundary"],
+            "review_eligibility": {"can_review_own_execution": False},
+            "authority": ["review_decision"],
+            "working_boundaries": ["verify_result", "evidence", "contract"],
+        },
+        "runtime_owner": {
+            "minimum_fields": ["id", "type", "strengths", "responsibility_boundary"],
+            "authority": ["runtime_profile", "runtime_event"],
+            "working_boundaries": ["runtime_profiles", "evidence_input"],
+        },
+    }
+
+
+def _validate_participants(participants: list[dict], matrix: list[dict]) -> dict:
+    ids = {item.get("id") for item in participants}
+    missing = sorted(_assigned_participants(matrix) - ids)
+    reviewer_ids = {item.get("reviewer") for item in matrix if item.get("reviewer")}
+    executor_ids = {item.get("primary_owner") for item in matrix if item.get("step") == 6}
+    return {
+        "status": "pass" if not missing and reviewer_ids.isdisjoint(executor_ids) else "blocker",
+        "missing_assigned_participants": missing,
+        "reviewer_separate_from_executor": reviewer_ids.isdisjoint(executor_ids),
+    }
 
 
 def _now_utc() -> str:

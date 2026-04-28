@@ -470,12 +470,17 @@ def cmd_profile(args):
         return 0
     if args.profile_subcmd == "apply":
         try:
-            result = apply_adoption_profile(args.root, args.profile_id, agent_id=args.agent_id)
+            result = apply_adoption_profile(args.root, args.profile_id, agent_id=args.agent_id, preview=args.preview, force=args.force)
         except ValueError as exc:
             print(str(exc))
             return 1
         if args.format == "json":
             print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if result.get("preview"):
+            print(f"Profile apply preview: {result['profile_id']}")
+            print(f"- would_overwrite: {str(result.get('would_overwrite')).lower()}")
+            print(f"- requires_force: {str(result.get('requires_force')).lower()}")
             return 0
         print(f"Applied adoption profile: {result['profile_id']}")
         print(f"- path: {result['path']}")
@@ -520,6 +525,143 @@ def cmd_handoff(args):
     print("Compact handoff written")
     print(f"- handoff: {result['handoff']}")
     print(f"- context_pack: {result['context_pack']}")
+    return 0
+
+
+def cmd_runtime(args):
+    from governance.runtime_profiles import add_runtime_profile, list_runtime_profiles, show_runtime_profile
+
+    if args.runtime_subcmd == "profile" and args.profile_action == "add":
+        try:
+            payload = add_runtime_profile(
+                args.root,
+                runtime_id=args.runtime_id,
+                runtime_type=args.runtime_type,
+                owner=args.owner,
+                capabilities=list(args.capability or []),
+                risks=list(args.risk or []),
+                evidence=list(args.evidence or []),
+                constraints=list(args.constraint or []),
+            )
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        if args.format == "json":
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(payload), end="")
+            return 0
+        print(f"Runtime profile written: {payload['runtime_id']}")
+        print(f"- authority: {payload['authority']}")
+        return 0
+    if args.runtime_subcmd == "profile" and args.profile_action == "list":
+        payload = {"profiles": list_runtime_profiles(args.root)}
+        if args.format == "json":
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(payload), end="")
+            return 0
+        for item in payload["profiles"]:
+            print(f"- {item['runtime_id']}: {item.get('runtime_type')} owner={item.get('owner')}")
+        return 0
+    if args.runtime_subcmd == "profile" and args.profile_action == "show":
+        try:
+            payload = show_runtime_profile(args.root, args.runtime_id)
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        if args.format == "json":
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        if args.format == "yaml":
+            from governance.simple_yaml import dump_yaml
+
+            print(dump_yaml(payload), end="")
+            return 0
+        print(f"Runtime profile: {payload['runtime_id']}")
+        print(f"- type: {payload.get('runtime_type')}")
+        print(f"- owner: {payload.get('owner')}")
+        return 0
+    return 0
+
+
+def cmd_runtime_event(args):
+    from governance.runtime_events import append_change_runtime_event
+
+    event = append_change_runtime_event(
+        args.root,
+        change_id=args.change_id,
+        event_type=args.event_type,
+        step=args.step,
+        actor_id=args.actor_id,
+        refs=list(args.ref or []),
+        authority=args.authority,
+    )
+    if args.format == "json":
+        print(json.dumps(event, ensure_ascii=False, indent=2))
+        return 0
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(event), end="")
+        return 0
+    print(f"Runtime event appended: {event['event_id']}")
+    print(f"- ref: .governance/changes/{args.change_id}/evidence/runtime-events/events.yaml")
+    return 0
+
+
+def cmd_adapter(args):
+    from governance.evidence import validate_adapter_output
+    from governance.simple_yaml import load_yaml
+
+    payload = load_yaml(args.path)
+    errors = validate_adapter_output(payload)
+    result = {"schema": "adapter-validation/v1", "status": "pass" if not errors else "fail", "errors": errors}
+    if args.format == "json":
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if not errors else 1
+    if args.format == "yaml":
+        from governance.simple_yaml import dump_yaml
+
+        print(dump_yaml(result), end="")
+        return 0 if not errors else 1
+    print(f"Adapter output validation: {result['status']}")
+    for error in errors:
+        print(f"- {error}")
+    return 0 if not errors else 1
+
+
+def cmd_evidence(args):
+    from governance.evidence import validate_adapter_output, write_evidence_index
+    from governance.simple_yaml import load_yaml
+
+    if args.evidence_subcmd == "index":
+        path = write_evidence_index(Path(args.root) / ".governance" / "changes" / args.change_id / "evidence")
+        print(f"Evidence index written: {Path(path).relative_to(Path(args.root))}")
+        return 0
+    if args.evidence_subcmd == "append":
+        payload = load_yaml(args.adapter)
+        errors = validate_adapter_output(payload)
+        if errors:
+            print("Evidence append failed: adapter output is invalid")
+            for error in errors:
+                print(f"- {error}")
+            return 1
+        target_dir = Path(args.root) / ".governance" / "changes" / args.change_id / "evidence"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / "adapter-output.yaml"
+        from governance.simple_yaml import write_yaml
+
+        write_yaml(target, payload)
+        write_evidence_index(target_dir)
+        print(f"Evidence appended from adapter: {target.relative_to(Path(args.root))}")
+        return 0
     return 0
 
 
@@ -1767,6 +1909,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_profile_apply = p_profile_sub.add_parser("apply", help="Apply a collaboration mode")
     p_profile_apply.add_argument("profile_id", help="Profile id")
     p_profile_apply.add_argument("--agent-id", default="current-agent", help="Current Agent participant id")
+    p_profile_apply.add_argument("--preview", action="store_true", help="Preview changes without writing")
+    p_profile_apply.add_argument("--force", action="store_true", help="Overwrite existing adoption profile")
     p_profile_apply.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     p_context_pack = subparsers.add_parser("context-pack", help="Create or read handoff material indexes")
@@ -1912,6 +2056,48 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--created", action="append", default=[], help="Created artifact path")
     p_run.add_argument("--modified", action="append", default=[], help="Modified artifact path")
     p_run.add_argument("--evidence-ref", action="append", default=[], help="Additional evidence reference path")
+
+    p_runtime = subparsers.add_parser("runtime", help="Manage runtime profiles")
+    p_runtime_sub = p_runtime.add_subparsers(dest="runtime_subcmd")
+    p_runtime_profile = p_runtime_sub.add_parser("profile", help="Manage runtime profiles")
+    p_runtime_profile_sub = p_runtime_profile.add_subparsers(dest="profile_action")
+    p_runtime_profile_add = p_runtime_profile_sub.add_parser("add", help="Add runtime profile")
+    p_runtime_profile_add.add_argument("--runtime-id", required=True)
+    p_runtime_profile_add.add_argument("--runtime-type", default="local-cli")
+    p_runtime_profile_add.add_argument("--owner", default="unassigned")
+    p_runtime_profile_add.add_argument("--capability", action="append", default=[])
+    p_runtime_profile_add.add_argument("--risk", action="append", default=[])
+    p_runtime_profile_add.add_argument("--evidence", action="append", default=[])
+    p_runtime_profile_add.add_argument("--constraint", action="append", default=[])
+    p_runtime_profile_add.add_argument("--format", choices=["text", "yaml", "json"], default="text")
+    p_runtime_profile_list = p_runtime_profile_sub.add_parser("list", help="List runtime profiles")
+    p_runtime_profile_list.add_argument("--format", choices=["text", "yaml", "json"], default="text")
+    p_runtime_profile_show = p_runtime_profile_sub.add_parser("show", help="Show runtime profile")
+    p_runtime_profile_show.add_argument("runtime_id")
+    p_runtime_profile_show.add_argument("--format", choices=["text", "yaml", "json"], default="text")
+
+    p_runtime_event = subparsers.add_parser("runtime-event", help="Append change runtime event")
+    p_runtime_event.add_argument("subcmd", choices=["append"])
+    p_runtime_event.add_argument("--change-id", required=True)
+    p_runtime_event.add_argument("--event-type", required=True)
+    p_runtime_event.add_argument("--step", type=int, required=True)
+    p_runtime_event.add_argument("--actor-id", default="governance")
+    p_runtime_event.add_argument("--ref", action="append", default=[])
+    p_runtime_event.add_argument("--authority", choices=["trace_only", "evidence_input", "verification_result"], default="trace_only")
+    p_runtime_event.add_argument("--format", choices=["text", "yaml", "json"], default="text")
+
+    p_adapter = subparsers.add_parser("adapter", help="Validate adapter outputs")
+    p_adapter.add_argument("subcmd", choices=["validate-output"])
+    p_adapter.add_argument("path")
+    p_adapter.add_argument("--format", choices=["text", "yaml", "json"], default="text")
+
+    p_evidence = subparsers.add_parser("evidence", help="Manage evidence indexes")
+    p_evidence_sub = p_evidence.add_subparsers(dest="evidence_subcmd")
+    p_evidence_index = p_evidence_sub.add_parser("index", help="Generate evidence index")
+    p_evidence_index.add_argument("--change-id", required=True)
+    p_evidence_append = p_evidence_sub.add_parser("append", help="Append adapter output evidence")
+    p_evidence_append.add_argument("--change-id", required=True)
+    p_evidence_append.add_argument("--adapter", required=True, help="Adapter output YAML path")
 
     p_verify = subparsers.add_parser("verify", help="Verify execution results")
     p_verify.add_argument("--change-id", required=True, help="Target change id")
@@ -2112,6 +2298,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_contract_validate(args)
     elif args.command == "run":
         return cmd_run(args)
+    elif args.command == "runtime":
+        return cmd_runtime(args)
+    elif args.command == "runtime-event" and args.subcmd == "append":
+        return cmd_runtime_event(args)
+    elif args.command == "adapter" and args.subcmd == "validate-output":
+        return cmd_adapter(args)
+    elif args.command == "evidence":
+        return cmd_evidence(args)
     elif args.command == "verify":
         return cmd_verify(args)
     elif args.command == "review":

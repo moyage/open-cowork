@@ -315,6 +315,7 @@ class V035ProjectActivationTests(unittest.TestCase):
             "04-agent-adoption-and-doc-governance.md",
             "05-deterministic-resume-and-merge-safe-governance.md",
             "06-team-adoption-and-context-pack.md",
+            "07-v038-runtime-evidence-and-closeout.md",
             "README.md",
         ])
 

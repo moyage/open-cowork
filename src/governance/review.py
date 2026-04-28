@@ -40,6 +40,9 @@ def write_review_decision(
     if verify_payload.get("summary", {}).get("status") != "pass":
         raise ValueError(f"change '{change_id}' must have a passing verify result before review")
     warnings = _reviewer_warnings(paths, change_id, reviewer)
+    hard_blocks = _reviewer_hard_blocks(paths, change_id, reviewer)
+    if hard_blocks:
+        raise ValueError(hard_blocks[0])
     if warnings and not allow_reviewer_mismatch:
         raise ValueError(warnings[0])
     if warnings and allow_reviewer_mismatch:
@@ -94,8 +97,11 @@ def write_review_decision(
         }.items()
         if value
     }
+    evidence_sources = _runtime_evidence_sources(paths, change_id)
     if runtime_evidence:
         payload["runtime_evidence"] = runtime_evidence
+    if evidence_sources:
+        payload["runtime_evidence_sources"] = evidence_sources
     if warnings:
         payload["warnings"] = warnings
         payload["reviewer_mismatch_bypass"] = {
@@ -133,6 +139,54 @@ def write_review_decision(
     })
     set_maintenance_status(root, status=manifest.get("status"), current_change_active=manifest.get("status"), current_change_id=change_id)
     return payload
+
+
+def _runtime_evidence_sources(paths: GovernancePaths, change_id: str) -> dict:
+    evidence_dir = paths.evidence_dir(change_id)
+    index_path = evidence_dir / "index.yaml"
+    index = load_yaml(index_path) if index_path.exists() else {}
+    entries = index.get("entries", []) if isinstance(index, dict) else []
+    conflicts = _runtime_governance_conflicts(paths, change_id)
+    return {
+        "evidence_index_ref": str(index_path.relative_to(paths.root)) if index_path.exists() else None,
+        "sources": [
+            {
+                "ref": item.get("ref"),
+                "kind": item.get("kind"),
+                "authority": item.get("authority"),
+                "runtime_id": item.get("runtime_id"),
+                "status": item.get("status"),
+            }
+            for item in entries
+        ],
+        "conflict_status": "detected" if conflicts else "not_detected",
+        "conflicts": conflicts,
+        "conflict_policy": "governance_facts_override_runtime_events",
+    }
+
+
+def _runtime_governance_conflicts(paths: GovernancePaths, change_id: str) -> list[dict]:
+    manifest = load_yaml(paths.change_file(change_id, "manifest.yaml")) if paths.change_file(change_id, "manifest.yaml").exists() else {}
+    governance_status = manifest.get("status")
+    events_path = paths.evidence_dir(change_id) / "runtime-events" / "events.yaml"
+    events = load_yaml(events_path) if events_path.exists() else {}
+    conflicts = []
+    for event in events.get("events", []) if isinstance(events, dict) else []:
+        if event.get("governance_conflict"):
+            conflicts.append({
+                "event_id": event.get("event_id"),
+                "reason": event.get("governance_conflict"),
+                "policy": "governance_facts_override_runtime_events",
+            })
+        runtime_status = event.get("to_status")
+        if runtime_status and governance_status and runtime_status != governance_status:
+            conflicts.append({
+                "event_id": event.get("event_id"),
+                "runtime_status": runtime_status,
+                "governance_status": governance_status,
+                "policy": "governance_facts_override_runtime_events",
+            })
+    return conflicts
 
 
 def _append_review_lifecycle(
@@ -210,4 +264,28 @@ def _reviewer_warnings(paths: GovernancePaths, change_id: str, reviewer: str) ->
     expected = step8.get("reviewer") or step8.get("owner")
     if expected and expected != reviewer:
         return [f"reviewer does not match Step 8 binding: expected {expected}, got {reviewer}"]
+    return []
+
+
+def _reviewer_hard_blocks(paths: GovernancePaths, change_id: str, reviewer: str) -> list[str]:
+    bindings_path = paths.change_file(change_id, "bindings.yaml")
+    if not bindings_path.exists():
+        return []
+    bindings = load_yaml(bindings_path)
+    steps = bindings.get("steps", {}) if isinstance(bindings, dict) else {}
+    step6 = steps.get(6) or steps.get("6") or steps.get("'6'") or {}
+    executor = step6.get("owner")
+    if executor and reviewer == executor:
+        return [f"reviewer must be independent from Step 6 executor: {reviewer}"]
+    participants_path = paths.root / ".governance" / "participants.yaml"
+    if participants_path.exists():
+        profile = load_yaml(participants_path)
+        participants = {
+            item.get("id"): item
+            for item in profile.get("participants", [])
+            if isinstance(item, dict)
+        }
+        participant = participants.get(reviewer)
+        if participant and participant.get("responsibility_boundary") not in {None, "reviewer"} and reviewer != "human-sponsor":
+            return [f"reviewer responsibility boundary is not reviewer: {reviewer}"]
     return []

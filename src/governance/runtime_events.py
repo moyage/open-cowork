@@ -57,6 +57,50 @@ def append_runtime_event(
     return event
 
 
+def append_change_runtime_event(
+    root: str | Path,
+    *,
+    change_id: str,
+    event_type: str,
+    step: int,
+    actor_id: str | None = None,
+    refs: list[str] | None = None,
+    authority: str = "trace_only",
+    extra: dict | None = None,
+) -> dict:
+    paths = GovernancePaths(Path(root))
+    event = append_runtime_event(
+        root,
+        change_id=change_id,
+        event_type=event_type,
+        step=step,
+        from_status=None,
+        to_status=None,
+        actor_id=actor_id,
+        refs=refs,
+        extra={"authority": authority, **(extra or {})},
+    )
+    events_dir = paths.evidence_dir(change_id) / "runtime-events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    target = events_dir / "events.yaml"
+    payload = load_yaml(target) if target.exists() else {
+        "schema": "runtime-events/v1",
+        "change_id": change_id,
+        "authority": "trace_only",
+        "events": [],
+    }
+    payload["events"] = _merge_events(payload.get("events", []), [event])
+    payload["generated_at"] = _now_utc()
+    write_yaml(target, payload)
+    try:
+        from .evidence import write_evidence_index
+
+        write_evidence_index(paths.evidence_dir(change_id))
+    except Exception:
+        pass
+    return event
+
+
 def merge_runtime_timeline_payload(existing: dict, new_payload: dict) -> dict:
     merged_events = _merge_events(existing.get("events", []), new_payload.get("events", []))
     return {

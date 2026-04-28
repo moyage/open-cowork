@@ -23,11 +23,21 @@ def create_context_pack(root: str | Path, change_id: str, *, level: str = "stand
         change_dir / "verify.yaml",
         change_dir / "review.yaml",
     ], paths.root)
+    source_index = write_source_index(root, change_id)
+    compression_checkpoint = write_compression_checkpoint(root, change_id)
     supporting_reads = _existing([
         change_dir / "step-reports" / f"step-{snapshot['current_step']}.md",
         change_dir / "step-reports" / f"step-{snapshot['current_step']}.yaml",
         change_dir / "evidence" / "index.yaml",
+        Path(source_index) if source_index else change_dir / "context" / "source-index.yaml",
+        Path(compression_checkpoint) if compression_checkpoint else change_dir / "context" / "compression-checkpoint.md",
     ], paths.root)
+    optional_deep_reads = _optional_deep_reads(manifest)
+    if level == "minimal":
+        supporting_reads = []
+        optional_deep_reads = []
+    elif level == "standard":
+        optional_deep_reads = []
     pack = {
         "context_pack_version": "ocw.context-pack.v1",
         "change_id": change_id,
@@ -36,7 +46,7 @@ def create_context_pack(root: str | Path, change_id: str, *, level: str = "stand
         "purpose": "resume",
         "authoritative_reads": authoritative_reads,
         "supporting_reads": supporting_reads,
-        "optional_deep_reads": _optional_deep_reads(manifest),
+        "optional_deep_reads": optional_deep_reads,
         "summary": snapshot,
         "compression_notes": {
             "context_pack_is_authoritative": False,
@@ -60,7 +70,10 @@ def read_context_pack(root: str | Path, change_id: str, *, level: str = "standar
     path = paths.change_dir(change_id) / "context" / "context-pack.yaml"
     if not path.exists():
         return create_context_pack(root, change_id, level=level)["pack"]
-    return load_yaml(path)
+    pack = load_yaml(path)
+    if pack.get("pack_level") != level:
+        return create_context_pack(root, change_id, level=level)["pack"]
+    return pack
 
 
 def write_compact_handoff(root: str | Path, change_id: str) -> dict:
@@ -70,6 +83,7 @@ def write_compact_handoff(root: str | Path, change_id: str) -> dict:
     context_dir = paths.change_dir(change_id) / "context"
     handoff_path = context_dir / "handoff-compact.md"
     handoff_path.write_text(_format_handoff(pack), encoding="utf-8")
+    _enforce_handoff_length(handoff_path, max_lines=120)
     return {
         "change_id": change_id,
         "handoff": f".governance/changes/{change_id}/context/handoff-compact.md",
@@ -163,8 +177,74 @@ def _format_handoff(pack: dict) -> str:
         "",
         "## Recommended Read Set",
         *[f"- {item}" for item in reads],
+        "",
+        "## Length Guard",
+        "- max_lines: 120",
+        "- do_not_copy_full_history: true",
     ]
     return "\n".join(lines) + "\n"
+
+
+def write_source_index(root: str | Path, change_id: str) -> str:
+    paths = GovernancePaths(Path(root))
+    change_dir = paths.change_dir(change_id)
+    context_dir = change_dir / "context"
+    context_dir.mkdir(parents=True, exist_ok=True)
+    manifest = _load_if_exists(change_dir / "manifest.yaml")
+    source_docs = [str(item) for item in manifest.get("source_docs", [])]
+    entries = []
+    for idx, source in enumerate(source_docs, start=1):
+        entries.append({
+            "source_ref": source,
+            "batch": idx,
+            "read_status": "pending-deep-read",
+            "summary_ref": f".governance/changes/{change_id}/context/source-summaries/batch-{idx}.md",
+            "deep_read_required": True,
+        })
+    target = context_dir / "source-index.yaml"
+    write_yaml(target, {
+        "schema": "source-index/v1",
+        "change_id": change_id,
+        "sources": entries,
+    })
+    summaries = context_dir / "source-summaries"
+    summaries.mkdir(parents=True, exist_ok=True)
+    for entry in entries:
+        summary_path = paths.root / entry["summary_ref"]
+        if not summary_path.exists():
+            summary_path.write_text(
+                f"# Batch {entry['batch']} source summary\n\n- source: {entry['source_ref']}\n- status: pending-deep-read\n",
+                encoding="utf-8",
+            )
+    return str(target)
+
+
+def write_compression_checkpoint(root: str | Path, change_id: str) -> str:
+    paths = GovernancePaths(Path(root))
+    context_dir = paths.change_dir(change_id) / "context"
+    context_dir.mkdir(parents=True, exist_ok=True)
+    source_index = context_dir / "source-index.yaml"
+    target = context_dir / "compression-checkpoint.md"
+    target.write_text(
+        "\n".join([
+            f"# 压缩检查点: {change_id}",
+            "",
+            "- 本文件只记录分批阅读的短摘要入口，不替代权威事实。",
+            f"- source_index: {source_index.relative_to(paths.root) if source_index.exists() else 'not_recorded'}",
+            "- compact_handoff_max_lines: 120",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    return str(target)
+
+
+def _enforce_handoff_length(path: Path, *, max_lines: int) -> None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if len(lines) <= max_lines:
+        return
+    trimmed = lines[: max_lines - 2] + ["", "- truncated_by_length_guard: true"]
+    path.write_text("\n".join(trimmed) + "\n", encoding="utf-8")
 
 
 def _now_utc() -> str:

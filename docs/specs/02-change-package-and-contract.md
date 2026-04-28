@@ -33,6 +33,19 @@
 
 Step report 中 scope、acceptance 和 verification commands 必须优先显示当前权威事实。若 intent facts 缺失，应从 Contract 回退；若 intent 与 Contract 冲突，应明确显示 conflict。
 
+### 完整实现与范围修订
+
+`requirements.md`、`tasks.md`、`contract.yaml` 中已确认的需求、`scope_in` 和验收标准默认要求完整实现。`scope_out` 只能表达已经确认的不做事项，不能作为 Agent 隐藏遗漏需求、降低验收标准或推迟任务的地方。
+
+如果执行中发现必须降级、拆分、延期或缩减范围，Agent 必须：
+
+- 停止把当前实现声明为完成。
+- 在 change package 中记录原因、影响、拟调整范围和剩余风险。
+- 请求人的明确批准。
+- 在批准后同步更新 requirements、tasks、contract、human gate 或 revision 记录。
+
+未经批准的范围缩减不得进入 verify pass、review approve 或 archive。
+
 ## Baseline separation
 
 `baseline.yaml` 记录 change prepare 时的 Git baseline：

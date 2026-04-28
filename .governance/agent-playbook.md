@@ -15,6 +15,7 @@
 7. verify、review 或 archive 前先记录客观 evidence。
 8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
 9. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。
+10. 所有已确认需求都按完整实现推进；如需降级、拆分或延期，先停下记录影响并取得人的明确批准。
 
 ## Human update template
 

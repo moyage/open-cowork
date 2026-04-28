@@ -30,6 +30,9 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
     selected_step = step or matrix["current_step"]
     if not isinstance(selected_step, int) or selected_step < 1 or selected_step > 9:
         raise ValueError("step must be an integer from 1 to 9")
+    report_dir = package.path / "step-reports"
+    existing_report = _load_optional_yaml(report_dir / f"step-{selected_step}.yaml")
+    timing = _timing_for_report(existing_report, _status_for_step(selected_step, matrix))
     bindings = _load_optional_yaml(package.path / "bindings.yaml")
     human_gates = _load_optional_yaml(package.path / "human-gates.yaml")
     step_binding = _step_binding(bindings, selected_step)
@@ -70,9 +73,9 @@ def materialize_step_report(root: str | Path, *, change_id: str, step: int | Non
         "human_decisions_required": _human_decisions(selected_step, step_binding, intent),
         "human_confirmation_options": _human_confirmation_options(step_binding),
         "recommended_next_action": _recommended_next_action(selected_step, step_binding, intent, payload_status, approval_state),
+        **timing,
         "generated_at": _now_utc(),
     }
-    report_dir = package.path / "step-reports"
     report_dir.mkdir(parents=True, exist_ok=True)
     write_yaml(report_dir / f"step-{selected_step}.yaml", payload)
     (report_dir / f"step-{selected_step}.md").write_text(_format_report(payload), encoding="utf-8")
@@ -308,6 +311,7 @@ def _artifact_summary(change_dir: Path, step: int) -> dict:
             "archive_destination": str(change_dir).replace("/.governance/changes/", "/.governance/archive/"),
             "review_decision": (review.get("decision") or {}).get("status"),
             "verify_status": (verify.get("summary") or {}).get("status"),
+            "final_round_report": receipt.get("traceability", {}).get("final_round_report"),
             "archive_preview_files": list(traceability.values()) if traceability else _archive_preview_paths(change_dir),
             "carry_forward_items": [*review_followups, *residual_followups],
         }
@@ -451,6 +455,9 @@ def _format_report(payload: dict) -> str:
         f"- gate_type: {payload['gate_type']}",
         f"- gate_state: {payload['gate_state']}",
         f"- approval_state: {payload['approval_state']}",
+        f"- started_at: {payload.get('started_at')}",
+        f"- completed_at: {payload.get('completed_at')}",
+        f"- duration_seconds: {payload.get('duration_seconds')}",
         "",
         "## Participant responsibilities",
         *_bullets(payload["participant_responsibilities"]),
@@ -591,3 +598,28 @@ def _participant_responsibilities(binding: dict) -> list[str]:
 
 def _now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _timing_for_report(existing_report: dict, status: str) -> dict:
+    now = _now_utc()
+    started_at = existing_report.get("started_at")
+    if not started_at:
+        started_at = existing_report.get("generated_at") or ("not_recorded" if status == "completed" else now)
+    completed_at = now if status == "completed" else existing_report.get("completed_at") or "not_recorded"
+    duration = _duration_seconds(started_at, completed_at)
+    return {
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "duration_seconds": duration,
+    }
+
+
+def _duration_seconds(started_at: str, completed_at: str):
+    if not started_at or not completed_at or started_at == "not_recorded" or completed_at == "not_recorded":
+        return "unknown"
+    try:
+        started = datetime.fromisoformat(str(started_at).replace("Z", "+00:00"))
+        completed = datetime.fromisoformat(str(completed_at).replace("Z", "+00:00"))
+    except ValueError:
+        return "unknown"
+    return max(0, int((completed - started).total_seconds()))

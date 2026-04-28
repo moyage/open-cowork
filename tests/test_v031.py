@@ -284,7 +284,7 @@ class V031HumanRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = self._run_cli(root, "version")
-            self.assertIn("open-cowork 0.3.7", output)
+            self.assertIn("open-cowork 0.3.8", output)
 
     def _prepare_change(self, root: Path, change_id: str) -> None:
         with contextlib.redirect_stdout(io.StringIO()):

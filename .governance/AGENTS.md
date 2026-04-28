@@ -20,6 +20,8 @@ Do not ask the human to memorize ocw commands. Use `ocw` only as an internal too
 ## 硬边界
 
 - 未经人明确同意，不要在 `scope_in` 之外执行。
+- 未经人明确同意，不要缩减需求、`scope_in`、验收标准或任务完成定义。
 - 不要让 executor 自己批准最终 review。
 - review 通过前不要 archive。
 - 不要在执行过程中暗中改写 contract 或 bindings。
+- 不要把完整需求自行降级为最小实现、部分实现或后续再补。

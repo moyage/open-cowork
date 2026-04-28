@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from .paths import GovernancePaths
-from .simple_yaml import write_yaml
+from .simple_yaml import load_yaml, write_yaml
 
 
 ADOPTION_PROFILES: dict[str, dict] = {
@@ -117,17 +117,30 @@ def get_adoption_profile(profile_id: str) -> dict:
     return deepcopy(ADOPTION_PROFILES[profile_id])
 
 
-def apply_adoption_profile(root: str | Path, profile_id: str, *, agent_id: str = "current-agent") -> dict:
+def apply_adoption_profile(root: str | Path, profile_id: str, *, agent_id: str = "current-agent", preview: bool = False, force: bool = False) -> dict:
     paths = GovernancePaths(Path(root))
     profile = get_adoption_profile(profile_id)
     target_dir = paths.governance_dir / "profiles"
     target_dir.mkdir(parents=True, exist_ok=True)
-    write_yaml(target_dir / "adoption.yaml", profile)
-    _write_default_participant_profiles(paths, agent_id=agent_id)
-    return {
+    target = target_dir / "adoption.yaml"
+    existing = load_yaml(target) if target.exists() else {}
+    result = {
         "profile_id": profile_id,
         "path": ".governance/profiles/adoption.yaml",
         "participant_profile_dir": ".governance/participants/",
+        "preview": preview,
+        "would_overwrite": bool(existing and existing != profile),
+        "requires_force": bool(existing and existing != profile and not force),
+    }
+    if preview:
+        return result
+    if result["requires_force"]:
+        raise ValueError("adoption profile already exists with different content; rerun with --force or --preview first")
+    write_yaml(target, profile)
+    _write_default_participant_profiles(paths, agent_id=agent_id)
+    return {
+        **result,
+        "requires_force": False,
     }
 
 
