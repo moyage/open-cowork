@@ -1,0 +1,19 @@
+- round_id: v0311-docs-agent-entry
+  goal: Update README, docs, and governance entry files so new Agents see v0.3.11 lean protocol and Agent-first usage as the default.
+  final_status: approved
+  closeout_summary: Hermes first returned revise, Codex fixed the two narrow issues, Hermes rereview approved, and full tests passed.
+  evidence_refs:
+    - .agent-state/tasks/v0311-docs-agent-entry/verify-result.md
+    - .agent-state/tasks/v0311-docs-agent-entry/hermes-review.md
+    - .agent-state/tasks/v0311-docs-agent-entry/closeout.md
+  closed_at: '2026-04-29T07:31:12Z'
+- round_id: v0311-dogfood-resume
+  goal: Dogfood v0.3.11 lean state files in this repository and make lean-only ocw resume continue from state.yaml without legacy current-change.yaml.
+  final_status: completed
+  closeout_summary: Lean documents validate, dogfood resume returns continue-active-round, v0.3.11专项 and full tests pass, real local Hermes review approved, and release prep checks passed locally.
+  evidence_refs:
+    - .agent-state/tasks/v0311-dogfood-resume/verify-result.md
+    - .agent-state/tasks/v0311-dogfood-resume/hermes-review.md
+    - .agent-state/tasks/v0311-dogfood-resume/closeout.md
+    - E-V0311-RELEASE-CHECK-20260429
+  closed_at: '2026-04-29T07:48:12Z'

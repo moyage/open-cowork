@@ -1,0 +1,15 @@
+- id: scope-bound-execution
+  title: "Stay within active round scope"
+  status: active
+  failure_impact: blocking
+  summary: "Do not modify files outside active_round.scope.in or the execution contract without explicit human approval."
+- id: real-local-review-required
+  title: "Final review must be independent"
+  status: active
+  failure_impact: blocking
+  summary: "Codex executor cannot approve its own final review; use real local Hermes or another approved local Agent."
+- id: compact-evidence-only
+  title: "Keep long context out of default read set"
+  status: active
+  failure_impact: warning
+  summary: "Store large logs and raw outputs outside the default read set, and reference them through compact evidence entries."

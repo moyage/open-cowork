@@ -2,22 +2,19 @@
 
 ## 触发语句
 
-当人要求继续、接手、审查、验证或发布本项目工作时，先运行确定性入口 `ocw resume`。自然语言只是请求入口，不是协议触发条件。
+当人要求继续、接手、审查、验证或发布本项目工作时，先运行确定性项目 resume / status 入口。自然语言只是请求入口，不是协议触发条件。
 
 ## Agent 职责
 
 1. 行动前先理解项目目标。
-2. 先做项目级 resume；多 active change 时必须显式选择 change_id。
-3. 保持 `.governance/local/current-state.md` 与 active change 对齐。
-4. 使用 `ocw resume` recommended read set 中的 contract.yaml 作为执行边界。
-5. 使用 `ocw resume` recommended read set 中的 bindings.yaml 作为 owner 映射。
+2. 先做项目级 activation；多 active round 时必须显式选择目标。
+3. 保持 `.governance/current-state.md` 与 `state.yaml` 对齐。
+4. 使用当前 round 的 scope 作为执行边界。
+5. 使用 role bindings 作为 owner / reviewer / human gate 映射。
 6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。
-7. 修改项目文件前先运行 execution preflight；preflight 未通过时停止执行并汇报缺失 gate、contract、scope 或 readiness。
-8. verify、review 或 archive 前先记录客观 evidence。
-9. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
-10. 上下文预算优先：先读 recommended read set，不要把归档计划整包加载进会话。
-11. 所有已确认需求都按完整实现推进；如需降级、拆分或延期，先停下记录影响并取得人的明确批准。
-12. 如果发现已有实现绕过 open-cowork，只能记录 flow bypass recovery，再补齐治理链路；不要把 recovery 当成正常 Step 6 evidence。
+7. verify、review 或 closeout 前先记录客观 evidence refs。
+8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
+9. 上下文预算优先：先读 recommended read set，不要把冷历史整包加载进会话。
 
 ## Human update template
 

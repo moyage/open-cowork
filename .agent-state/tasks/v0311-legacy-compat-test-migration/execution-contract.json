@@ -1,0 +1,57 @@
+{
+  "task_id": "v0311-legacy-compat-test-migration",
+  "created_at": "2026-04-29T00:00:00+08:00",
+  "goal": "Resolve the remaining full-suite failures caused by legacy tests and CLI paths still assuming the pre-v0.3.11 heavy default governance layout, while preserving the v0.3.11 lean default model.",
+  "approval_evidence": {
+    "source": "chat",
+    "summary": "Human asked the current session to optimize compressed context and continue after being told the next step was a second compatibility/test-migration round.",
+    "approved_by": "human:mlabs",
+    "approved_at": "2026-04-29"
+  },
+  "inputs": [
+    "/Users/mlabs/.codex/recovery/session-019dd6e9-3967-7590-8e1f-d7190d2fb664-continuation.md",
+    ".agent-state/tasks/v0311-lean-implementation/execution-contract.json",
+    "Full unittest failure snapshot from PYTHONPATH=src python3 -m unittest discover -s tests"
+  ],
+  "scope_in": [
+    "Update legacy compatibility code and tests needed to make the current full unittest suite coherent with the v0.3.11 lean default.",
+    "Preserve lean default behavior: do not recreate .governance/changes, .governance/archive, .governance/runtime, .governance/index, or .governance/local as normal v0.3.11 runtime output.",
+    "Keep changes focused on the observed failing tests and any directly shared helper they exercise.",
+    "Maintain a low-context recovery summary after each substantial phase."
+  ],
+  "allowed_files": [
+    "src/governance/cli.py",
+    "src/governance/lean_paths.py",
+    "src/governance/lean_state.py",
+    "src/governance/lean_render.py",
+    "src/governance/lean_round.py",
+    "tests/test_cli.py",
+    "tests/test_v028.py",
+    "tests/test_v030.py",
+    "tests/test_v035.py",
+    "tests/test_v036.py",
+    "tests/test_v0311_lean_state.py",
+    "tests/test_v0311_gates.py",
+    "tests/test_state_consistency.py",
+    "docs/specs/08-v0311-lean-protocol-reset.md",
+    ".agent-state/tasks/v0311-legacy-compat-test-migration/execution-contract.json",
+    "/Users/mlabs/.codex/recovery/session-019dd6e9-3967-7590-8e1f-d7190d2fb664-continuation.md"
+  ],
+  "scope_out": [
+    "Reverting unrelated user edits in .governance/AGENTS.md or .governance/agent-playbook.md.",
+    "Restoring the legacy heavy layout as the default v0.3.11 behavior.",
+    "Changing release metadata, tagging, pushing, or publishing.",
+    "Reading the original failed session JSONL."
+  ],
+  "acceptance": [
+    "Each compatibility change is backed by a failing or already-failing test observation.",
+    "Targeted v0.3.11 lean tests continue to pass.",
+    "The previously failing legacy tests pass or are explicitly migrated with narrow assertions.",
+    "A fresh full unittest run is performed and reported with exact result."
+  ],
+  "expected_outputs": [
+    "Passing targeted compatibility tests for the prior 2 failures and 4 errors.",
+    "Fresh full-suite verification result.",
+    "Updated low-context continuation note."
+  ]
+}

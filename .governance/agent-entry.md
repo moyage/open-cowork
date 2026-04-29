@@ -6,24 +6,30 @@ This file is the project-scoped source of truth for Agent handoff. It can be reg
 
 ## Deterministic protocol trigger
 
-- Reliable trigger: run `ocw resume` in the project root.
-- List work: run `ocw resume --list`.
-- Continue explicit work: run `ocw resume --change-id <change-id>`.
-- Natural-language phrasing is only a request to run this command; do not rely on keywords, language, or chat history.
-- `.governance/local/**` is a local projection, not team-authoritative truth.
+- Reliable trigger: run the project resume / status entry in the project root.
+- Natural-language phrasing is only a request to run that entry; do not rely on keywords, language, or chat history.
+- v0.3.11 default model is lean protocol: read the small current working set first, not cold history.
+
+## Recommended read set
+
+1. `.governance/AGENTS.md`
+2. `.governance/agent-playbook.md`
+3. `.governance/current-state.md`
+4. `.governance/state.yaml`
+5. `.governance/evidence.yaml`
+6. `.governance/ledger.yaml`
+7. `.governance/rules.yaml`
+
+If a file is missing during migration, report the missing fact explicitly and use the migration / verify flow before execution.
 
 ## Activation rule
 
 1. Treat open-cowork as project-scoped, not Agent-scoped.
-2. Run deterministic project resume internally before acting.
-3. If multiple active changes exist, select the explicit change requested by the human; otherwise ask for the change_id before execution.
-4. Read only the recommended read set from resume.
-5. Never reconstruct project state from chat history when `.governance/` facts exist.
-
-## Default internal activation
-
-- Use `ocw resume` to discover whether the project has one active change, multiple active changes, or no active change.
-- Use `ocw resume --change-id <change-id>` when the human has selected a specific work item.
+2. Run deterministic project resume / status internally before acting.
+3. If exactly one active round exists, continue that round after reporting its scope and readiness.
+4. If multiple active rounds exist and the human named one, select that explicit target; if multiple exist and no target was named, ask which round to continue before execution.
+5. Read only the recommended read set unless a state entry points to a specific evidence or cold-history path.
+6. Never reconstruct project state from chat history when `.governance/` facts exist.
 
 ## Human-facing report
 
@@ -33,7 +39,7 @@ Report in this shape, without exposing command lists:
 当前项目推进状态
 
 - 项目目标：
-- 当前 change：
+- 当前 round：
 - 当前步骤：
 - 当前 Owner：
 - 已完成：
@@ -45,7 +51,7 @@ Report in this shape, without exposing command lists:
 
 ## Hard boundaries
 
-- Do not execute outside the active contract scope.
+- Do not execute outside the active scope.
 - Do not let the executor approve its own final review.
-- Do not archive before review approval and Step 9 human approval.
+- Do not close out before review approval and Step 9 human approval.
 - Do not ask the human to memorize open-cowork CLI commands.

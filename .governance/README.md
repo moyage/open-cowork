@@ -1,23 +1,16 @@
-# .governance 目录
+# .governance
 
-`.governance/` 是 `open-cowork` 的运行时治理产物目录，不是普通文档目录。
+本目录是 open-cowork 的项目事实层。v0.3.11 默认采用 lean protocol：当前事实应优先落在少量可读、可验证、可轮转的文件中。
 
-它用于保存项目在执行过程中的结构化事实、当前变更、证据、状态快照、归档和接续材料。
+## 当前默认入口
 
-## 仓库中默认提交的内容
+- `AGENTS.md`：项目内 Agent 规则入口。
+- `agent-entry.md`：任意 Agent 接手、验证、审查或实现时的固定入口。
+- `agent-playbook.md`：本项目 Agent 操作规则。
+- `current-state.md`：给人和新 Agent 读取的当前状态摘要。
+- `state.yaml`：compact 权威状态，缺失时应先走迁移 / 初始化流程。
+- `evidence.yaml`：有界证据引用。
+- `ledger.yaml`：closeout、迁移 receipt 和接续记录。
+- `rules.yaml`：项目规则与 gate 策略。
 
-- `templates/`：可复用模板。
-- `README.md`：本说明文件。
-
-## 运行时生成且默认不提交的内容
-
-- `index/`：当前 change 指针、维护状态和索引。
-- `changes/`：正在推进的 change package。
-- `archive/`：已归档的 change package。
-- `runtime/`：状态、timeline 和面向外部工具的投影输出。
-
-## 初始化方式
-
-初始化由 Agent 在目标项目根目录内部完成。人类默认只需要用自然语言要求 Agent “在当前项目中实施 open-cowork”。
-
-如果你只是阅读 `open-cowork` 框架本身，通常不需要手动编辑 `.governance/`。
+旧版本项目可能保留 heavy layout。它们是迁移来源或冷历史，不是 v0.3.11 新项目默认模型。Agent 不应默认全文读取冷历史；只有当前 state、恢复包或人明确指定路径时才按需读取。

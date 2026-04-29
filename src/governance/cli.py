@@ -143,7 +143,7 @@ def cmd_pilot(args):
     print(f"- target: {target}")
     print(f"- change_id: {args.change_id}")
     print("")
-    cmd_init(argparse.Namespace(root=str(target)))
+    cmd_init(argparse.Namespace(root=str(target), legacy_layout=False))
     create_exit = cmd_change_create(argparse.Namespace(root=str(target), change_id=args.change_id, title=args.title or args.change_id, active_policy=args.active_policy))
     if create_exit:
         return create_exit
@@ -638,6 +638,21 @@ def cmd_adapter(args):
 
 
 def cmd_evidence(args):
+    if args.evidence_subcmd == "add":
+        from governance.lean_commands import add_evidence
+
+        entry = add_evidence(
+            args.root,
+            evidence_id=args.id,
+            kind=args.kind,
+            ref=args.ref,
+            summary=args.summary,
+            created_by=args.created_by,
+            round_id=args.round_id,
+        )
+        print(f"Lean evidence added: {entry['evidence_id']}")
+        return 0
+
     from governance.evidence import validate_adapter_output, write_evidence_index
     from governance.simple_yaml import load_yaml
 
@@ -665,6 +680,98 @@ def cmd_evidence(args):
     return 0
 
 
+def cmd_round(args):
+    from governance.lean_commands import approve_round_gate, close_round, init_participants, start_round
+
+    if args.round_subcmd == "start":
+        state = start_round(
+            args.root,
+            round_id=args.round_id,
+            goal=args.goal,
+            scope_in=args.scope_in,
+            scope_out=args.scope_out,
+            acceptance_summary=args.acceptance,
+        )
+        print(f"Lean round started: {state['active_round']['round_id']}")
+        return 0
+    if args.round_subcmd == "participants" and args.participants_subcmd == "init":
+        state = init_participants(
+            args.root,
+            sponsor=args.sponsor,
+            owner_agent=args.owner_agent,
+            orchestrator=args.orchestrator,
+            executor=args.executor,
+            reviewer=args.reviewer,
+            advisors=args.advisor,
+        )
+        status = state["active_round"]["participant_initialization"]["status"]
+        print(f"Lean participants initialized: {status}")
+        return 0 if status == "complete" else 1
+    if args.round_subcmd == "approve":
+        state = approve_round_gate(
+            args.root,
+            gate=args.gate,
+            approved_by=args.approved_by,
+            evidence_ref=args.evidence_ref,
+            reason=args.reason,
+        )
+        print(f"Lean gate approved: {args.gate} by {state['active_round']['gates'][args.gate]['approved_by']}")
+        return 0
+    if args.round_subcmd == "close":
+        ok, payload = close_round(
+            args.root,
+            final_status=args.final_status,
+            closed_by=args.closed_by,
+            summary=args.summary,
+            evidence_ref=args.evidence_ref,
+        )
+        if not ok:
+            print(f"Lean round close blocked: {payload['reason']}")
+            return 1
+        print(f"Lean round closed: {payload['round_id']} ({payload['final_status']})")
+        return 0
+    print("Unsupported round command.")
+    return 1
+
+
+def cmd_rule(args):
+    from governance.lean_commands import add_rule, update_rule_status
+
+    if args.rule_subcmd == "add":
+        ok, payload = add_rule(
+            args.root,
+            rule_id=args.id,
+            name=args.name,
+            kind=args.kind,
+            failure_impact=args.failure_impact,
+            applies_to=args.applies_to,
+            command=args.rule_command,
+            authorization_ref=args.authorization_ref,
+        )
+        if not ok:
+            print(f"Rule add blocked: {payload['reason']}")
+            return 1
+        print(f"Lean rule added: {payload['id']}")
+        return 0
+    status_by_subcmd = {"suspend": "suspended", "resume": "active", "remove": "removed"}
+    if args.rule_subcmd in status_by_subcmd:
+        ok, payload = update_rule_status(
+            args.root,
+            rule_id=args.id,
+            status=status_by_subcmd[args.rule_subcmd],
+            actor=args.actor,
+            reason=args.reason,
+            authorization_ref=args.authorization_ref,
+        )
+        if not ok:
+            print(f"Rule change blocked: {payload['reason']}")
+            return 1
+        print(f"Lean rule {args.rule_subcmd}: {payload['id']}")
+        return 0
+    print("Unsupported rule command.")
+    return 1
+
+
 def cmd_index_rebuild(args):
     from governance.index import rebuild_governance_index
 
@@ -688,6 +795,24 @@ def cmd_index_rebuild(args):
 
 
 def cmd_hygiene(args):
+    if getattr(args, "cleanup", False):
+        from governance.lean_migration import cleanup_legacy
+
+        payload = cleanup_legacy(args.root, dry_run=getattr(args, "dry_run", False), confirm=getattr(args, "confirm", False))
+        if payload.get("blocked"):
+            print("清理需要显式确认：请使用 --confirm，或先用 --dry-run 查看计划。")
+            return 1
+        if payload.get("dry_run"):
+            print("清理预览")
+        else:
+            print("清理确认已记录，未执行物理删除")
+        print("")
+        for item in payload.get("candidates", []):
+            print(f"- {item}")
+        if payload.get("receipt"):
+            print(f"- receipt: {payload['receipt']}")
+        return 0
+
     from governance.hygiene import build_hygiene_report
 
     payload = build_hygiene_report(args.root)
@@ -723,6 +848,70 @@ def cmd_hygiene(args):
         print(f"- status: {state_consistency.get('status')}")
         for issue in state_consistency.get("issues", []):
             print(f"- {issue}")
+    return 0
+
+
+def cmd_migrate(args):
+    from governance.lean_migration import detect_legacy_layout, migrate_legacy_to_lean, verify_migration
+
+    if args.subcmd == "detect":
+        payload = detect_legacy_layout(args.root)
+        print("旧版治理目录检测")
+        print("")
+        print(f"- layout: {payload['layout']}")
+        print(f"- protocol_version: {payload['protocol_version']}")
+        print(f"- active_legacy_change: {payload['active_legacy_change']}")
+        print("- legacy_dirs:")
+        for name, meta in payload["legacy_dirs"].items():
+            print(f"  - {name}: exists={str(meta['exists']).lower()} entries={meta['entry_count']}")
+        print("- cleanup_candidates:")
+        for item in payload["cleanup_candidates"]:
+            print(f"  - {item}")
+        return 0
+    if args.subcmd == "lean":
+        dry_run = bool(args.dry_run or not args.confirm)
+        payload = migrate_legacy_to_lean(args.root, dry_run=dry_run, confirm=args.confirm)
+        if payload.get("blocked"):
+            print("迁移需要显式确认：请使用 --confirm，或先用 --dry-run 查看计划。")
+            return 1
+        if payload["dry_run"]:
+            print("迁移预览")
+        else:
+            print("迁移完成")
+        print("")
+        for item in payload.get("move_plan", []):
+            print(f"- {item['from']} -> {item['to']}")
+        if payload.get("receipt"):
+            print(f"- receipt: {payload['receipt']}")
+        return 0
+    if args.subcmd == "verify":
+        payload = verify_migration(args.root)
+        if payload["ok"]:
+            print("迁移验证通过")
+            return 0
+        print("迁移验证失败")
+        for error in payload["errors"]:
+            print(f"- {error}")
+        return 1
+    return 1
+
+
+def cmd_uninstall(args):
+    from governance.lean_migration import uninstall_governance
+
+    payload = uninstall_governance(args.root, dry_run=args.dry_run or not args.confirm, confirm=args.confirm)
+    if payload.get("blocked"):
+        print("卸载需要显式确认：请使用 --confirm，或先用 --dry-run 查看计划。")
+        return 1
+    if payload["dry_run"]:
+        print("卸载预览")
+    else:
+        print("卸载完成")
+    print("")
+    for item in payload.get("targets", []):
+        print(f"- {item}")
+    if payload.get("receipt"):
+        print(f"- receipt: {payload['receipt']}")
     return 0
 
 
@@ -1504,10 +1693,17 @@ def cmd_revise(args):
 
 
 def cmd_init(args):
-    from governance.index import ensure_governance_index
+    if getattr(args, "legacy_layout", False):
+        from governance.index import ensure_governance_index
 
-    ensure_governance_index(args.root)
-    print(f"Initialized open-cowork governance in {args.root}/.governance")
+        ensure_governance_index(args.root)
+        print(f"Initialized open-cowork governance in {args.root}/.governance (legacy layout)")
+        return 0
+    from governance.lean_paths import ensure_lean_layout
+
+    ensure_lean_layout(args.root)
+    print(f"Initialized open-cowork v0.3.11 lean governance in {args.root}/.governance")
+    return 0
 
 
 def cmd_version(args):
@@ -1555,7 +1751,7 @@ def cmd_onboard(args):
     print(f"- target: {target}")
     print(f"- mode: {mode}")
     print("")
-    cmd_init(argparse.Namespace(root=str(target)))
+    cmd_init(argparse.Namespace(root=str(target), legacy_layout=False))
     print("")
     cmd_status(argparse.Namespace(root=str(target)))
     if not args.no_diagnose:
@@ -1660,6 +1856,9 @@ def cmd_status(args):
     from governance.step_matrix import format_status_snapshot_view, write_status_snapshot
 
     try:
+        if _should_render_lean_status(args):
+            _print_lean_status(args.root)
+            return
         if getattr(args, "sync_current_state", False):
             from governance.current_state import sync_current_state
 
@@ -1714,6 +1913,41 @@ def cmd_status(args):
     except Exception as e:
         print(f"Status check failed: {e}")
         print("Tip: Have you run 'ocw init' or set a current change?")
+
+
+def _should_render_lean_status(args) -> bool:
+    if getattr(args, "change_id", None):
+        return False
+    root = Path(args.root)
+    return (root / ".governance/state.yaml").exists() and not (root / ".governance/index/current-change.yaml").exists()
+
+
+def _print_lean_status(root: str | Path) -> None:
+    from governance.lean_round import evaluate_closeout_gate, evaluate_execution_gate
+    from governance.lean_state import load_lean_state, validate_lean_state
+
+    state = load_lean_state(root)
+    active_round = state.get("active_round", {})
+    print("# open-cowork lean status")
+    print("")
+    print(f"- protocol: {state.get('protocol', {}).get('version')}")
+    print(f"- layout: {state.get('layout')}")
+    print(f"- round_id: {active_round.get('round_id')}")
+    print(f"- goal: {active_round.get('goal')}")
+    print(f"- phase: {active_round.get('phase')}")
+    print(f"- participant_initialization: {active_round.get('participant_initialization', {}).get('status')}")
+    errors = validate_lean_state(state)
+    print(f"- schema_valid: {str(not errors).lower()}")
+    if errors:
+        print("- schema_errors:")
+        for error in errors:
+            print(f"  - {error}")
+    execution = evaluate_execution_gate(state)
+    closeout = evaluate_closeout_gate(state)
+    print("## Gates")
+    print(f"- execution: {execution.get('reason')} allowed={str(execution.get('allowed')).lower()}")
+    print(f"- closeout: {closeout.get('reason')} allowed={str(closeout.get('allowed')).lower()}")
+    print("")
 
 
 def _print_status_preflight(root: str | Path, change_id: str | None) -> None:
@@ -2171,7 +2405,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", default=".", help="Project root directory")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    subparsers.add_parser("init", help="Initialize minimum governance directory")
+    p_init = subparsers.add_parser("init", help="Initialize minimum governance directory")
+    p_init.add_argument("--legacy-layout", action="store_true", help="Intentionally initialize the legacy heavy governance layout")
     subparsers.add_parser("propose", help="Create an intent draft")
     subparsers.add_parser("version", help="Show open-cowork version and command paths")
     p_activate = subparsers.add_parser("activate", help="Show project-scoped activation and handoff state")
@@ -2249,6 +2484,21 @@ def build_parser() -> argparse.ArgumentParser:
         p_hygiene = subparsers.add_parser(command_name, help="Classify governance artifacts and repository hygiene")
         p_hygiene.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
         p_hygiene.add_argument("--state-consistency", action="store_true", help="Include human-readable state consistency checks")
+        p_hygiene.add_argument("--cleanup", action="store_true", help="Preview or confirm v0.3.11 legacy cleanup")
+        p_hygiene.add_argument("--dry-run", action="store_true", help="Preview cleanup without writing changes")
+        p_hygiene.add_argument("--confirm", action="store_true", help="Confirm cleanup and write a receipt")
+
+    p_migrate = subparsers.add_parser("migrate", help="Detect and migrate legacy governance layouts")
+    p_migrate_sub = p_migrate.add_subparsers(dest="subcmd")
+    p_migrate_sub.add_parser("detect", help="Detect legacy heavy governance directories")
+    p_migrate_lean = p_migrate_sub.add_parser("lean", help="Migrate legacy governance to v0.3.11 lean layout")
+    p_migrate_lean.add_argument("--dry-run", action="store_true", help="Preview migration without moving files")
+    p_migrate_lean.add_argument("--confirm", action="store_true", help="Confirm migration and write a receipt")
+    p_migrate_sub.add_parser("verify", help="Verify v0.3.11 lean migration outputs")
+
+    p_uninstall = subparsers.add_parser("uninstall", help="Preview or confirm safe open-cowork governance uninstall")
+    p_uninstall.add_argument("--dry-run", action="store_true", help="Preview uninstall without deleting files")
+    p_uninstall.add_argument("--confirm", action="store_true", help="Confirm uninstall and write a receipt")
 
     p_participants = subparsers.add_parser("participants", help="Configure human and Agent participants")
     p_participants_sub = p_participants.add_subparsers(dest="subcmd")
@@ -2514,8 +2764,60 @@ def build_parser() -> argparse.ArgumentParser:
     p_adapter.add_argument("path")
     p_adapter.add_argument("--format", choices=["text", "yaml", "json"], default="text")
 
+    p_round = subparsers.add_parser("round", help="Manage lean protocol rounds")
+    p_round_sub = p_round.add_subparsers(dest="round_subcmd")
+    p_round_start = p_round_sub.add_parser("start", help="Start a lean round")
+    p_round_start.add_argument("--round-id", required=True)
+    p_round_start.add_argument("--goal", required=True)
+    p_round_start.add_argument("--scope-in", action="append", default=[])
+    p_round_start.add_argument("--scope-out", action="append", default=[])
+    p_round_start.add_argument("--acceptance", default="")
+    p_round_participants = p_round_sub.add_parser("participants", help="Initialize round participants")
+    p_round_participants_sub = p_round_participants.add_subparsers(dest="participants_subcmd")
+    p_round_participants_init = p_round_participants_sub.add_parser("init", help="Initialize required roles")
+    p_round_participants_init.add_argument("--sponsor", required=True)
+    p_round_participants_init.add_argument("--owner-agent", required=True)
+    p_round_participants_init.add_argument("--orchestrator", default="")
+    p_round_participants_init.add_argument("--executor", required=True)
+    p_round_participants_init.add_argument("--reviewer", required=True)
+    p_round_participants_init.add_argument("--advisor", action="append", default=[])
+    p_round_approve = p_round_sub.add_parser("approve", help="Approve a lean gate")
+    p_round_approve.add_argument("--gate", choices=["execution", "closeout"], required=True)
+    p_round_approve.add_argument("--approved-by", required=True)
+    p_round_approve.add_argument("--evidence-ref", required=True)
+    p_round_approve.add_argument("--reason", default="")
+    p_round_close = p_round_sub.add_parser("close", help="Close a lean round into the ledger")
+    p_round_close.add_argument("--final-status", choices=["completed", "cancelled", "blocked"], default="completed")
+    p_round_close.add_argument("--closed-by", required=True)
+    p_round_close.add_argument("--summary", default="")
+    p_round_close.add_argument("--evidence-ref", default="")
+
+    p_rule = subparsers.add_parser("rule", help="Manage lean external rules")
+    p_rule_sub = p_rule.add_subparsers(dest="rule_subcmd")
+    p_rule_add = p_rule_sub.add_parser("add", help="Add an external rule")
+    p_rule_add.add_argument("--id", required=True)
+    p_rule_add.add_argument("--name", required=True)
+    p_rule_add.add_argument("--kind", required=True)
+    p_rule_add.add_argument("--failure-impact", choices=["blocking", "warning", "advisory"], required=True)
+    p_rule_add.add_argument("--applies-to", action="append", default=[])
+    p_rule_add.add_argument("--command", dest="rule_command", default="")
+    p_rule_add.add_argument("--authorization-ref", default="")
+    for action in ("suspend", "resume", "remove"):
+        p_rule_action = p_rule_sub.add_parser(action, help=f"{action.title()} an external rule")
+        p_rule_action.add_argument("--id", required=True)
+        p_rule_action.add_argument("--reason", default="")
+        p_rule_action.add_argument("--actor", default="agent")
+        p_rule_action.add_argument("--authorization-ref", default="")
+
     p_evidence = subparsers.add_parser("evidence", help="Manage evidence indexes")
     p_evidence_sub = p_evidence.add_subparsers(dest="evidence_subcmd")
+    p_evidence_add = p_evidence_sub.add_parser("add", help="Add lean evidence")
+    p_evidence_add.add_argument("--id", required=True)
+    p_evidence_add.add_argument("--kind", required=True)
+    p_evidence_add.add_argument("--ref", required=True)
+    p_evidence_add.add_argument("--summary", required=True)
+    p_evidence_add.add_argument("--created-by", required=True)
+    p_evidence_add.add_argument("--round-id", default=None)
     p_evidence_index = p_evidence_sub.add_parser("index", help="Generate evidence index")
     p_evidence_index.add_argument("--change-id", required=True)
     p_evidence_append = p_evidence_sub.add_parser("append", help="Append adapter output evidence")
@@ -2693,6 +2995,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_handoff(args)
     elif args.command in {"hygiene", "doctor"}:
         return cmd_hygiene(args)
+    elif args.command == "migrate":
+        return cmd_migrate(args)
+    elif args.command == "uninstall":
+        return cmd_uninstall(args)
     elif args.command == "participants" and args.subcmd == "setup":
         return cmd_participants_setup(args)
     elif args.command == "participants" and args.subcmd == "list":
@@ -2747,6 +3053,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_runtime_event(args)
     elif args.command == "adapter" and args.subcmd == "validate-output":
         return cmd_adapter(args)
+    elif args.command == "round":
+        return cmd_round(args)
+    elif args.command == "rule":
+        return cmd_rule(args)
     elif args.command == "evidence":
         return cmd_evidence(args)
     elif args.command == "verify":

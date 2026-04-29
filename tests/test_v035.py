@@ -315,6 +315,7 @@ class V035ProjectActivationTests(unittest.TestCase):
             "05-deterministic-resume-and-merge-safe-governance.md",
             "06-team-adoption-and-context-pack.md",
             "07-v038-runtime-evidence-and-closeout.md",
+            "08-v0311-lean-protocol-reset.md",
             "08-v039-team-operating-loop.md",
             "09-v0310-governance-enforcement.md",
             "README.md",

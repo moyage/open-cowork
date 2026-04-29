@@ -24,14 +24,14 @@ class V036DeterministicResumeTests(unittest.TestCase):
 
             idle = Path(tmp) / "idle"
             idle.mkdir()
-            self._run_cli(idle, "init")
+            self._run_cli(idle, "init", "--legacy-layout")
             idle_output = self._run_cli(idle, "resume")
             self.assertIn("recommended_mode: open-new-change", idle_output)
             self.assertTrue((idle / ".governance/.gitignore").exists())
 
             project = Path(tmp) / "project"
             project.mkdir()
-            self._run_cli(project, "init")
+            self._run_cli(project, "init", "--legacy-layout")
             self._prepare(project, "REQ-1", "需求 1")
             single_output = self._run_cli(project, "resume")
             self.assertIn("recommended_mode: continue-active-change", single_output)

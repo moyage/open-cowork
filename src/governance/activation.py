@@ -10,6 +10,7 @@ from .simple_yaml import load_yaml
 from .simple_yaml import write_yaml
 from .step_matrix import STEP_LABELS, render_status_snapshot
 from .context_pack import context_read_set
+from .lean_state import load_lean_state
 
 
 def build_project_activation(root: str | Path, change_id: str | None = None, *, list_only: bool = False) -> dict:
@@ -37,6 +38,9 @@ def build_project_activation(root: str | Path, change_id: str | None = None, *, 
         return activation
 
     activation["governance_state"] = "installed"
+    if _is_lean_only(paths):
+        return _activation_for_lean_state(paths, activation, list_only=list_only)
+
     active_changes = _active_changes(paths)
     activation["active_changes"] = active_changes
     if list_only:
@@ -203,6 +207,15 @@ def format_project_activation(payload: dict) -> str:
             f"- waiting_on: {active.get('waiting_on')}",
             f"- next_decision: {active.get('next_decision')}",
         ])
+    active_round = payload.get("active_round") or {}
+    if active_round:
+        lines.extend([
+            f"- active_round_id: {active_round.get('round_id')}",
+            f"- current_phase: {active_round.get('phase')}",
+            f"- current_owner: {active_round.get('owner_agent')}",
+            f"- waiting_on: {active_round.get('waiting_on')}",
+            f"- next_decision: {active_round.get('next_decision')}",
+        ])
     preflight = payload.get("execution_preflight") or {}
     if preflight:
         lines.extend([
@@ -235,6 +248,79 @@ def format_project_activation(payload: dict) -> str:
 def _write_activation(paths: GovernancePaths, payload: dict) -> None:
     paths.local_dir.mkdir(parents=True, exist_ok=True)
     write_yaml(paths.project_activation_file(), payload)
+
+
+def _is_lean_only(paths: GovernancePaths) -> bool:
+    return (paths.governance_dir / "state.yaml").exists() and not paths.current_change_file().exists()
+
+
+def _activation_for_lean_state(paths: GovernancePaths, activation: dict, *, list_only: bool) -> dict:
+    state = load_lean_state(paths.root)
+    active_round = state.get("active_round") or {}
+    round_id = active_round.get("round_id") or ""
+    participants = active_round.get("participants") or {}
+    review = active_round.get("review") or {}
+    verify = active_round.get("verify") or {}
+    closeout = active_round.get("closeout") or {}
+    recommended_mode = "choose-active-round" if list_only else "continue-active-round"
+    activation.update({
+        "recommended_mode": recommended_mode,
+        "active_change": None,
+        "active_round": {
+            "round_id": round_id,
+            "goal": active_round.get("goal") or "",
+            "phase": active_round.get("phase") or "",
+            "owner_agent": participants.get("owner_agent") or participants.get("executor") or "",
+            "review_status": review.get("status") or "",
+            "review_decision": review.get("decision") or "",
+            "verify_status": verify.get("status") or "",
+            "closeout_status": closeout.get("status") or "",
+            "waiting_on": _lean_waiting_on(active_round),
+            "next_decision": _lean_next_decision(active_round),
+        },
+        "recommended_read_set": [
+            ".governance/AGENTS.md",
+            ".governance/agent-entry.md",
+            ".governance/agent-playbook.md",
+            ".governance/current-state.md",
+            ".governance/state.yaml",
+        ],
+        "agent_instructions": [
+            "Continue from lean project governance facts; do not reinstall unless .governance is missing.",
+            "Read the recommended set before acting.",
+            "Respect active_round scope, gates, review independence, and evidence refs.",
+            "Do not create or rely on legacy .governance/index/current-change.yaml for lean-only projects.",
+            "Report goal, phase, owner, blockers, next action, and human decision needed.",
+        ],
+    })
+    if list_only:
+        activation["active_rounds"] = [activation["active_round"]] if round_id else []
+    return activation
+
+
+def _lean_waiting_on(active_round: dict) -> str:
+    gates = active_round.get("gates") or {}
+    execution_gate = gates.get("execution") or {}
+    closeout_gate = gates.get("closeout") or {}
+    review = active_round.get("review") or {}
+    verify = active_round.get("verify") or {}
+    closeout = active_round.get("closeout") or {}
+    if execution_gate.get("status") != "approved":
+        return "execution gate"
+    if verify.get("status") not in {"passed", "complete", "completed"}:
+        return "verification"
+    if review.get("status") != "completed":
+        return "independent review"
+    if closeout_gate.get("status") != "approved" and closeout.get("status") != "closed":
+        return "closeout gate"
+    return "none"
+
+
+def _lean_next_decision(active_round: dict) -> str:
+    waiting_on = _lean_waiting_on(active_round)
+    if waiting_on == "none":
+        return "open next round or release preparation"
+    return f"resolve {waiting_on}"
 
 
 def _execution_preflight(root: str | Path, change_id: str) -> dict:

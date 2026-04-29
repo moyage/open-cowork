@@ -1,8 +1,10 @@
 # open-cowork
 
-`open-cowork` 是一个 Agent-first collaboration governance protocol。它把复杂项目里的意图、范围、角色、证据、审查、归档和接续状态落成项目事实，让不同 AI Coding 环境和本地个人域 Agent 可以围绕同一个项目继续工作。
+`open-cowork` 是一个 Agent-first collaboration governance protocol。它把复杂项目里的意图、范围、角色、证据、审查、归档和接续状态落成轻量项目事实，让不同 AI Coding 环境和本地个人域 Agent 可以围绕同一个项目继续工作。
 
-它的默认入口不是让人学习一套命令行，而是让人把目标讲给 Agent。**CLI 是 Agent 内部工具**，用于维护结构化事实、排障和接力。
+它的默认入口不是让人学习命令行，而是让人把目标讲给 Agent。**CLI 是 Agent 内部工具**，用于维护结构化事实、排障和接力。
+
+v0.3.11 起，open-cowork 的默认项目模型是 lean protocol：目标项目默认只需要一组小文件，例如 `.governance/AGENTS.md`、`.governance/agent-entry.md`、`.governance/agent-playbook.md`、`.governance/state.yaml`、`.governance/current-state.md`、`.governance/evidence.yaml`、`.governance/ledger.yaml` 和 `.governance/rules.yaml`。旧版本的重目录布局只作为迁移来源和兼容对象存在。
 
 ## 人只需要对 Agent 说
 
@@ -28,21 +30,21 @@
 请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续。
 ```
 
-Agent 会在内部运行确定性 resume 入口、读取项目事实、确认要接续的 change，然后继续当前步骤。自然语言只是请求 Agent 运行项目入口；协议触发点是项目内的 resume 入口，不是靠关键词猜测。open-cowork 的应用对象是项目，不是某个单独 Agent。
+Agent 会在内部运行确定性 resume / status 入口、读取项目事实、确认要接续的 round，然后继续当前步骤。对旧版项目，这相当于先做 activate 后接续；对 v0.3.11 lean 项目，则是先恢复当前 round 再执行。自然语言只是请求 Agent 运行项目入口；协议触发点是项目内的确定性入口，不是靠关键词猜测。open-cowork 的应用对象是项目，不是某个单独 Agent。
 
 ## 典型使用场景
 
 ### 个人域单一 Agent 系统
 
-一个人只使用 Codex、Claude Code 或其他单一 AI Coding 环境时，open-cowork 主要解决“长任务不断线”的问题。Agent 把本轮需求、范围、执行证据、验证结果和下一步接续状态写入项目里的 `.governance/`，即使会话压缩、重开窗口或隔天继续，也可以从项目事实恢复，而不是靠聊天记录回忆。
+一个人只使用 Codex、Claude Code 或其他单一 AI Coding 环境时，open-cowork 主要解决“长任务不断线”的问题。Agent 把本轮需求、范围、执行证据、验证结果和下一步接续状态写入项目里的轻量治理文件，即使会话压缩、重开窗口或隔天继续，也可以从项目事实恢复，而不是靠聊天记录回忆。
 
 ### 本地个人域多个 Agent 系统调度协同
 
-一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先按 `.governance/agent-entry.md` 使用确定性 resume 入口，再围绕同一个 active change、contract、bindings 和 evidence 协作。需求 1 和需求 2 可以同时存在于 active changes 列表中，但接手时必须显式选择要继续哪个 change。
+一个人同时使用 Codex、Claude Code、Hermes、OMOC / OpenCode 等多个本地 Agent 时，open-cowork 主要解决“同一项目、多个 Agent 不互相猜状态”的问题。不同 Agent 进入项目后都先按 `.governance/agent-entry.md` 使用确定性入口，再围绕同一个 active round、scope、role bindings 和 evidence refs 协作。多个需求可以同时存在于 `state.yaml` 的 rounds / current round 视图中，接手时必须显式选择要继续的需求。
 
 ### 团队多人域场景
 
-多人团队中，每个人可以有自己的个人域 Agent 和熟悉的 AI Coding 环境。open-cowork 不要求团队统一 runtime 或工作台，而是在项目层提供共同事实面：谁负责、当前范围是什么、何时允许执行、证据在哪里、谁做独立审查、是否可以归档。这样每个“超级个体”可以保持自己的工具组合，同时通过项目级 contract、evidence、review 和 archive 形成可持续协作的“超级组织”。
+多人团队中，每个人可以有自己的个人域 Agent 和熟悉的 AI Coding 环境。open-cowork 不要求团队统一 runtime 或工作台，而是在项目层提供共同事实面：谁负责、当前范围是什么、何时允许执行、证据在哪里、谁做独立审查、是否可以收束归档。这样每个“超级个体”可以保持自己的工具组合，同时通过项目级 state、rules、evidence、review 和 ledger 形成可持续协作的“超级组织”。
 
 ## 项目级接手规则（Skill）怎么用
 
@@ -57,34 +59,23 @@ open-cowork 会在已实施项目中生成 `.governance/agent-entry.md`。它放
 - 并行需求选择：当同一项目有多个正在进行的需求，让 Agent 先列出可接续项，再由人选择。
 - 团队成员接入：团队成员在自己的个人域 Agent 中打开项目后，使用同一份接手规则遵守相同流程和边界。
 
-你可以这样对 Agent 说：
-
-```text
-这个项目已经实施 open-cowork，请按项目里的 open-cowork 接手规则接续当前需求。
-```
-
-或：
-
-```text
-请先列出这个项目当前正在进行的 open-cowork 需求，我选择后再接续需求 2。
-```
-
 ## 一张图
 
 ```mermaid
 flowchart TD
     Human["人：说明目标、确认范围、批准关键门"] --> Agent["Agent：实施 open-cowork"]
     Agent --> Facts["项目事实层 .governance/"]
-    Facts --> State["当前状态 current-state"]
-    Facts --> Change["变更包 change package"]
-    Change --> Contract["Contract：执行边界"]
-    Change --> Evidence["Evidence：执行证据"]
+    Facts --> State["state.yaml：紧凑权威状态"]
+    Facts --> Current["current-state.md：可读状态摘要"]
+    Facts --> Evidence["evidence.yaml：有界证据引用"]
+    Facts --> Ledger["ledger.yaml：收束与接续记录"]
+    State --> Scope["Round scope：目标、范围、验收"]
+    State --> Roles["Role bindings：owner / reviewer / gates"]
     Evidence --> Verify["Verify：验证结果"]
     Verify --> Review["Independent review：独立审查"]
-    Review --> Archive["Archive：归档接续"]
-    State --> NextAgent["新会话 / 另一个 Agent：activate 后接续"]
-    Facts --> Active["active-changes：并行需求列表"]
-    Active --> NextAgent
+    Review --> Ledger
+    Current --> NextAgent["新会话 / 另一个 Agent：按 agent-entry 接续"]
+    State --> NextAgent
 ```
 
 ## 9 个步骤的清晰名称
@@ -94,59 +85,66 @@ flowchart TD
 | 1 | 明确意图 / Clarify intent | 目标、背景、输入是否说清楚。 |
 | 2 | 确定范围 / Lock scope | 要做什么、不做什么、验收标准是什么。 |
 | 3 | 方案设计 / Shape approach | 方案方向、风险和取舍是否可接受。 |
-| 4 | 组装变更包 / Assemble change package | Agent 把需求、方案、任务和边界装进同一个工作单元。 |
-| 5 | 批准开工 / Approve execution | 人批准进入真实执行。 |
-| 6 | 执行变更 / Execute change | Agent 在 contract 范围内工作并记录 evidence。 |
+| 4 | 组装执行范围 / Assemble working round | Agent 把需求、方案、任务和边界装进同一个 round。 |
+| 5 | 批准开工 / Approve execution | 人批准按当前范围进入真实执行。 |
+| 6 | 执行变更 / Execute change | Agent 在 scope 范围内工作并记录 evidence refs。 |
 | 7 | 验证结果 / Verify result | 测试、检查和一致性验证。 |
 | 8 | 独立审查 / Independent review | 非执行者给出 approve / revise / reject。 |
-| 9 | 归档接续 / Archive and handoff | 归档、收束、生成下一轮接续状态。 |
+| 9 | 归档接续 / Close out and hand off | 收束本轮，写入 ledger，留下下一轮可恢复状态。 |
 
 ## 核心能力
 
 open-cowork 的 README 只说明当前框架和流程，不承担版本发布说明。具体版本变化请看 `CHANGELOG.md` 和 GitHub Release。
 
 - 项目事实层：把意图、范围、角色、证据、审查、归档和接续状态落到 `.governance/`。
+- Lean 默认模型：用少量可读、可验证、可轮转的文件承载当前事实，避免每轮工作生成大量目录。
 - 9 步协作主链：从明确意图到归档接续，区分人类决策、Agent 执行、验证和独立审查。
 - 项目级接续：新会话、另一个 Agent 或另一个团队成员都从项目事实继续，而不是从聊天历史猜状态。
 - 团队协作模式：Agent 推荐轻量、个人多 Agent、团队标准或团队严格协作，人只确认协作强度是否合适。
-- 接手摘要：为当前 change 生成内部接手资料索引和短摘要，帮助长任务在上下文压缩后恢复。
-- 并行需求管理：同一项目可以同时存在多个正在推进的 change，接手时先选择要继续的需求。
-- 执行边界：通过 contract 明确允许范围、禁止动作、验证要求和证据要求。
+- 接手摘要：为当前 round 生成内部接手资料索引和短摘要，帮助长任务在上下文压缩后恢复。
+- 并行需求管理：同一项目可以同时登记多个 round，接手时先选择要继续的需求。
+- 执行边界：通过 round scope、role bindings 和 rules 明确允许范围、禁止动作、验证要求和证据要求。
 - 完整实现约束：已确认的需求、范围和验收标准默认要求完整实现；未经人明确批准，Agent 不得自行降级为最小实现、部分实现或延期实现。
-- 执行前检查：已启用 open-cowork 的项目，Agent 修改项目文件前必须先确认 active change、contract、scope、Step 5 approval 和 Step 6 readiness；事后补录只能作为 recovery，不能伪装成正常 evidence。
-- 团队操作循环：维护 `.governance/team/**` 中的参与者、分派、阻塞、审查队列、周期性意图、团队摘要、carry-forward 和复盘资产，让个人域 Agent 与远程团队成员 Agent 能围绕同一项目事实协作。
+- 执行前检查：已启用 open-cowork 的项目，Agent 修改项目文件前必须先确认当前 round、scope、approval、reviewer 独立性和 readiness；事后补录只能作为 recovery，不能伪装成正常 evidence。
 - 证据与审查：执行结果、测试输出、review decision 和 human gate 都可追溯。
 - 低侵入协同：不强制统一 IDE、Agent runtime、工作台或团队成员的个人域工具组合。
 
 ## 核心概念
 
-- `change` / 变更包：一轮可执行、可验证、可归档的工作单元。
-- `contract` / 执行边界：说明目标、范围、允许动作、禁止动作、验证方式和证据要求。
-- `bindings` / 角色绑定：说明每一步由谁负责、谁协助、谁审查、哪些步骤需要人确认。
-- `evidence` / 证据：执行输出、测试结果、修改摘要和其他可审查材料。
+- `round` / 工作轮次：一轮可执行、可验证、可收束的工作单元。
+- `scope` / 执行范围：说明目标、允许范围、禁止范围、验证对象和证据要求。
+- `role bindings` / 角色绑定：说明每一步由谁负责、谁协助、谁审查、哪些步骤需要人确认。
+- `evidence refs` / 证据引用：执行输出、测试结果、修改摘要和其他可审查材料的有界引用。
 - `review` / 独立审查：非执行者给出 approve / revise / reject。
-- `archive` / 归档接续：收束本轮工作，留下下一轮可恢复的状态。
+- `ledger` / 接续账本：收束本轮工作，留下下一轮可恢复的状态。
 
 ## `.governance/` 里放什么
 
-`.governance/` 是目标项目里的协作事实层，不是普通文档目录，也不是所有过程材料的堆放处。它主要保存 Agent 执行与团队审计需要共享的事实：
+`.governance/` 是目标项目里的协作事实层，不是普通文档目录，也不是所有过程材料的堆放处。v0.3.11 默认只把小而关键的事实放在第一屏可读位置：
 
 | 内容 | 典型位置 | 主要消费者 |
 | --- | --- | --- |
-| Agent 接手入口 | `.governance/AGENTS.md`、`.governance/agent-entry.md` | Agent |
-| 当前状态摘要 | `.governance/local/current-state.md` | 人 + Agent |
-| 项目索引 | `.governance/index/*.yaml` | Agent |
-| 协作模式与成员职责边界 | `.governance/profiles/adoption.yaml`、`.governance/participants/*.yaml` | Agent + 团队 |
-| 团队操作循环事实 | `.governance/team/*.yaml`、`.governance/team/retrospectives/` | Agent + 团队 |
-| 当前变更包 | `.governance/changes/<change-id>/` | Agent + Reviewer |
-| 执行边界与角色绑定 | `contract.yaml`、`bindings.yaml` | Agent + 人 |
-| 接手材料 | `context/context-pack.yaml`、`context/handoff-compact.md` | 新会话 Agent + Reviewer |
-| 阶段报告 | `step-reports/*.md` | 人 + 团队 |
-| 执行证据与验证 | `evidence/**`、`verify.yaml`、`review.yaml` | Agent + Reviewer |
-| 归档与接续 | `.governance/archive/<change-id>/` | Agent + 审计 |
-| 临时运行投影 | `.governance/local/runtime/**`、`PROJECT_ACTIVATION.yaml` | Agent |
+| Agent 接手入口 | `.governance/AGENTS.md`、`.governance/agent-entry.md`、`.governance/agent-playbook.md` | Agent |
+| 权威状态 | `.governance/state.yaml` | Agent + Reviewer |
+| 可读状态摘要 | `.governance/current-state.md` | 人 + Agent |
+| 证据引用 | `.governance/evidence.yaml` | Agent + Reviewer |
+| 规则与策略 | `.governance/rules.yaml` | Agent + Reviewer |
+| 收束与接续记录 | `.governance/ledger.yaml` | Agent + 审计 |
 
-人和团队通常只需要读 `current-state.md`、当前 step report、review 摘要和 archive closeout；Agent 才需要消费 YAML 索引、contract、bindings、evidence 和 runtime 投影。
+旧版本项目可能仍有重目录布局。v0.3.11 对这类项目的处理方式是：先检测，再 dry-run，再经人确认迁移到 cold history，最后按需清理或卸载。旧重目录不再是新项目的默认操作模型。
+
+人和团队通常只需要读 `current-state.md`、当前状态报告、review 摘要和 closeout 摘要；Agent 才需要消费 YAML 状态、证据引用和 rules。
+
+## 旧版本如何迁移、清理和卸载
+
+Agent 负责处理旧版本项目，人不需要记命令。推荐顺序是：
+
+1. 识别旧 heavy 布局和潜在风险。
+2. 先做 dry-run，向人说明会移动什么、不会删除什么。
+3. 经过人确认后，把旧历史移动到 cold history，并写入迁移 receipt。
+4. 运行 verify，确认 lean 文件、receipt 和 legacy 状态一致。
+5. 如需清理，再次 dry-run 并经人确认后执行 cleanup。
+6. 如需卸载，默认拒绝破坏性删除；只有显式确认并记录卸载前 audit 时才移除治理文件。
 
 ## 人类最小操作面
 
@@ -155,7 +153,7 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 1. 确认意图和范围。
 2. 批准是否进入执行。
 3. 选择 review 结论。
-4. 批准归档或要求继续修订。
+4. 批准收束或要求继续修订。
 
 Agent 负责运行内部命令、维护 `.governance/`、汇报当前步骤、owner、阻断、下一步和需要人决定的事项。人类不需要学习 CLI；只有安装或排障时才需要让 Agent 展示少量备用命令。
 
@@ -164,7 +162,7 @@ Agent 负责运行内部命令、维护 `.governance/`、汇报当前步骤、ow
 - `AGENTS.md`：给 Agent 的仓库级入口，强调不要把人带回 CLI-first。
 - `docs/README.md`：文档地图，说明普通读者、Agent、规格读者和历史追溯者各看哪里。
 - `docs/glossary.md`：术语表。
-- `docs/getting-started.md`：上手细节和备用路径。
+- `docs/getting-started.md`：上手细节、迁移恢复和个人域多 Agent 建议。
 - `docs/agent-skill.md`：说明项目级 Agent Entry 与平台 Skill 适配关系。
 - `docs/agent-playbook.md`：Agent 实施 open-cowork 时的操作规则。
 - `docs/specs/`：当前有效协议规格。
@@ -172,4 +170,4 @@ Agent 负责运行内部命令、维护 `.governance/`、汇报当前步骤、ow
 
 ## 一句话总结
 
-`open-cowork` 的价值不是让人多背一套流程，而是让多个 Agent 和多个 AI Coding 环境在同一个项目里，按同一套可验证事实协作和接续。
+`open-cowork` 的价值不是让人多背一套流程，而是让多个 Agent 和多个 AI Coding 环境在同一个项目里，按同一套轻量、可验证的项目事实协作和接续。

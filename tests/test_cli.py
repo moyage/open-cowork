@@ -221,7 +221,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with contextlib.redirect_stdout(io.StringIO()):
-                main(["--root", str(root), "init"])
+                main(["--root", str(root), "init", "--legacy-layout"])
                 main(["--root", str(root), "change", "create", "CHG-PARTICIPANTS", "--title", "Participants"])
                 main([
                     "--root",
@@ -1213,11 +1213,13 @@ class CliTests(unittest.TestCase):
 
             output = stdout.getvalue()
             self.assertEqual(exit_code, 0)
-            self.assertTrue((target / ".governance/index/current-change.yaml").exists())
+            self.assertTrue((target / ".governance/state.yaml").exists())
+            self.assertTrue((target / ".governance/current-state.md").exists())
+            self.assertFalse((target / ".governance/index").exists())
             self.assertIn("open-cowork onboard", output)
             self.assertIn("mode: quickstart", output)
-            self.assertIn("Initialized open-cowork governance", output)
-            self.assertIn("# open-cowork status", output)
+            self.assertIn("Initialized open-cowork v0.3.11 lean governance", output)
+            self.assertIn("# open-cowork lean status", output)
             self.assertIn("# Session Execution Diagnosis", output)
             self.assertIn("onboard complete", output)
             self.assertNotIn("personal-demo", output)
@@ -1247,7 +1249,8 @@ class CliTests(unittest.TestCase):
 
             output = stdout.getvalue()
             self.assertEqual(exit_code, 0)
-            self.assertTrue((target / ".governance/index/current-change.yaml").exists())
+            self.assertTrue((target / ".governance/state.yaml").exists())
+            self.assertFalse((target / ".governance/index").exists())
             self.assertIn("mode: quickstart", output)
             self.assertNotIn("# Session Execution Diagnosis", output)
 
@@ -1263,7 +1266,8 @@ class CliTests(unittest.TestCase):
 
                 output = stdout.getvalue()
                 self.assertEqual(exit_code, 0)
-                self.assertTrue((Path(tmp) / ".governance/index/current-change.yaml").exists())
+                self.assertTrue((Path(tmp) / ".governance/state.yaml").exists())
+                self.assertFalse((Path(tmp) / ".governance/index").exists())
                 self.assertIn(f"- target: {Path(tmp).resolve()}", output)
             finally:
                 os.chdir(previous_cwd)
@@ -1304,7 +1308,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with contextlib.redirect_stdout(io.StringIO()):
-                main(["--root", str(root), "init"])
+                main(["--root", str(root), "init", "--legacy-layout"])
             (root / ".governance/local/current-state.md").write_text(
                 "# open-cowork Current State\n\nLifecycle: idle\nLast archived change: None\n",
                 encoding="utf-8",
@@ -1388,7 +1392,7 @@ class CliTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("open-cowork 0.3.10", output)
+        self.assertIn("open-cowork 0.3.11", output)
         self.assertIn("python:", output)
         self.assertIn("cli:", output)
         self.assertIn("project_root:", output)

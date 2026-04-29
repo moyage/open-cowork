@@ -1,5 +1,14 @@
 # 变更日志
 
+## 0.3.11
+
+- 将默认治理结构切换为 lean layout：新项目默认生成 `.governance/state.yaml`、`current-state.md`、`evidence.yaml`、`ledger.yaml` 和 `rules.yaml`，不再默认创建重型 runtime / change / archive 树。
+- 增加 lean activation / resume / status 路径，新会话和跨 Agent 接续只读取紧凑权威状态，避免长周期、多轮次、多 Agent 项目被历史产物拖慢。
+- 增加 lean round、participant initialization、gate approval、evidence、external rule 和 ledger closeout 命令，强约束协作者初始化、执行授权、独立 review、验证结果和 closeout approval。
+- 增加旧项目检测、迁移、dry-run cleanup、migration receipt、cleanup receipt 和 uninstall 支持，为 v0.3.10 及更早安装环境提供可审计升级路径。
+- 更新 Agent-first 文档、getting started、glossary 和 superpowers adoption 指引，将 CLI 降为 Agent 内部维护结构化协作事实的工具。
+- 增加 v0.3.11 回归与压力测试，覆盖 lean schema、resume 读取集、gate 阻断、外部规则、迁移兼容、长周期状态增长和仓库自身 dogfood。
+
 ## 0.3.10
 
 - 增加治理强约束层：`ocw audit` 检查 Step 1-9 required outputs、状态一致性、human gate reconciliation、writer metadata、canonical artifact digest、scope drift、flow bypass recovery 和 reviewer independence。

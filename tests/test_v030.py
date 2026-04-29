@@ -157,7 +157,7 @@ class V030HumanParticipationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with contextlib.redirect_stdout(io.StringIO()):
-                main(["--root", str(root), "init"])
+                main(["--root", str(root), "init", "--legacy-layout"])
                 main(["--root", str(root), "change", "create", "CHG-V030-PREPARE", "--title", "Prepare semantics"])
                 exit_code = main([
                     "--root",
@@ -194,7 +194,7 @@ class V030HumanParticipationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with contextlib.redirect_stdout(io.StringIO()):
-                main(["--root", str(root), "init"])
+                main(["--root", str(root), "init", "--legacy-layout"])
 
             adopt_stdout = io.StringIO()
             with contextlib.redirect_stdout(adopt_stdout):

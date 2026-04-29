@@ -6,24 +6,20 @@
 
 1. `.governance/agent-entry.md`：任意 Agent 接手项目时的固定入口。
 2. `.governance/agent-playbook.md`：Agent 操作规则。
-3. `.governance/index/active-changes.yaml`：项目级并行 change 列表。
-4. `.governance/local/current-state.md`：本地可再生状态投影。
-5. `ocw resume` 输出的 recommended read set：当前 change 的权威事实。
+3. `.governance/current-state.md`：当前可读状态摘要。
+4. `.governance/state.yaml`：v0.3.11 lean compact 权威状态。
+5. `.governance/evidence.yaml`、`.governance/ledger.yaml`、`.governance/rules.yaml`：证据引用、接续记录和规则。
 
-只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。
+只读取当前 active working set。不要默认全文扫描冷历史、历史计划或旧 heavy layout；历史文档只在明确需要追溯 source docs 时按路径读取。
 
 ## 操作规则
 
-Deterministic protocol trigger: run `ocw resume` before continuing project work. Natural language is only a request to run the command, not the protocol trigger.
-Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, archive, and continuity.
-Before modifying project files, run execution preflight through open-cowork. If preflight says project files cannot be modified, stop and report the missing active change, gate, contract, scope, or readiness item. Do not complete implementation first and then ask whether to backfill open-cowork.
+Deterministic protocol trigger: run the project resume / status entry before continuing project work. Natural language is only a request to run the entry, not the protocol trigger.
+Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, closeout, and continuity.
 
 ## 硬边界
 
-- 未经人明确同意，不要在 `scope_in` 之外执行。
-- 未经人明确同意，不要缩减需求、`scope_in`、验收标准或任务完成定义。
+- 未经人明确同意，不要在 active scope 之外执行。
 - 不要让 executor 自己批准最终 review。
-- review 通过前不要 archive。
-- 不要在执行过程中暗中改写 contract 或 bindings。
-- 不要把完整需求自行降级为最小实现、部分实现或后续再补。
-- 不要把事后补录伪装成正常 Step 6 evidence；绕过流程只能记录为 recovery。
+- review 通过前不要 closeout。
+- 不要在执行过程中暗中改写 scope、role bindings 或 rules。
