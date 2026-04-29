@@ -21,6 +21,7 @@ venv/
 # Local Agent/runtime state from dogfood or target-project operation
 .agent-state/
 docs/superpowers/
+tests/
 
 # Runtime governance outputs (generated)
 .governance/current-state.md
