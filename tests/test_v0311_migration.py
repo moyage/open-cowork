@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import contextlib
 import io
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import test_support  # noqa: F401
 
 from governance.cli import main
 from governance.lean_paths import LEGACY_HEAVY_DIRS, ensure_lean_layout
-from governance.lean_migration import detect_legacy_layout, migrate_legacy_to_lean, uninstall_governance
+from governance.lean_migration import detect_legacy_layout, install_or_upgrade_lean, migrate_legacy_to_lean, uninstall_governance
+from governance.simple_yaml import load_yaml
 
 
 class V0311MigrationTests(unittest.TestCase):
@@ -88,6 +91,111 @@ class V0311MigrationTests(unittest.TestCase):
             self.assertIn("迁移预览", output)
             self.assertIn("迁移完成", output)
             self.assertIn("迁移验证通过", output)
+
+    def test_init_automatically_migrates_legacy_layout_without_human_migration_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_legacy_layout(root)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "init"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("legacy layout detected and migrated automatically", output)
+            self.assertTrue((root / ".governance/state.yaml").exists())
+            self.assertFalse((root / ".governance/changes").exists())
+            self.assertTrue((root / ".governance/cold/legacy/changes").exists())
+            self.assertTrue((root / ".governance/cold/legacy/migration-receipt.yaml").exists())
+
+    def test_setup_automatically_migrates_legacy_layout_for_agent_first_installation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_legacy_layout(root)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "setup", "--target", str(root), "--yes", "--no-diagnose"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("legacy layout detected and migrated automatically", output)
+            self.assertTrue((root / ".governance/state.yaml").exists())
+            self.assertFalse((root / ".governance/index").exists())
+            self.assertTrue((root / ".governance/cold/legacy/index").exists())
+
+    def test_onboard_automatically_migrates_legacy_layout_for_agent_first_installation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_legacy_layout(root)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "onboard", "--target", str(root), "--yes", "--no-diagnose"])
+
+            output = stdout.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("legacy layout detected and migrated automatically", output)
+            self.assertTrue((root / ".governance/state.yaml").exists())
+            self.assertFalse((root / ".governance/index").exists())
+            self.assertTrue((root / ".governance/cold/legacy/index").exists())
+
+    def test_setup_stops_when_automatic_upgrade_verification_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            stdout = io.StringIO()
+            with mock.patch("governance.cli.cmd_init", return_value=1), contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "setup", "--target", str(root), "--yes", "--no-diagnose"])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("Onboarding stopped", stdout.getvalue())
+            self.assertNotIn("open-cowork onboard complete", stdout.getvalue())
+
+    def test_detect_report_and_migration_receipt_record_git_tracked_legacy_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _make_legacy_layout(root)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(["git", "add", ".governance"], cwd=root, check=True, capture_output=True, text=True)
+
+            report = detect_legacy_layout(root)
+            result = migrate_legacy_to_lean(root, dry_run=False, confirm=True)
+            receipt = load_yaml(root / result["receipt"])
+
+            self.assertIn(".governance/changes/CHG-OLD/manifest.yaml", report["tracked_legacy_runtime_artifacts"])
+            self.assertIn(".governance/index/current-change.yaml", receipt["tracked_legacy_runtime_artifacts"])
+
+    def test_install_or_upgrade_updates_existing_lean_protocol_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_lean_layout(root)
+            state_path = root / ".governance/state.yaml"
+            state = load_yaml(state_path)
+            state["protocol"]["version"] = "0.3.10"
+            from governance.simple_yaml import write_yaml
+
+            write_yaml(state_path, state)
+
+            result = install_or_upgrade_lean(root)
+
+            upgraded = load_yaml(state_path)
+            self.assertIn("upgraded-lean-protocol-version", result["actions"])
+            self.assertEqual(upgraded["protocol"]["version"], "0.3.11")
+            self.assertTrue(result["verification"]["ok"])
+
+    def test_migration_verify_accepts_native_lean_project_without_legacy_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_lean_layout(root)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                verify_exit = main(["--root", str(root), "migrate", "verify"])
+
+            self.assertEqual(verify_exit, 0)
+            self.assertIn("迁移验证通过", stdout.getvalue())
 
     def test_uninstall_requires_confirm_and_writes_receipt_next_to_project(self):
         with tempfile.TemporaryDirectory() as tmp:

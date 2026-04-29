@@ -13,6 +13,14 @@ from .context_pack import context_read_set
 from .lean_state import load_lean_state
 
 
+LEAN_CONTEXT_DISCIPLINE = [
+    "Do not full-scan cold history, archives, session JSONL, or large logs unless a state entry points to a specific path.",
+    "Write large outputs to files and cite evidence refs or short summaries in chat.",
+    "Keep tool output bounded with targeted reads, filters, and summaries; prefer current-state.md and state.yaml for resume.",
+    "After compact failure, recover from the generated handoff and last successful evidence, not the full failed transcript.",
+]
+
+
 def build_project_activation(root: str | Path, change_id: str | None = None, *, list_only: bool = False) -> dict:
     paths = GovernancePaths(Path(root).expanduser().resolve())
     activation = {
@@ -239,6 +247,11 @@ def format_project_activation(payload: dict) -> str:
     lines.extend(["", "Recommended read set:"])
     for item in payload.get("recommended_read_set", []):
         lines.append(f"- {item}")
+    context_discipline = payload.get("context_discipline") or []
+    if context_discipline:
+        lines.extend(["", "Context discipline:"])
+        for item in context_discipline:
+            lines.append(f"- {item}")
     lines.extend(["", "Agent instructions:"])
     for item in payload.get("agent_instructions", []):
         lines.append(f"- {item}")
@@ -285,6 +298,7 @@ def _activation_for_lean_state(paths: GovernancePaths, activation: dict, *, list
             ".governance/current-state.md",
             ".governance/state.yaml",
         ],
+        "context_discipline": LEAN_CONTEXT_DISCIPLINE,
         "agent_instructions": [
             "Continue from lean project governance facts; do not reinstall unless .governance is missing.",
             "Read the recommended set before acting.",

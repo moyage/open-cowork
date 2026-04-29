@@ -14,7 +14,9 @@
 6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。
 7. verify、review 或 closeout 前先记录客观 evidence refs。
 8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。
-9. 上下文预算优先：先读 recommended read set，不要把冷历史整包加载进会话。
+9. 上下文预算优先：先读 recommended read set，不要把冷历史、session JSONL、大日志或历史计划整包加载进会话。
+10. 大型输出写入文件，只在聊天里保留 evidence ref、路径、关键结论和失败证据。
+11. compact / stream 失败后，先读恢复 handoff 和最后成功 evidence，不要重新全文读取失败会话。
 
 ## Human update template
 

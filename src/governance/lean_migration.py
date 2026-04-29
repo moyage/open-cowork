@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .lean_paths import LEGACY_HEAVY_DIRS, ensure_lean_layout, governance_dir
-from .lean_state import initial_lean_state, validate_lean_documents
+from .lean_state import PROTOCOL_VERSION, initial_lean_state, validate_lean_documents
 from .simple_yaml import load_yaml, write_yaml
 
 
@@ -31,8 +32,39 @@ def detect_legacy_layout(root: str | Path) -> dict:
         "legacy_dirs": legacy_dirs,
         "active_legacy_change": _active_legacy_change(base),
         "unmigrated_archives": _unmigrated_archives(base),
-        "tracked_legacy_runtime_artifacts": [],
+        "tracked_legacy_runtime_artifacts": _tracked_legacy_runtime_artifacts(root_path),
         "cleanup_candidates": cleanup_candidates,
+    }
+
+
+def install_or_upgrade_lean(root: str | Path) -> dict:
+    """Initialize lean governance, automatically migrating older layouts when present."""
+    root_path = Path(root)
+    base = governance_dir(root_path)
+    report = detect_legacy_layout(root_path)
+    actions: list[str] = []
+    receipt = None
+
+    if report["cleanup_candidates"]:
+        migrated = migrate_legacy_to_lean(root_path, dry_run=False, confirm=True)
+        actions.append("migrated-legacy-heavy-layout")
+        receipt = migrated.get("receipt")
+    else:
+        ensure_lean_layout(root_path)
+        actions.append("ensured-lean-layout")
+
+    upgraded_protocol = _upgrade_existing_lean_state(base)
+    if upgraded_protocol:
+        actions.append("upgraded-lean-protocol-version")
+        ensure_lean_layout(root_path)
+
+    verification = verify_migration(root_path)
+    return {
+        "layout_before": report["layout"],
+        "protocol_before": report["protocol_version"],
+        "actions": actions,
+        "receipt": receipt,
+        "verification": verification,
     }
 
 
@@ -87,6 +119,7 @@ def migrate_legacy_to_lean(root: str | Path, *, dry_run: bool, confirm: bool) ->
         "created_at": _now_utc(),
         "active_legacy_change": report["active_legacy_change"],
         "unmigrated_archives": report["unmigrated_archives"],
+        "tracked_legacy_runtime_artifacts": report["tracked_legacy_runtime_artifacts"],
         "moved": moved,
         "gitignore_updates": gitignore_updates,
         "summary": "旧版 heavy governance 目录已移入 cold/legacy，当前状态已转换为 v0.3.11 lean state。",
@@ -107,6 +140,9 @@ def verify_migration(root: str | Path) -> dict:
     else:
         errors.extend(validate_lean_documents(root_path))
     receipt_path = base / "cold/legacy/migration-receipt.yaml"
+    live_legacy_dirs = [dirname for dirname in LEGACY_HEAVY_DIRS if (base / dirname).exists()]
+    if not receipt_path.exists() and not live_legacy_dirs:
+        return {"ok": not errors, "errors": errors}
     if not receipt_path.exists():
         errors.append("migration receipt missing")
     else:
@@ -115,9 +151,8 @@ def verify_migration(root: str | Path) -> dict:
         except Exception as exc:
             receipt = {}
             errors.append(f"migration receipt unreadable: {exc}")
-        for dirname in LEGACY_HEAVY_DIRS:
-            if (base / dirname).exists():
-                errors.append(f"live legacy directory still exists: .governance/{dirname}")
+        for dirname in live_legacy_dirs:
+            errors.append(f"live legacy directory still exists: .governance/{dirname}")
         for index, item in enumerate(receipt.get("moved") or []):
             source = item.get("from")
             target = item.get("to")
@@ -236,6 +271,23 @@ def _unmigrated_archives(base: Path) -> list[str]:
     return sorted(path.name for path in archive.iterdir() if path.is_dir())
 
 
+def _tracked_legacy_runtime_artifacts(root: Path) -> list[str]:
+    paths = [f".governance/{dirname}" for dirname in LEGACY_HEAVY_DIRS]
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--", *paths],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return []
+    if completed.returncode != 0:
+        return []
+    return sorted(line for line in completed.stdout.splitlines() if line.strip())
+
+
 def _round_id_from_legacy(change_id: str) -> str:
     if not change_id:
         return "R-MIGRATED-001"
@@ -265,6 +317,24 @@ def _ensure_gitignore(root: Path) -> list[str]:
     if changed:
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return [f".gitignore:{item}" for item in applied]
+
+
+def _upgrade_existing_lean_state(base: Path) -> bool:
+    state_path = base / "state.yaml"
+    if not state_path.exists():
+        return False
+    try:
+        payload = load_yaml(state_path)
+    except Exception:
+        return False
+    protocol = payload.setdefault("protocol", {})
+    if protocol.get("version") == PROTOCOL_VERSION:
+        return False
+    protocol["name"] = protocol.get("name") or "open-cowork"
+    protocol["version"] = PROTOCOL_VERSION
+    payload.setdefault("layout", "lean")
+    write_yaml(state_path, payload)
+    return True
 
 
 def _unique_path(path: Path) -> Path:

@@ -163,6 +163,39 @@ class V0311LeanStateTests(unittest.TestCase):
             self.assertIn(".governance/state.yaml", output)
             self.assertFalse((root / ".governance/index").exists())
 
+    def test_cli_resume_surfaces_compact_resilience_rules_for_lean_projects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_lean_layout(root, initial_state=initial_lean_state(
+                round_id="R-COMPACT",
+                goal="降低上下文压力",
+            ))
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "resume"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("Context discipline:", output)
+            self.assertIn("Do not full-scan cold history", output)
+            self.assertIn("Write large outputs to files and cite evidence refs", output)
+
+    def test_cli_status_surfaces_context_budget_for_lean_projects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_lean_layout(root)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = main(["--root", str(root), "status"])
+
+            self.assertEqual(exit_code, 0)
+            output = stdout.getvalue()
+            self.assertIn("## Context Budget", output)
+            self.assertIn("- default_read_set: bounded", output)
+            self.assertIn("- large_outputs: write-to-file-and-reference", output)
+
     def test_initialized_state_and_current_state_stay_within_context_budget(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -385,7 +418,6 @@ class V0311LeanStateTests(unittest.TestCase):
             active_round["review"]["reviewer"] = "hermes"
             active_round["gates"]["closeout"]["status"] = "approved"
             active_round["gates"]["closeout"]["approval_evidence_ref"] = "E-CLOSE-001"
-            active_round["closeout"]["summary"] = "全部发布前检查完成"
             write_yaml(root / ".governance/state.yaml", state)
 
             closed = main([
@@ -397,6 +429,8 @@ class V0311LeanStateTests(unittest.TestCase):
                 "codex",
                 "--evidence-ref",
                 "E-CLOSE-001",
+                "--summary",
+                "全部发布前检查完成",
             ])
 
             self.assertEqual(closed, 0)
