@@ -10,10 +10,10 @@ from .simple_yaml import load_yaml
 from .simple_yaml import write_yaml
 from .step_matrix import STEP_LABELS, render_status_snapshot
 from .context_pack import context_read_set
-from .lean_state import load_lean_state
+from .project_state import load_project_state
 
 
-LEAN_CONTEXT_DISCIPLINE = [
+PROJECT_CONTEXT_DISCIPLINE = [
     "Do not full-scan cold history, archives, session JSONL, or large logs unless a state entry points to a specific path.",
     "Write large outputs to files and cite evidence refs or short summaries in chat.",
     "Keep tool output bounded with targeted reads, filters, and summaries; prefer current-state.md and state.yaml for resume.",
@@ -46,8 +46,8 @@ def build_project_activation(root: str | Path, change_id: str | None = None, *, 
         return activation
 
     activation["governance_state"] = "installed"
-    if _is_lean_only(paths):
-        return _activation_for_lean_state(paths, activation, list_only=list_only)
+    if _is_current_state_only(paths):
+        return _activation_for_project_state(paths, activation, list_only=list_only)
 
     active_changes = _active_changes(paths)
     activation["active_changes"] = active_changes
@@ -263,12 +263,12 @@ def _write_activation(paths: GovernancePaths, payload: dict) -> None:
     write_yaml(paths.project_activation_file(), payload)
 
 
-def _is_lean_only(paths: GovernancePaths) -> bool:
+def _is_current_state_only(paths: GovernancePaths) -> bool:
     return (paths.governance_dir / "state.yaml").exists() and not paths.current_change_file().exists()
 
 
-def _activation_for_lean_state(paths: GovernancePaths, activation: dict, *, list_only: bool) -> dict:
-    state = load_lean_state(paths.root)
+def _activation_for_project_state(paths: GovernancePaths, activation: dict, *, list_only: bool) -> dict:
+    state = load_project_state(paths.root)
     active_round = state.get("active_round") or {}
     round_id = active_round.get("round_id") or ""
     participants = active_round.get("participants") or {}
@@ -288,8 +288,8 @@ def _activation_for_lean_state(paths: GovernancePaths, activation: dict, *, list
             "review_decision": review.get("decision") or "",
             "verify_status": verify.get("status") or "",
             "closeout_status": closeout.get("status") or "",
-            "waiting_on": _lean_waiting_on(active_round),
-            "next_decision": _lean_next_decision(active_round),
+            "waiting_on": _project_waiting_on(active_round),
+            "next_decision": _project_next_decision(active_round),
         },
         "recommended_read_set": [
             ".governance/AGENTS.md",
@@ -298,12 +298,12 @@ def _activation_for_lean_state(paths: GovernancePaths, activation: dict, *, list
             ".governance/current-state.md",
             ".governance/state.yaml",
         ],
-        "context_discipline": LEAN_CONTEXT_DISCIPLINE,
+        "context_discipline": PROJECT_CONTEXT_DISCIPLINE,
         "agent_instructions": [
-            "Continue from lean project governance facts; do not reinstall unless .governance is missing.",
+            "Continue from project governance facts; do not reinstall unless .governance is missing.",
             "Read the recommended set before acting.",
             "Respect active_round scope, gates, review independence, and evidence refs.",
-            "Do not create or rely on legacy .governance/index/current-change.yaml for lean-only projects.",
+            "Do not create or rely on legacy .governance/index/current-change.yaml for current-state-only projects.",
             "Report goal, phase, owner, blockers, next action, and human decision needed.",
         ],
     })
@@ -312,7 +312,7 @@ def _activation_for_lean_state(paths: GovernancePaths, activation: dict, *, list
     return activation
 
 
-def _lean_waiting_on(active_round: dict) -> str:
+def _project_waiting_on(active_round: dict) -> str:
     gates = active_round.get("gates") or {}
     execution_gate = gates.get("execution") or {}
     closeout_gate = gates.get("closeout") or {}
@@ -321,7 +321,7 @@ def _lean_waiting_on(active_round: dict) -> str:
     closeout = active_round.get("closeout") or {}
     if execution_gate.get("status") != "approved":
         return "execution gate"
-    if verify.get("status") not in {"passed", "complete", "completed"}:
+    if verify.get("status") not in {"pass", "passed", "complete", "completed"}:
         return "verification"
     if review.get("status") != "completed":
         return "independent review"
@@ -330,8 +330,8 @@ def _lean_waiting_on(active_round: dict) -> str:
     return "none"
 
 
-def _lean_next_decision(active_round: dict) -> str:
-    waiting_on = _lean_waiting_on(active_round)
+def _project_next_decision(active_round: dict) -> str:
+    waiting_on = _project_waiting_on(active_round)
     if waiting_on == "none":
         return "open next round or release preparation"
     return f"resolve {waiting_on}"
@@ -352,11 +352,11 @@ def _execution_preflight(root: str | Path, change_id: str) -> dict:
 
 
 def _current_state_path(paths: GovernancePaths) -> str:
-    if paths.current_state_file().exists():
-        return ".governance/local/current-state.md"
     if paths.legacy_current_state_file().exists():
         return ".governance/current-state.md"
-    return ".governance/local/current-state.md"
+    if paths.current_state_file().exists():
+        return ".governance/local/current-state.md"
+    return ".governance/current-state.md"
 
 
 def _agent_entry_path(paths: GovernancePaths) -> str:

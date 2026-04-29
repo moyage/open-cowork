@@ -108,7 +108,7 @@ def _format_agent_handoff(change_id: str) -> str:
         "Agent-first handoff ready.",
         "Read these files before continuing:",
         "- .governance/AGENTS.md",
-        "- .governance/local/current-state.md",
+        "- .governance/current-state.md",
         "- .governance/agent-playbook.md",
         f"- .governance/changes/{change_id}/contract.yaml",
         f"- .governance/changes/{change_id}/bindings.yaml",
@@ -639,7 +639,7 @@ def cmd_adapter(args):
 
 def cmd_evidence(args):
     if args.evidence_subcmd == "add":
-        from governance.lean_commands import add_evidence
+        from governance.project_commands import add_evidence
 
         entry = add_evidence(
             args.root,
@@ -650,7 +650,7 @@ def cmd_evidence(args):
             created_by=args.created_by,
             round_id=args.round_id,
         )
-        print(f"Lean evidence added: {entry['evidence_id']}")
+        print(f"Evidence added: {entry['evidence_id']}")
         return 0
 
     from governance.evidence import validate_adapter_output, write_evidence_index
@@ -681,7 +681,7 @@ def cmd_evidence(args):
 
 
 def cmd_round(args):
-    from governance.lean_commands import approve_round_gate, close_round, init_participants, start_round
+    from governance.project_commands import approve_round_gate, close_round, confirm_participants, init_participants, start_round
 
     if args.round_subcmd == "start":
         state = start_round(
@@ -692,7 +692,7 @@ def cmd_round(args):
             scope_out=args.scope_out,
             acceptance_summary=args.acceptance,
         )
-        print(f"Lean round started: {state['active_round']['round_id']}")
+        print(f"Round started: {state['active_round']['round_id']}")
         return 0
     if args.round_subcmd == "participants" and args.participants_subcmd == "init":
         state = init_participants(
@@ -705,8 +705,18 @@ def cmd_round(args):
             advisors=args.advisor,
         )
         status = state["active_round"]["participant_initialization"]["status"]
-        print(f"Lean participants initialized: {status}")
+        print(f"Participants initialized: {status}")
         return 0 if status == "complete" else 1
+    if args.round_subcmd == "participants" and args.participants_subcmd == "confirm":
+        state = confirm_participants(
+            args.root,
+            confirmed_by=args.confirmed_by,
+            evidence_ref=args.evidence_ref,
+            summary=args.summary,
+        )
+        status = state["active_round"]["participant_confirmation"]["status"]
+        print(f"Participant confirmation recorded: {status}")
+        return 0
     if args.round_subcmd == "approve":
         state = approve_round_gate(
             args.root,
@@ -715,7 +725,7 @@ def cmd_round(args):
             evidence_ref=args.evidence_ref,
             reason=args.reason,
         )
-        print(f"Lean gate approved: {args.gate} by {state['active_round']['gates'][args.gate]['approved_by']}")
+        print(f"Round gate approved: {args.gate} by {state['active_round']['gates'][args.gate]['approved_by']}")
         return 0
     if args.round_subcmd == "close":
         ok, payload = close_round(
@@ -726,16 +736,16 @@ def cmd_round(args):
             evidence_ref=args.evidence_ref,
         )
         if not ok:
-            print(f"Lean round close blocked: {payload['reason']}")
+            print(f"Round close blocked: {payload['reason']}")
             return 1
-        print(f"Lean round closed: {payload['round_id']} ({payload['final_status']})")
+        print(f"Round closed: {payload['round_id']} ({payload['final_status']})")
         return 0
     print("Unsupported round command.")
     return 1
 
 
 def cmd_rule(args):
-    from governance.lean_commands import add_rule, update_rule_status
+    from governance.project_commands import add_rule, confirm_external_rules, update_rule_status
 
     if args.rule_subcmd == "add":
         ok, payload = add_rule(
@@ -751,7 +761,17 @@ def cmd_rule(args):
         if not ok:
             print(f"Rule add blocked: {payload['reason']}")
             return 1
-        print(f"Lean rule added: {payload['id']}")
+        print(f"External rule added: {payload['id']}")
+        return 0
+    if args.rule_subcmd == "confirm":
+        state = confirm_external_rules(
+            args.root,
+            actor=args.actor,
+            evidence_ref=args.evidence_ref,
+            summary=args.summary,
+        )
+        status = state["active_round"]["external_rules"]["confirmation"]["status"]
+        print(f"External rules confirmation recorded: {status}")
         return 0
     status_by_subcmd = {"suspend": "suspended", "resume": "active", "remove": "removed"}
     if args.rule_subcmd in status_by_subcmd:
@@ -766,7 +786,7 @@ def cmd_rule(args):
         if not ok:
             print(f"Rule change blocked: {payload['reason']}")
             return 1
-        print(f"Lean rule {args.rule_subcmd}: {payload['id']}")
+        print(f"External rule {args.rule_subcmd}: {payload['id']}")
         return 0
     print("Unsupported rule command.")
     return 1
@@ -795,17 +815,17 @@ def cmd_index_rebuild(args):
 
 
 def cmd_hygiene(args):
-    if getattr(args, "cleanup", False):
-        from governance.lean_migration import cleanup_legacy
+    if getattr(args, "prune", False):
+        from governance.project_migration import prune_legacy
 
-        payload = cleanup_legacy(args.root, dry_run=getattr(args, "dry_run", False), confirm=getattr(args, "confirm", False))
+        payload = prune_legacy(args.root, dry_run=getattr(args, "dry_run", False), confirm=getattr(args, "confirm", False))
         if payload.get("blocked"):
-            print("清理需要显式确认：请使用 --confirm，或先用 --dry-run 查看计划。")
+            print("prune需要显式确认：请使用 --confirm，或先用 --dry-run 查看计划。")
             return 1
         if payload.get("dry_run"):
-            print("清理预览")
+            print("prune预览")
         else:
-            print("清理确认已记录，未执行物理删除")
+            print("prune确认已记录，未执行物理删除")
         print("")
         for item in payload.get("candidates", []):
             print(f"- {item}")
@@ -852,7 +872,7 @@ def cmd_hygiene(args):
 
 
 def cmd_migrate(args):
-    from governance.lean_migration import detect_legacy_layout, migrate_legacy_to_lean, verify_migration
+    from governance.project_migration import detect_legacy_layout, migrate_legacy_to_current_state, verify_migration
 
     if args.subcmd == "detect":
         payload = detect_legacy_layout(args.root)
@@ -864,13 +884,13 @@ def cmd_migrate(args):
         print("- legacy_dirs:")
         for name, meta in payload["legacy_dirs"].items():
             print(f"  - {name}: exists={str(meta['exists']).lower()} entries={meta['entry_count']}")
-        print("- cleanup_candidates:")
-        for item in payload["cleanup_candidates"]:
+        print("- removal_candidates:")
+        for item in payload["removal_candidates"]:
             print(f"  - {item}")
         return 0
-    if args.subcmd == "lean":
+    if args.subcmd == "current-state":
         dry_run = bool(args.dry_run or not args.confirm)
-        payload = migrate_legacy_to_lean(args.root, dry_run=dry_run, confirm=args.confirm)
+        payload = migrate_legacy_to_current_state(args.root, dry_run=dry_run, confirm=args.confirm)
         if payload.get("blocked"):
             print("迁移需要显式确认：请使用 --confirm，或先用 --dry-run 查看计划。")
             return 1
@@ -897,7 +917,7 @@ def cmd_migrate(args):
 
 
 def cmd_uninstall(args):
-    from governance.lean_migration import uninstall_governance
+    from governance.project_migration import uninstall_governance
 
     payload = uninstall_governance(args.root, dry_run=args.dry_run or not args.confirm, confirm=args.confirm)
     if payload.get("blocked"):
@@ -1699,14 +1719,14 @@ def cmd_init(args):
         ensure_governance_index(args.root)
         print(f"Initialized open-cowork governance in {args.root}/.governance (legacy layout)")
         return 0
-    from governance.lean_migration import install_or_upgrade_lean
+    from governance.project_migration import install_or_upgrade_project
 
-    payload = install_or_upgrade_lean(args.root)
-    print(f"Initialized open-cowork v0.3.11 lean governance in {args.root}/.governance")
-    if "migrated-legacy-heavy-layout" in payload["actions"]:
-        print("- legacy layout detected and migrated automatically")
-    if "upgraded-lean-protocol-version" in payload["actions"]:
-        print("- existing lean state upgraded automatically")
+    payload = install_or_upgrade_project(args.root)
+    print(f"Initialized open-cowork v0.3.11 governance in {args.root}/.governance")
+    if "migrated-legacy-governance-layout" in payload["actions"]:
+        print("- legacy governance files detected and migrated automatically")
+    if "upgraded-current-state-protocol-version" in payload["actions"]:
+        print("- existing project state upgraded automatically")
     if payload.get("receipt"):
         print(f"- migration_receipt: {payload['receipt']}")
     if not payload["verification"]["ok"]:
@@ -1872,8 +1892,8 @@ def cmd_status(args):
     from governance.step_matrix import format_status_snapshot_view, write_status_snapshot
 
     try:
-        if _should_render_lean_status(args):
-            _print_lean_status(args.root)
+        if _should_render_project_status(args):
+            _print_project_status(args.root)
             return
         if getattr(args, "sync_current_state", False):
             from governance.current_state import sync_current_state
@@ -1931,35 +1951,37 @@ def cmd_status(args):
         print("Tip: Have you run 'ocw init' or set a current change?")
 
 
-def _should_render_lean_status(args) -> bool:
+def _should_render_project_status(args) -> bool:
     if getattr(args, "change_id", None):
         return False
     root = Path(args.root)
     return (root / ".governance/state.yaml").exists() and not (root / ".governance/index/current-change.yaml").exists()
 
 
-def _print_lean_status(root: str | Path) -> None:
-    from governance.activation import LEAN_CONTEXT_DISCIPLINE
-    from governance.lean_round import evaluate_closeout_gate, evaluate_execution_gate
-    from governance.lean_state import load_lean_state, validate_lean_state
+def _print_project_status(root: str | Path) -> None:
+    from governance.activation import PROJECT_CONTEXT_DISCIPLINE
+    from governance.project_round import evaluate_closeout_gate, evaluate_execution_gate_for_root
+    from governance.project_state import load_project_state, validate_project_state
 
-    state = load_lean_state(root)
+    state = load_project_state(root)
     active_round = state.get("active_round", {})
-    print("# open-cowork lean status")
+    print("# open-cowork project status")
     print("")
-    print(f"- protocol: {state.get('protocol', {}).get('version')}")
-    print(f"- layout: {state.get('layout')}")
+    print(f"- open_cowork_version: {state.get('protocol', {}).get('version')}")
     print(f"- round_id: {active_round.get('round_id')}")
     print(f"- goal: {active_round.get('goal')}")
     print(f"- phase: {active_round.get('phase')}")
     print(f"- participant_initialization: {active_round.get('participant_initialization', {}).get('status')}")
-    errors = validate_lean_state(state)
+    print(f"- participant_confirmation: {(active_round.get('participant_confirmation') or {}).get('status', 'pending')}")
+    print(f"- external_rules: {len((active_round.get('external_rules') or {}).get('active') or [])} active")
+    print(f"- external_rules_confirmation: {((active_round.get('external_rules') or {}).get('confirmation') or {}).get('status', 'pending')}")
+    errors = validate_project_state(state)
     print(f"- schema_valid: {str(not errors).lower()}")
     if errors:
         print("- schema_errors:")
         for error in errors:
             print(f"  - {error}")
-    execution = evaluate_execution_gate(state)
+    execution = evaluate_execution_gate_for_root(state, root)
     closeout = evaluate_closeout_gate(state)
     print("## Gates")
     print(f"- execution: {execution.get('reason')} allowed={str(execution.get('allowed')).lower()}")
@@ -1968,7 +1990,7 @@ def _print_lean_status(root: str | Path) -> None:
     print("- default_read_set: bounded")
     print("- large_outputs: write-to-file-and-reference")
     print("- cold_history: pointer-only")
-    for item in LEAN_CONTEXT_DISCIPLINE:
+    for item in PROJECT_CONTEXT_DISCIPLINE:
         print(f"- {item}")
     print("")
 
@@ -2429,7 +2451,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     p_init = subparsers.add_parser("init", help="Initialize minimum governance directory")
-    p_init.add_argument("--legacy-layout", action="store_true", help="Intentionally initialize the legacy heavy governance layout")
+    p_init.add_argument("--legacy-layout", action="store_true", help="Intentionally initialize the legacy governance file tree")
     subparsers.add_parser("propose", help="Create an intent draft")
     subparsers.add_parser("version", help="Show open-cowork version and command paths")
     p_activate = subparsers.add_parser("activate", help="Show project-scoped activation and handoff state")
@@ -2507,17 +2529,17 @@ def build_parser() -> argparse.ArgumentParser:
         p_hygiene = subparsers.add_parser(command_name, help="Classify governance artifacts and repository hygiene")
         p_hygiene.add_argument("--format", choices=["text", "yaml", "json"], default="text", help="Output format")
         p_hygiene.add_argument("--state-consistency", action="store_true", help="Include human-readable state consistency checks")
-        p_hygiene.add_argument("--cleanup", action="store_true", help="Preview or confirm v0.3.11 legacy cleanup")
-        p_hygiene.add_argument("--dry-run", action="store_true", help="Preview cleanup without writing changes")
-        p_hygiene.add_argument("--confirm", action="store_true", help="Confirm cleanup and write a receipt")
+        p_hygiene.add_argument("--prune", action="store_true", help="Preview or confirm v0.3.11 legacy prune")
+        p_hygiene.add_argument("--dry-run", action="store_true", help="Preview prune without writing changes")
+        p_hygiene.add_argument("--confirm", action="store_true", help="Confirm prune and write a receipt")
 
     p_migrate = subparsers.add_parser("migrate", help="Detect and migrate legacy governance layouts")
     p_migrate_sub = p_migrate.add_subparsers(dest="subcmd")
-    p_migrate_sub.add_parser("detect", help="Detect legacy heavy governance directories")
-    p_migrate_lean = p_migrate_sub.add_parser("lean", help="Migrate legacy governance to v0.3.11 lean layout")
-    p_migrate_lean.add_argument("--dry-run", action="store_true", help="Preview migration without moving files")
-    p_migrate_lean.add_argument("--confirm", action="store_true", help="Confirm migration and write a receipt")
-    p_migrate_sub.add_parser("verify", help="Verify v0.3.11 lean migration outputs")
+    p_migrate_sub.add_parser("detect", help="Detect legacy governance directories")
+    p_migrate_state = p_migrate_sub.add_parser("current-state", help="Migrate legacy governance to the v0.3.11 current-state model")
+    p_migrate_state.add_argument("--dry-run", action="store_true", help="Preview migration without moving files")
+    p_migrate_state.add_argument("--confirm", action="store_true", help="Confirm migration and write a receipt")
+    p_migrate_sub.add_parser("verify", help="Verify v0.3.11 migration outputs")
 
     p_uninstall = subparsers.add_parser("uninstall", help="Preview or confirm safe open-cowork governance uninstall")
     p_uninstall.add_argument("--dry-run", action="store_true", help="Preview uninstall without deleting files")
@@ -2787,9 +2809,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_adapter.add_argument("path")
     p_adapter.add_argument("--format", choices=["text", "yaml", "json"], default="text")
 
-    p_round = subparsers.add_parser("round", help="Manage lean protocol rounds")
+    p_round = subparsers.add_parser("round", help="Manage project collaboration rounds")
     p_round_sub = p_round.add_subparsers(dest="round_subcmd")
-    p_round_start = p_round_sub.add_parser("start", help="Start a lean round")
+    p_round_start = p_round_sub.add_parser("start", help="Start a project collaboration round")
     p_round_start.add_argument("--round-id", required=True)
     p_round_start.add_argument("--goal", required=True)
     p_round_start.add_argument("--scope-in", action="append", default=[])
@@ -2804,18 +2826,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_round_participants_init.add_argument("--executor", required=True)
     p_round_participants_init.add_argument("--reviewer", required=True)
     p_round_participants_init.add_argument("--advisor", action="append", default=[])
-    p_round_approve = p_round_sub.add_parser("approve", help="Approve a lean gate")
+    p_round_participants_confirm = p_round_participants_sub.add_parser("confirm", help="Record human confirmation of round collaborators")
+    p_round_participants_confirm.add_argument("--confirmed-by", required=True)
+    p_round_participants_confirm.add_argument("--evidence-ref", required=True)
+    p_round_participants_confirm.add_argument("--summary", default="")
+    p_round_approve = p_round_sub.add_parser("approve", help="Approve a round gate")
     p_round_approve.add_argument("--gate", choices=["execution", "closeout"], required=True)
     p_round_approve.add_argument("--approved-by", required=True)
     p_round_approve.add_argument("--evidence-ref", required=True)
     p_round_approve.add_argument("--reason", default="")
-    p_round_close = p_round_sub.add_parser("close", help="Close a lean round into the ledger")
+    p_round_close = p_round_sub.add_parser("close", help="Close a round into the ledger")
     p_round_close.add_argument("--final-status", choices=["completed", "cancelled", "blocked"], default="completed")
     p_round_close.add_argument("--closed-by", required=True)
     p_round_close.add_argument("--summary", default="")
     p_round_close.add_argument("--evidence-ref", default="")
 
-    p_rule = subparsers.add_parser("rule", help="Manage lean external rules")
+    p_rule = subparsers.add_parser("rule", help="Manage current-state external rules")
     p_rule_sub = p_rule.add_subparsers(dest="rule_subcmd")
     p_rule_add = p_rule_sub.add_parser("add", help="Add an external rule")
     p_rule_add.add_argument("--id", required=True)
@@ -2825,6 +2851,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_rule_add.add_argument("--applies-to", action="append", default=[])
     p_rule_add.add_argument("--command", dest="rule_command", default="")
     p_rule_add.add_argument("--authorization-ref", default="")
+    p_rule_confirm = p_rule_sub.add_parser("confirm", help="Confirm external rule selection or explicit skip")
+    p_rule_confirm.add_argument("--actor", required=True)
+    p_rule_confirm.add_argument("--evidence-ref", required=True)
+    p_rule_confirm.add_argument("--summary", required=True)
     for action in ("suspend", "resume", "remove"):
         p_rule_action = p_rule_sub.add_parser(action, help=f"{action.title()} an external rule")
         p_rule_action.add_argument("--id", required=True)
@@ -2834,7 +2864,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_evidence = subparsers.add_parser("evidence", help="Manage evidence indexes")
     p_evidence_sub = p_evidence.add_subparsers(dest="evidence_subcmd")
-    p_evidence_add = p_evidence_sub.add_parser("add", help="Add lean evidence")
+    p_evidence_add = p_evidence_sub.add_parser("add", help="Add project evidence")
     p_evidence_add.add_argument("--id", required=True)
     p_evidence_add.add_argument("--kind", required=True)
     p_evidence_add.add_argument("--ref", required=True)

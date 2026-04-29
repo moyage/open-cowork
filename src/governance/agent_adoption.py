@@ -8,11 +8,10 @@ from .step_matrix import STEP_LABELS
 
 
 DEFAULT_RECOMMENDED_READ_SET = [
-    ".governance/local/current-state.md",
-    ".governance/index/active-changes.yaml",
-    ".governance/index/current-change.yaml",
     ".governance/agent-playbook.md",
     ".governance/agent-entry.md",
+    ".governance/current-state.md",
+    ".governance/state.yaml",
 ]
 
 
@@ -24,25 +23,16 @@ def build_adoption_plan(
     source_docs: list[str] | None = None,
     agent_inventory: list[str] | None = None,
 ) -> dict:
-    from .index import read_current_change
-
     root_path = Path(root)
     target_path = Path(target).expanduser().resolve()
-    current = read_current_change(root_path)
-    nested_current = current.get("current_change", {})
-    if not isinstance(nested_current, dict):
-        nested_current = {}
-    active_change_id = current.get("current_change_id") or nested_current.get("change_id")
-    active_status = current.get("status") or nested_current.get("status")
+    active = _current_work(root_path)
+    active_change_id = active.get("id")
+    active_status = active.get("status")
     requires_lifecycle_decision = bool(active_change_id and active_status not in {"idle", "archived", "abandoned", "superseded"})
     candidate_change_id = _candidate_change_id(goal)
     source_docs = list(source_docs or [])
     agent_inventory = list(agent_inventory or [])
-    recommended_read_set = [
-        *DEFAULT_RECOMMENDED_READ_SET,
-        f".governance/changes/{active_change_id}/contract.yaml" if active_change_id else ".governance/changes/<change-id>/contract.yaml",
-        f".governance/changes/{active_change_id}/bindings.yaml" if active_change_id else ".governance/changes/<change-id>/bindings.yaml",
-    ]
+    recommended_read_set = _recommended_read_set(active)
     return {
         "schema": "adoption-plan/v1",
         "target": str(target_path),
@@ -58,6 +48,7 @@ def build_adoption_plan(
         "active_change": {
             "change_id": active_change_id,
             "status": active_status,
+            "kind": active.get("kind"),
             "requires_lifecycle_decision": requires_lifecycle_decision,
             "allowed_policies": ["continue", "supersede", "abandon", "archive-first", "force"] if requires_lifecycle_decision else ["prepare"],
         },
@@ -74,6 +65,47 @@ def build_adoption_plan(
         "human_decisions_needed": _human_decisions_needed(requires_lifecycle_decision, bool(agent_inventory)),
         "mutation": "none",
     }
+
+
+def _current_work(root_path: Path) -> dict:
+    state_path = root_path / ".governance" / "state.yaml"
+    current_change_path = root_path / ".governance" / "index" / "current-change.yaml"
+    if state_path.exists() and not current_change_path.exists():
+        from .project_state import load_project_state
+
+        state = load_project_state(root_path)
+        active_round = state.get("active_round") or {}
+        return {
+            "kind": "round",
+            "id": active_round.get("round_id"),
+            "status": active_round.get("phase"),
+        }
+
+    if current_change_path.exists():
+        from .index import read_current_change
+
+        current = read_current_change(root_path)
+        nested_current = current.get("current_change", {})
+        if not isinstance(nested_current, dict):
+            nested_current = {}
+        return {
+            "kind": "change",
+            "id": current.get("current_change_id") or nested_current.get("change_id"),
+            "status": current.get("status") or nested_current.get("status"),
+        }
+
+    return {"kind": "none", "id": None, "status": "idle"}
+
+
+def _recommended_read_set(active: dict) -> list[str]:
+    items = list(DEFAULT_RECOMMENDED_READ_SET)
+    if active.get("kind") == "change":
+        change_id = active.get("id")
+        items.extend([
+            f".governance/changes/{change_id}/contract.yaml" if change_id else ".governance/changes/<change-id>/contract.yaml",
+            f".governance/changes/{change_id}/bindings.yaml" if change_id else ".governance/changes/<change-id>/bindings.yaml",
+        ])
+    return items
 
 
 def write_agent_adoption_pack(
@@ -109,15 +141,15 @@ def _agent_entry() -> str:
         "",
         "1. `.governance/agent-entry.md`：任意 Agent 接手项目时的固定入口。",
         "2. `.governance/agent-playbook.md`：Agent 操作规则。",
-        "3. `.governance/index/active-changes.yaml`：项目级并行 change 列表。",
-        "4. `.governance/local/current-state.md`：本地可再生状态投影。",
-        "5. `ocw resume` 输出的 recommended read set：当前 change 的权威事实。",
+        "3. `.governance/current-state.md`：当前可读状态摘要。",
+        "4. `.governance/state.yaml`：current-state compact 权威状态。",
+        "5. `ocw resume` 输出的 recommended read set：当前 round 的权威事实。",
         "",
         "只读取当前 active working set。不要默认全文扫描 `docs/archive/plans/**`；历史文档只在明确需要追溯 source docs 时按路径读取。",
         "",
         "## 操作规则",
         "",
-        "Deterministic protocol trigger: run `ocw resume` before continuing project work. Natural language is only a request to run the command, not the protocol trigger.",
+        "Deterministic project entry: run `ocw resume` before continuing project work. Natural language is only a request to run the entry, not a platform Skill name.",
         "Do not ask the human to memorize ocw commands. Use `ocw` only as an internal tool when it helps maintain structured facts, evidence, review, archive, and continuity.",
         "",
         "## 硬边界",
@@ -136,14 +168,14 @@ def _agent_runtime_entry() -> str:
         "",
         "Use this project entry whenever a human asks any local Agent to continue, review, verify, or implement work in this project.",
         "",
-        "This file is the project-scoped source of truth for Agent handoff. It can be registered as a platform Skill when supported, but it is not tied to any single Agent runtime.",
+        "This file is the project-scoped source of truth for Agent handoff. open-cowork is not a required platform Skill name; if a runtime says the Skill is unavailable, read this file as project instructions and continue from project facts.",
         "",
-        "## Deterministic protocol trigger",
+        "## Deterministic project entry",
         "",
         "- Reliable trigger: run `ocw resume` in the project root.",
         "- List work: run `ocw resume --list`.",
         "- Continue explicit work: run `ocw resume --change-id <change-id>`.",
-        "- Natural-language phrasing is only a request to run this command; do not rely on keywords, language, or chat history.",
+        "- Natural-language phrasing is only a request to use the project entry; do not treat `open-cowork` as a missing platform Skill or reconstruct state from chat history.",
         "- `.governance/local/**` is a local projection, not team-authoritative truth.",
         "",
         "## Activation rule",
@@ -193,15 +225,15 @@ def _agent_playbook() -> str:
         "",
         "## 触发语句",
         "",
-        "当人要求继续、接手、审查、验证或发布本项目工作时，先运行确定性入口 `ocw resume`。自然语言只是请求入口，不是协议触发条件。",
+        "当人要求继续、接手、审查、验证或发布本项目工作时，先运行项目入口 `ocw resume`。自然语言只是请求入口，不是平台 Skill 名称。",
         "",
         "## Agent 职责",
         "",
         "1. 行动前先理解项目目标。",
-        "2. 先做项目级 resume；多 active change 时必须显式选择 change_id。",
-        "3. 保持 `.governance/local/current-state.md` 与 active change 对齐。",
-        "4. 使用 `ocw resume` recommended read set 中的 contract.yaml 作为执行边界。",
-        "5. 使用 `ocw resume` recommended read set 中的 bindings.yaml 作为 owner 映射。",
+        "2. 先做项目级 resume；多 active round 时必须显式选择 round_id。",
+        "3. 保持 `.governance/current-state.md` 与 active round 对齐。",
+        "4. 使用 `ocw resume` recommended read set 中的 state.yaml / round scope 作为执行边界。",
+        "5. 使用 role bindings 作为 owner / reviewer 映射。",
         "6. Step 6 前必须完成 Step 1-5 的真实确认链，不能把 prepare 当成 Step 5 完成。",
         "7. verify、review 或 archive 前先记录客观 evidence。",
         "8. 只有目标、边界、风险、取舍或最终决策需要判断时，才让人介入。",

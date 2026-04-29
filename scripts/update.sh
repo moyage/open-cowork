@@ -10,12 +10,12 @@ for arg in "$@"; do
     --skip-git-pull)
       SKIP_GIT_PULL=1
       ;;
-    --clean)
-      BOOTSTRAP_ARGS+=("--clean")
+    --reset-venv)
+      BOOTSTRAP_ARGS+=("--reset-venv")
       ;;
     *)
       echo "Unknown update option: $arg" >&2
-      echo "Usage: ./scripts/update.sh [--skip-git-pull] [--clean]" >&2
+      echo "Usage: ./scripts/update.sh [--skip-git-pull] [--reset-venv]" >&2
       exit 2
       ;;
   esac

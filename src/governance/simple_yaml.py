@@ -17,13 +17,13 @@ def write_yaml(path: str | Path, data) -> None:
 
 def loads_yaml(text: str):
     lines = text.splitlines()
-    cleaned = [line.strip() for line in lines if line.strip()]
-    if cleaned == ["{}"]:
+    cleared = [line.strip() for line in lines if line.strip()]
+    if cleared == ["{}"]:
         return {}
-    if cleaned == ["[]"]:
+    if cleared == ["[]"]:
         return []
     value, index = _parse_block(lines, 0, 0)
-    while index < len(lines) and not _clean(lines[index]):
+    while index < len(lines) and not _clear(lines[index]):
         index += 1
     if index != len(lines):
         raise ValueError(f"unexpected trailing content at line {index + 1}")
@@ -37,7 +37,7 @@ def _parse_block(lines: list[str], index: int, indent: int):
     current_indent = _indent(lines[index])
     if current_indent < indent:
         return {}, index
-    if _clean(lines[index]).startswith("- "):
+    if _clear(lines[index]).startswith("- "):
         return _parse_list(lines, index, indent)
     return _parse_dict(lines, index, indent)
 
@@ -46,7 +46,7 @@ def _parse_dict(lines: list[str], index: int, indent: int):
     result = {}
     while index < len(lines):
         raw = lines[index]
-        stripped = _clean(raw)
+        stripped = _clear(raw)
         if not stripped:
             index += 1
             continue
@@ -77,7 +77,7 @@ def _parse_list(lines: list[str], index: int, indent: int):
     items = []
     while index < len(lines):
         raw = lines[index]
-        stripped = _clean(raw)
+        stripped = _clear(raw)
         if not stripped:
             index += 1
             continue
@@ -115,10 +115,10 @@ def _parse_nested(lines: list[str], index: int, indent: int):
     index = _skip_blank(lines, index)
     if index >= len(lines):
         return {}, index
-    cleaned = _clean(lines[index])
-    if cleaned == "{}":
+    cleared = _clear(lines[index])
+    if cleared == "{}":
         return {}, index + 1
-    if cleaned == "[]":
+    if cleared == "[]":
         return [], index + 1
     next_indent = _indent(lines[index])
     if next_indent <= indent:
@@ -140,7 +140,7 @@ def _parse_block_scalar(lines: list[str], index: int, indent: int, folded: bool)
     parts = []
     while index < len(lines):
         raw = lines[index]
-        if not _clean(raw):
+        if not _clear(raw):
             parts.append("")
             index += 1
             continue
@@ -238,7 +238,7 @@ def _dump_scalar(value) -> str:
     return text
 
 
-def _clean(line: str) -> str:
+def _clear(line: str) -> str:
     return line.strip()
 
 
@@ -247,6 +247,6 @@ def _indent(line: str) -> int:
 
 
 def _skip_blank(lines: list[str], index: int) -> int:
-    while index < len(lines) and not _clean(lines[index]):
+    while index < len(lines) and not _clear(lines[index]):
         index += 1
     return index

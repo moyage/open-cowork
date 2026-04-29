@@ -13,7 +13,7 @@ IGNORED_ARTIFACT_PATTERNS = [
 
 AGENT_HANDOFF_FILES = [
     ".governance/AGENTS.md",
-    ".governance/local/current-state.md",
+    ".governance/current-state.md",
     ".governance/agent-playbook.md",
 ]
 
@@ -42,7 +42,7 @@ def build_hygiene_report(root: str | Path) -> dict:
         "ignored_artifact_patterns": IGNORED_ARTIFACT_PATTERNS,
         "suggested_commit": [*agent_handoff_files, *pending_docs],
         "suggested_ignore": IGNORED_ARTIFACT_PATTERNS,
-        "suggested_cleanup": ["Keep docs/archive/** out of default Agent context; reference specific source docs by path."],
+        "suggested_pruning": ["Keep docs/archive/** out of default Agent context; reference specific source docs by path."],
         "recommendations": _recommendations(agent_handoff_files, pending_docs),
     }
 
@@ -79,18 +79,37 @@ def _recommendations(agent_handoff_files: list[str], pending_docs: list[str]) ->
         "Treat docs/archive/** as cold history; do not load it into Agent context by default.",
     ]
     if agent_handoff_files:
-        recommendations.append("Commit durable Agent entry files; treat .governance/local/current-state.md as a regenerable local projection.")
+        recommendations.append("Commit durable Agent entry files; treat .governance/current-state.md as the compact project handoff.")
     if pending_docs:
         recommendations.append("Review pending docs and decide which are source documents for the active change.")
     return recommendations
 
 
 def _state_consistency(root: Path) -> dict:
-    current_state = root / ".governance/local/current-state.md"
+    current_state = root / ".governance/current-state.md"
     if not current_state.exists():
-        current_state = root / ".governance/current-state.md"
+        current_state = root / ".governance/local/current-state.md"
+    project_state = root / ".governance/state.yaml"
     current_change = root / ".governance/index/current-change.yaml"
     maintenance_status = root / ".governance/index/maintenance-status.yaml"
+
+    if project_state.exists():
+        if not current_state.exists():
+            return {"status": "unknown", "issues": ["current-state.md is missing"]}
+
+        from .simple_yaml import load_yaml
+
+        text = current_state.read_text(encoding="utf-8")
+        state = load_yaml(project_state)
+        active_round = state.get("active_round", {})
+        if not isinstance(active_round, dict):
+            active_round = {}
+        round_id = active_round.get("round_id")
+        issues = []
+        if round_id and str(round_id) not in text:
+            issues.append(f"current-state.md does not mention active round {round_id}")
+        return {"status": "blocker" if issues else "pass", "issues": issues}
+
     if not current_state.exists() or not current_change.exists():
         return {"status": "unknown", "issues": ["current-state.md or current-change.yaml is missing"]}
 

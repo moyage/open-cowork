@@ -35,7 +35,7 @@ v0.3.5 起，项目级 activation 支持并行 active changes：
 
 仓库文档分三层：
 
-1. 人类入口：`README.md`、`docs/README.md`、`docs/glossary.md`、`docs/getting-started.md`
+1. 人类入口：`README.md`、`docs/index.md`、`docs/glossary.md`、`docs/getting-started.md`
 2. Agent 执行面：`AGENTS.md`、`docs/agent-skill.md`、`docs/agent-playbook.md`、`docs/agent-adoption.md`
 3. 当前规格：`docs/specs/`
 

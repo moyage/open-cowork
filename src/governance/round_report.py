@@ -243,7 +243,7 @@ def _step_narrative(step: int, report: dict, base_dir: Path) -> str:
     if step == 2:
         return "锁定纳入范围、排除范围、验收标准和风险边界，把 v0.3.7 审计补项追加进 v0.3.8 需求包。"
     if step == 3:
-        return "形成面向运行证据、步骤报告、最终报告和完整实现约束的设计方案，避免把 open-cowork 提前扩张成运行时或平台。"
+        return "形成面向运行证据、步骤报告、最终报告和完整实现原则的设计方案，避免把 open-cowork 提前扩张成运行时或平台。"
     if step == 4:
         return "组装正式变更包、任务清单和执行契约，明确允许修改范围、验证命令和禁止降级规则。"
     if step == 5:

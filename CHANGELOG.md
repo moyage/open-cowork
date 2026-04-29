@@ -2,12 +2,12 @@
 
 ## 0.3.11
 
-- 将默认治理结构切换为 lean layout：新项目默认生成 `.governance/state.yaml`、`current-state.md`、`evidence.yaml`、`ledger.yaml` 和 `rules.yaml`，不再默认创建重型 runtime / change / archive 树。
-- 增加 lean activation / resume / status 路径，新会话和跨 Agent 接续只读取紧凑权威状态，避免长周期、多轮次、多 Agent 项目被历史产物拖慢。
-- 增加 lean round、participant initialization、gate approval、evidence、external rule 和 ledger closeout 命令，强约束协作者初始化、执行授权、独立 review、验证结果和 closeout approval。
-- 增加旧项目检测、迁移、dry-run cleanup、migration receipt、cleanup receipt 和 uninstall 支持，为 v0.3.10 及更早安装环境提供可审计升级路径。
+- 将默认治理结构切换为 current-state layout：新项目默认生成 `.governance/state.yaml`、`current-state.md`、`evidence.yaml`、`ledger.yaml` 和 `rules.yaml`，不再默认创建重型 runtime / change / archive 树。
+- 增加 project activation / resume / status 路径，新会话和跨 Agent 接续只读取紧凑权威状态，避免长周期、多轮次、多 Agent 项目被历史产物拖慢。
+- 增加 project round、participant initialization、gate approval、evidence、external rule 和 ledger closeout 命令，强约束协作者初始化、执行授权、独立 review、验证结果和 closeout approval。
+- 增加旧项目检测、迁移、dry-run prune、migration receipt、prune receipt 和 uninstall 支持，为 v0.3.10 及更早安装环境提供可审计升级路径。
 - 更新 Agent-first 文档、getting started、glossary 和 superpowers adoption 指引，将 CLI 降为 Agent 内部维护结构化协作事实的工具。
-- 增加 v0.3.11 回归与压力测试，覆盖 lean schema、resume 读取集、gate 阻断、外部规则、迁移兼容、长周期状态增长和仓库自身 dogfood。
+- 增加 v0.3.11 回归与压力测试，覆盖 current-state schema、resume 读取集、gate 阻断、外部规则、迁移兼容、长周期状态增长和仓库自身 dogfood。
 
 ## 0.3.10
 
@@ -28,7 +28,7 @@
 - 增加执行前治理 guard：`ocw preflight check` 在已启用 open-cowork 的项目中校验 active change、contract、Step 5 批准、Step 6 readiness，并支持 `--path` 对待修改文件执行 `scope_in` / `scope_out` 范围校验。
 - 增加绕过流程后的 recovery 记录：`ocw preflight recovery` 只能作为异常恢复路径，记录 bypass reason、已修改文件、缺失证据和恢复动作，不能伪装成正常 evidence。
 - 收紧多 Agent 协作安全：Agent 登记参与者默认进入待人工审阅状态；reviewer 自审阻断会同时读取 team assignment 与 change package bindings 中既有 Step 6 executor / owner。
-- 将 v0.3.9 规格、README、版本号和回归测试更新到完整实现状态，覆盖团队操作循环、参与者接入、执行前 guard、恢复路径、步骤边界和发布清理。
+- 将 v0.3.9 规格、README、版本号和回归测试更新到完整实现状态，覆盖团队操作循环、参与者接入、执行前 guard、恢复路径、步骤边界和发布prune。
 
 ## 0.3.8
 
@@ -43,7 +43,7 @@
 
 ## 0.3.7
 
-- 增加 `ocw profile list/show/apply`，提供轻量协作、个人多 Agent 协作、团队标准协作和团队严格协作四种基础协作模式；大量资料阅读改为可叠加的 Agent 内部模式，而不是单独档位。
+- 增加 `ocw profile list/show/apply`，提供基础协作、个人多 Agent 协作、团队标准协作和团队严格协作四种基础协作模式；大量资料阅读改为可叠加的 Agent 内部模式，而不是单独档位。
 - 增加成员/Agent 职责边界目录 `.governance/participants/`，记录角色、权限、审查资格和工作边界，为“超级个体 -> 超级组织”协作提供最小成员事实面。
 - 增加 `ocw context-pack create/read` 和 `ocw handoff --compact`，为 active change 生成接手资料索引和接手摘要；这些材料只指向权威事实，不替代 contract、intent、verify、review 等真相源。
 - 将 project activation / resume 的内部建议读取顺序接入接手资料索引和接手摘要，使新会话优先读取最小权威材料，再按需深入。
@@ -78,7 +78,7 @@
 - 将标准 9 步名称改为中文动作名 + 英文锚点，降低 Step 1-9 的理解成本。
 - 增加 `activate` 项目级激活入口，输出 active change、当前步骤、推荐读取集和跨 Agent 接续指令，并落盘 `.governance/PROJECT_ACTIVATION.yaml`。
 - 重写 README 的人类入口，明确人只需要对 Agent 说什么、CLI 是 Agent 内部工具，并加入流程图和最小操作面。
-- 增加 `docs/glossary.md`、`docs/specs/README.md`，并收束 `docs/README.md` / `docs/archive/README.md` 的阅读分层，区分当前规格、Agent 执行面和历史证据。
+- 增加 `docs/glossary.md`、`docs/specs/index.md`，并收束 `docs/index.md` / `docs/archive/index.md` 的阅读分层，区分当前规格、Agent 执行面和历史证据。
 - 基于 xSearch v0.3.3 dogfood 反馈继续收束 v0.3.4：Step report 统一投影 contract / intent 权威事实，Step 3/4/5 展示 design、tasks、scope、verification commands，避免 `scope_in: none` 造成报告与执行不一致。
 - 修正 human gate 语义：`intent confirm` 自动满足 Step 1 approval；非 gate step 可记录 acknowledgement；Step 8 允许先记录 reviewer decision，再由人决定是否接受该 decision，archive 前仍强制 Step 8/9 human approval。
 - 增加连续迭代 baseline separation：`change prepare` 写入 `baseline.yaml`，记录 parent archived change 和 dirty worktree，帮助 reviewer 区分历史归档基线、本轮增量和无关噪声。
@@ -180,7 +180,7 @@
 ## 0.2.4
 
 - 增加 `ocw version` / `open-cowork version`，用于升级诊断。
-- 增加 `scripts/update.sh` 和 `scripts/bootstrap.sh --clean`，支撑从 V0.2.3 到 V0.2.4 的平滑升级。
+- 增加 `scripts/update.sh` 和 `scripts/bootstrap.sh --reset-venv`，支撑从 V0.2.3 到 V0.2.4 的平滑升级。
 - 增加 `ocw change prepare`，为 change package 填充 intent、requirements、design、tasks、contract 和 bindings。
 - 增加 `ocw pilot`，作为一条命令完成个人域 pilot setup 的路径。
 - 更新 README 和 getting-started 文档，补充升级、重装、guided pilot 和 Agent prompt 说明。
@@ -203,7 +203,7 @@
 
 - 将 onboarding 文档整合到 `docs/getting-started.md`。
 - 将历史 plans 和 reports 移入 `docs/archive/`。
-- 将 `docs/README.md` 重写为简洁文档地图。
+- 将 `docs/index.md` 重写为简洁文档地图。
 - 将 governance 和 community 文档本地化为中文。
 - 明确 `.governance/` 是 runtime artifact storage，而不是文档区。
 

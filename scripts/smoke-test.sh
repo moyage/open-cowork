@@ -59,6 +59,10 @@ test -f "$SMOKE_ROOT/.governance/index/active-changes.yaml"
 "$OCW_BIN" --root "$SMOKE_ROOT" status --sync-current-state >/dev/null
 "$OCW_BIN" --root "$SMOKE_ROOT" status --last-archive >/dev/null
 
-"$PYTHON_BIN" -m unittest discover -s tests -v
+if [[ -d tests ]]; then
+  "$PYTHON_BIN" -m unittest discover -s tests -v
+else
+  echo "No tests/ directory found; skipping unittest discovery."
+fi
 
 echo "open-cowork smoke test passed."

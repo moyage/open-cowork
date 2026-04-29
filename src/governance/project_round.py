@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from .lean_state import validate_lean_state
+from pathlib import Path
+
+from .project_state import validate_project_state
 
 
 def evaluate_gate_decision(state: dict, gate: str) -> dict:
@@ -16,7 +18,19 @@ def status_gate_decision(state: dict, gate: str) -> dict:
 
 
 def evaluate_execution_gate(state: dict) -> dict:
-    errors = validate_lean_state(state)
+    return evaluate_execution_gate_for_root(state, None)
+
+
+def evaluate_execution_gate_for_root(state: dict, root: str | Path | None) -> dict:
+    return _evaluate_execution(state, root, require_gate=True)
+
+
+def evaluate_execution_prerequisites(state: dict, root: str | Path | None) -> dict:
+    return _evaluate_execution(state, root, require_gate=False)
+
+
+def _evaluate_execution(state: dict, root: str | Path | None, *, require_gate: bool) -> dict:
+    errors = validate_project_state(state)
     if errors:
         return {"allowed": False, "reason": "state_schema_invalid", "errors": errors}
     active_round = state["active_round"]
@@ -35,16 +49,33 @@ def evaluate_execution_gate(state: dict) -> dict:
     if executor and reviewer and executor == reviewer and not _has_bypass_evidence(bypass):
         return {"allowed": False, "reason": "independent_reviewer_required"}
 
-    gate = active_round["gates"]["execution"]
-    if gate.get("status") != "approved":
-        return {"allowed": False, "reason": "execution_approval_required"}
-    if not gate.get("approval_evidence_ref"):
-        return {"allowed": False, "reason": "approval_evidence_required"}
+    confirmation = active_round.get("participant_confirmation") or {}
+    if confirmation.get("status") != "human-confirmed" or not confirmation.get("evidence_ref"):
+        return {"allowed": False, "reason": "participant_confirmation_required"}
+
+    external_confirmation = (active_round.get("external_rules") or {}).get("confirmation") or {}
+    if external_confirmation.get("status") not in {"confirmed", "selected"} or not external_confirmation.get("evidence_ref"):
+        return {"allowed": False, "reason": "external_rules_confirmation_required"}
+
+    missing_outputs = _missing_required_step_outputs(active_round, root)
+    if missing_outputs:
+        return {
+            "allowed": False,
+            "reason": "step_outputs_required",
+            "missing_outputs": missing_outputs,
+        }
+
+    if require_gate:
+        gate = active_round["gates"]["execution"]
+        if gate.get("status") != "approved":
+            return {"allowed": False, "reason": "execution_approval_required"}
+        if not gate.get("approval_evidence_ref"):
+            return {"allowed": False, "reason": "approval_evidence_required"}
     return {"allowed": True, "reason": "execution_ready"}
 
 
 def evaluate_closeout_gate(state: dict) -> dict:
-    errors = validate_lean_state(state)
+    errors = validate_project_state(state)
     if errors:
         return {"allowed": False, "reason": "state_schema_invalid", "errors": errors}
 
@@ -93,6 +124,27 @@ def _has_bypass_evidence(bypass: dict) -> bool:
         and bool(bypass.get("impact_scope"))
         and bool(bypass.get("approval_evidence_ref"))
     )
+
+
+def _missing_required_step_outputs(active_round: dict, root: str | Path | None) -> list[str]:
+    if root is None:
+        return []
+    step_outputs = active_round.get("step_outputs") or {}
+    base_dir = step_outputs.get("base_dir") or f"docs/open-cowork/rounds/{active_round.get('round_id', '')}"
+    base = Path(root) / base_dir
+    missing: list[str] = []
+    for item in step_outputs.get("required_before_execution") or []:
+        filename = item.get("file")
+        if filename and not _substantive_file(base / filename):
+            missing.append(str((Path(base_dir) / filename).as_posix()))
+    return missing
+
+
+def _substantive_file(path: Path) -> bool:
+    try:
+        return path.exists() and bool(path.read_text(encoding="utf-8").strip())
+    except OSError:
+        return False
 
 
 def _failed_blocking_external_rule(active_round: dict) -> str:

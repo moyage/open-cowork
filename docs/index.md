@@ -16,7 +16,7 @@
 | 文件 | 用途 |
 | --- | --- |
 | `../AGENTS.md` | 仓库级 Agent-first 入口。 |
-| `agent-playbook.md` | Agent 如何维护 lean `.governance/`、汇报进展、处理 handoff。 |
+| `agent-playbook.md` | Agent 如何维护 `.governance/` 当前状态、汇报进展、处理 handoff。 |
 | `agent-adoption.md` | Agent 如何把 open-cowork 应用到目标项目。 |
 | 目标项目 `.governance/AGENTS.md` | 已实施项目里的 Agent 入口。 |
 | 目标项目 `.governance/agent-entry.md` | 任意 Agent 进入项目后的固定激活与汇报规则。 |
@@ -25,7 +25,7 @@
 | 目标项目 `.governance/evidence.yaml` | 有界证据引用。 |
 | 目标项目 `.governance/ledger.yaml` | closeout、迁移 receipt 和接续记录。 |
 
-旧版项目中的 `active-changes.yaml` 只作为兼容读取和迁移识别对象出现；v0.3.11 新项目默认使用 lean `state.yaml` / `current-state.md` / `evidence.yaml` / `ledger.yaml`。
+旧版项目中的 `active-changes.yaml` 只作为兼容读取和迁移识别对象出现；v0.3.11 新项目默认使用 `state.yaml` / `current-state.md` / `evidence.yaml` / `ledger.yaml`。
 
 ## 当前有效规格
 
@@ -38,15 +38,15 @@
 | `specs/02-change-package-and-contract.md` | 旧模型与 contract 兼容语义；v0.3.11 后新项目默认使用 round scope。 |
 | `specs/03-evidence-review-archive.md` | Evidence、Verify、Review、Closeout 和 review lifecycle。 |
 | `specs/04-agent-adoption-and-doc-governance.md` | Agent-first 实施、project activation 和文档治理。 |
-| `specs/08-v0311-lean-protocol-reset.md` | v0.3.11 lean protocol reset。 |
+| `specs/08-v0311-current-state-reset.md` | v0.3.11 当前状态收敛与迁移规格。 |
 
 ## 真相源优先级
 
-1. 目标项目 lean `.governance/**`：运行时项目事实。
+1. 目标项目 `.governance/**`：运行时项目事实。
 2. `README.md`、`AGENTS.md`、`docs/agent-playbook.md`：当前人类和 Agent 入口。
-3. `docs/specs/08-v0311-lean-protocol-reset.md`：当前 lean reset 规格。
+3. `docs/specs/08-v0311-current-state-reset.md`：当前状态收敛与迁移规格。
 4. 其他规格、Git 历史 / release artifacts：兼容背景和历史演进。
 
 ## 历史证据，不是当前实施入口
 
-不要默认全文扫描历史材料。Agent 应读取当前项目入口给出的 recommended read set，只在需要追溯来源时按明确路径打开历史文件。旧 heavy layout 迁移后的 cold history 也遵守同一原则。
+不要默认全文扫描历史材料。Agent 应读取当前项目入口给出的 recommended read set，只在需要追溯来源时按明确路径打开历史文件。旧版大量历史治理目录迁移后的 cold history 也遵守同一原则。

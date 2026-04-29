@@ -48,7 +48,7 @@ def approve_step(
     if evidence_ref:
         approvals[step]["evidence_ref"] = evidence_ref
     write_yaml(path, payload)
-    _clean_readiness_after_approval(root, package, step)
+    _clear_readiness_after_approval(root, package, step)
     _refresh_step_report_if_possible(root, change_id, step)
     return payload
 
@@ -79,7 +79,7 @@ def record_intent_confirmation_approval(
         "source": "intent-confirm",
     }
     write_yaml(path, payload)
-    _clean_readiness_after_approval(root, package, 1)
+    _clear_readiness_after_approval(root, package, 1)
     _refresh_step_report_if_possible(root, change_id, 1)
     return payload
 
@@ -207,15 +207,15 @@ def _load_yaml(path: Path) -> dict:
     return load_yaml(path) if path.exists() else {}
 
 
-def _clean_readiness_after_approval(root: str | Path, package, step: int) -> None:
+def _clear_readiness_after_approval(root: str | Path, package, step: int) -> None:
     readiness = dict(package.manifest.get("readiness") or {})
     missing_items = list(readiness.get("missing_items") or [])
     remove = {f"step{step}_approval", f"step{step}_confirmation"}
     if step == 1 and _intent_is_confirmed(package.path):
         remove.add("intent_confirmation")
-    cleaned = [item for item in missing_items if item not in remove]
-    if cleaned != missing_items:
-        readiness["missing_items"] = cleaned
+    cleared = [item for item in missing_items if item not in remove]
+    if cleared != missing_items:
+        readiness["missing_items"] = cleared
         update_manifest(root, package.change_id, readiness=readiness)
 
 

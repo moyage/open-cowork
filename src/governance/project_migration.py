@@ -5,8 +5,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .lean_paths import LEGACY_HEAVY_DIRS, ensure_lean_layout, governance_dir
-from .lean_state import PROTOCOL_VERSION, initial_lean_state, validate_lean_documents
+from .project_paths import LEGACY_PROJECT_DIRS, ensure_project_layout, governance_dir
+from .project_state import PROTOCOL_VERSION, initial_project_state, validate_project_documents
 from .simple_yaml import load_yaml, write_yaml
 
 
@@ -14,8 +14,8 @@ def detect_legacy_layout(root: str | Path) -> dict:
     root_path = Path(root)
     base = governance_dir(root_path)
     legacy_dirs = {}
-    cleanup_candidates = []
-    for dirname in LEGACY_HEAVY_DIRS:
+    removal_candidates = []
+    for dirname in LEGACY_PROJECT_DIRS:
         path = base / dirname
         exists = path.exists()
         legacy_dirs[dirname] = {
@@ -24,39 +24,39 @@ def detect_legacy_layout(root: str | Path) -> dict:
             "entry_count": _entry_count(path) if exists else 0,
         }
         if exists:
-            cleanup_candidates.append(f".governance/{dirname}")
+            removal_candidates.append(f".governance/{dirname}")
 
     return {
-        "layout": "legacy-heavy" if cleanup_candidates else "lean-or-empty",
+        "layout": "legacy-governance" if removal_candidates else "current-state-or-empty",
         "protocol_version": _project_protocol_version(base),
         "legacy_dirs": legacy_dirs,
         "active_legacy_change": _active_legacy_change(base),
         "unmigrated_archives": _unmigrated_archives(base),
         "tracked_legacy_runtime_artifacts": _tracked_legacy_runtime_artifacts(root_path),
-        "cleanup_candidates": cleanup_candidates,
+        "removal_candidates": removal_candidates,
     }
 
 
-def install_or_upgrade_lean(root: str | Path) -> dict:
-    """Initialize lean governance, automatically migrating older layouts when present."""
+def install_or_upgrade_project(root: str | Path) -> dict:
+    """Initialize current-state governance, automatically migrating older layouts when present."""
     root_path = Path(root)
     base = governance_dir(root_path)
     report = detect_legacy_layout(root_path)
     actions: list[str] = []
     receipt = None
 
-    if report["cleanup_candidates"]:
-        migrated = migrate_legacy_to_lean(root_path, dry_run=False, confirm=True)
-        actions.append("migrated-legacy-heavy-layout")
+    if report["removal_candidates"]:
+        migrated = migrate_legacy_to_current_state(root_path, dry_run=False, confirm=True)
+        actions.append("migrated-legacy-governance-layout")
         receipt = migrated.get("receipt")
     else:
-        ensure_lean_layout(root_path)
-        actions.append("ensured-lean-layout")
+        ensure_project_layout(root_path)
+        actions.append("ensured-current-state-layout")
 
-    upgraded_protocol = _upgrade_existing_lean_state(base)
+    upgraded_protocol = _upgrade_existing_project_state(base)
     if upgraded_protocol:
-        actions.append("upgraded-lean-protocol-version")
-        ensure_lean_layout(root_path)
+        actions.append("upgraded-current-state-protocol-version")
+        ensure_project_layout(root_path)
 
     verification = verify_migration(root_path)
     return {
@@ -68,7 +68,7 @@ def install_or_upgrade_lean(root: str | Path) -> dict:
     }
 
 
-def migrate_legacy_to_lean(root: str | Path, *, dry_run: bool, confirm: bool) -> dict:
+def migrate_legacy_to_current_state(root: str | Path, *, dry_run: bool, confirm: bool) -> dict:
     root_path = Path(root)
     base = governance_dir(root_path)
     report = detect_legacy_layout(root_path)
@@ -92,11 +92,11 @@ def migrate_legacy_to_lean(root: str | Path, *, dry_run: bool, confirm: bool) ->
         result["reason"] = "confirm_required"
         return result
 
-    state = initial_lean_state(
+    state = initial_project_state(
         round_id=_round_id_from_legacy(report["active_legacy_change"]),
         goal=_legacy_goal(base, report["active_legacy_change"]),
     )
-    ensure_lean_layout(root_path, initial_state=state)
+    ensure_project_layout(root_path, initial_state=state)
     cold = base / "cold" / "legacy"
     cold.mkdir(parents=True, exist_ok=True)
     moved = []
@@ -122,7 +122,7 @@ def migrate_legacy_to_lean(root: str | Path, *, dry_run: bool, confirm: bool) ->
         "tracked_legacy_runtime_artifacts": report["tracked_legacy_runtime_artifacts"],
         "moved": moved,
         "gitignore_updates": gitignore_updates,
-        "summary": "旧版 heavy governance 目录已移入 cold/legacy，当前状态已转换为 v0.3.11 lean state。",
+        "summary": "旧版 governance 目录已移入 cold/legacy，当前状态已转换为 v0.3.11 state。",
     }
     receipt_path = cold / "migration-receipt.yaml"
     write_yaml(receipt_path, receipt)
@@ -138,9 +138,9 @@ def verify_migration(root: str | Path) -> dict:
     if not (base / "state.yaml").exists():
         errors.append(".governance/state.yaml missing")
     else:
-        errors.extend(validate_lean_documents(root_path))
+        errors.extend(validate_project_documents(root_path))
     receipt_path = base / "cold/legacy/migration-receipt.yaml"
-    live_legacy_dirs = [dirname for dirname in LEGACY_HEAVY_DIRS if (base / dirname).exists()]
+    live_legacy_dirs = [dirname for dirname in LEGACY_PROJECT_DIRS if (base / dirname).exists()]
     if not receipt_path.exists() and not live_legacy_dirs:
         return {"ok": not errors, "errors": errors}
     if not receipt_path.exists():
@@ -166,12 +166,12 @@ def verify_migration(root: str | Path) -> dict:
     return {"ok": not errors, "errors": errors}
 
 
-def cleanup_legacy(root: str | Path, *, dry_run: bool, confirm: bool) -> dict:
+def prune_legacy(root: str | Path, *, dry_run: bool, confirm: bool) -> dict:
     root_path = Path(root)
     base = governance_dir(root_path)
     cold = base / "cold" / "legacy"
     candidates = []
-    for dirname in LEGACY_HEAVY_DIRS:
+    for dirname in LEGACY_PROJECT_DIRS:
         live = base / dirname
         archived = cold / dirname
         if live.exists():
@@ -186,14 +186,14 @@ def cleanup_legacy(root: str | Path, *, dry_run: bool, confirm: bool) -> dict:
         result["reason"] = "confirm_required"
         return result
     cold.mkdir(parents=True, exist_ok=True)
-    receipt_path = cold / "cleanup-receipt.yaml"
+    receipt_path = cold / "prune-receipt.yaml"
     write_yaml(receipt_path, {
-        "receipt_type": "cleanup",
+        "receipt_type": "prune",
         "created_at": _now_utc(),
         "candidates": candidates,
         "removed": [],
         "retained": candidates,
-        "summary": "清理已确认；为避免默认破坏审计历史，本实现保留 cold legacy 文件并写入清理 receipt。",
+        "summary": "prune已确认；为避免默认破坏审计历史，本实现保留 cold legacy 文件并写入prune receipt。",
     })
     result["receipt"] = str(receipt_path.relative_to(root_path))
     return result
@@ -272,7 +272,7 @@ def _unmigrated_archives(base: Path) -> list[str]:
 
 
 def _tracked_legacy_runtime_artifacts(root: Path) -> list[str]:
-    paths = [f".governance/{dirname}" for dirname in LEGACY_HEAVY_DIRS]
+    paths = [f".governance/{dirname}" for dirname in LEGACY_PROJECT_DIRS]
     try:
         completed = subprocess.run(
             ["git", "-C", str(root), "ls-files", "--", *paths],
@@ -319,7 +319,7 @@ def _ensure_gitignore(root: Path) -> list[str]:
     return [f".gitignore:{item}" for item in applied]
 
 
-def _upgrade_existing_lean_state(base: Path) -> bool:
+def _upgrade_existing_project_state(base: Path) -> bool:
     state_path = base / "state.yaml"
     if not state_path.exists():
         return False
@@ -332,7 +332,7 @@ def _upgrade_existing_lean_state(base: Path) -> bool:
         return False
     protocol["name"] = protocol.get("name") or "open-cowork"
     protocol["version"] = PROTOCOL_VERSION
-    payload.setdefault("layout", "lean")
+    payload.setdefault("layout", "current-state")
     write_yaml(state_path, payload)
     return True
 

@@ -4,11 +4,11 @@ Use this project entry whenever a human asks any local Agent to continue, review
 
 This file is the project-scoped source of truth for Agent handoff. It can be registered as a platform Skill when supported, but it is not tied to any single Agent runtime.
 
-## Deterministic protocol trigger
+## Deterministic project entry
 
 - Reliable trigger: run the project resume / status entry in the project root.
-- Natural-language phrasing is only a request to run that entry; do not rely on keywords, language, or chat history.
-- v0.3.11 default model is lean protocol: read the small current working set first, not cold history.
+- Natural-language phrasing is only a request to use this project entry; do not treat `open-cowork` as a missing platform Skill or reconstruct state from chat history.
+- v0.3.11 default behavior is to read the small current working set first, not cold history.
 
 ## Recommended read set
 

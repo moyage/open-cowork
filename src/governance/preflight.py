@@ -30,6 +30,10 @@ def check_execution_preflight(root: str | Path, change_id: str | None = None, pa
             "required_action": "initialize open-cowork before modifying project files",
         }
 
+    project_state_path = paths.governance_dir / "state.yaml"
+    if project_state_path.exists() and not (paths.governance_dir / "index" / "current-change.yaml").exists():
+        return _check_project_state_preflight(paths, payload, paths_to_modify)
+
     selected = _select_active_change(paths, change_id)
     if not selected:
         reason = "change_not_found" if change_id else "no_active_change"
@@ -113,6 +117,74 @@ def check_execution_preflight(root: str | Path, change_id: str | None = None, pa
     }
 
 
+def _check_project_state_preflight(paths: GovernancePaths, payload: dict, paths_to_modify: list[str] | None) -> dict:
+    from .project_round import evaluate_execution_gate_for_root
+    from .project_state import load_project_state
+
+    state = load_project_state(paths.root)
+    active_round = state.get("active_round", {}) if isinstance(state, dict) else {}
+    round_id = active_round.get("round_id")
+    base = {
+        **payload,
+        "change_id": round_id,
+        "current_step": active_round.get("phase"),
+        "current_status": "active-round",
+        "contract_ref": ".governance/state.yaml",
+        "evidence_ref": ".governance/evidence.yaml",
+        "checked_paths": list(paths_to_modify or []),
+    }
+
+    decision = evaluate_execution_gate_for_root(state, paths.root)
+    if not decision.get("allowed"):
+        return {
+            **base,
+            "reason": decision.get("reason") or "execution_gate_required",
+            "required_action": _project_state_required_action(decision),
+            "gate_decision": decision,
+        }
+
+    scope = active_round.get("scope") or {}
+    scope_result = _scope_check_patterns(
+        list(scope.get("in") or []),
+        list(scope.get("out") or []),
+        list(paths_to_modify or []),
+    )
+    if not scope_result["allowed"]:
+        return {
+            **base,
+            "reason": scope_result["reason"],
+            "required_action": scope_result["required_action"],
+            "scope_violations": scope_result["violations"],
+        }
+
+    return {
+        **base,
+        "can_execute": True,
+        "reason": decision.get("reason") or "execution_ready",
+        "required_action": "record objective evidence in .governance/evidence.yaml for the active round",
+        "gate_decision": decision,
+    }
+
+
+def _project_state_required_action(decision: dict) -> str:
+    reason = decision.get("reason")
+    if reason == "participant_initialization_required":
+        return "initialize required round participants before modifying project files"
+    if reason == "participant_confirmation_required":
+        return "record human confirmation of round participants before modifying project files"
+    if reason == "external_rules_confirmation_required":
+        return "confirm external rules or explicit skip before modifying project files"
+    if reason == "step_outputs_required":
+        return "complete required round step output documents before modifying project files"
+    if reason == "execution_approval_required":
+        return "approve the round execution gate before modifying project files"
+    if reason == "approval_evidence_required":
+        return "record execution gate approval evidence before modifying project files"
+    if reason == "state_schema_invalid":
+        return "fix .governance/state.yaml schema errors before modifying project files"
+    return "resolve active round execution gate blockers before modifying project files"
+
+
 def record_flow_bypass_recovery(
     root: str | Path,
     *,
@@ -177,8 +249,14 @@ def _scope_check(contract_path: Path, paths_to_modify: list[str]) -> dict:
     if not paths_to_modify:
         return {"allowed": True, "reason": "", "required_action": "", "violations": []}
     contract = load_yaml(contract_path)
-    scope_in = list(contract.get("scope_in") or [])
-    scope_out = list(contract.get("scope_out") or [])
+    return _scope_check_patterns(
+        list(contract.get("scope_in") or []),
+        list(contract.get("scope_out") or []),
+        paths_to_modify,
+    )
+
+
+def _scope_check_patterns(scope_in: list[str], scope_out: list[str], paths_to_modify: list[str]) -> dict:
     violations = []
     for path in paths_to_modify:
         normalized = str(path).strip().lstrip("./")

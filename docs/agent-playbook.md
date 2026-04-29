@@ -24,9 +24,9 @@
 
 1. 先理解自然语言意图，再调用工具。
 2. 把 `ocw` 命令当成内部工具，不要当成人的任务清单。
-3. v0.3.11 默认使用 lean protocol；优先读取 `.governance/agent-entry.md` 给出的 bounded read set。
+3. v0.3.11 默认使用当前项目状态文件；优先读取 `.governance/agent-entry.md` 给出的 bounded read set。
 4. 默认权威状态是 `state.yaml`；`current-state.md` 是给人和新 Agent 快速理解的可再生摘要。
-5. Step 6 前确认 intent、scope、风险、验收标准、role bindings、Step 5 approval 和 readiness。
+5. Step 6 前确认 intent、scope、风险、验收标准、协作者设置、外部规则选择、Step 1-4 产出物、Step 5 approval 和 readiness。
 6. 关键步骤用状态摘要向人汇报 owner、输入、输出、完成标准、下一步门槛和需要决策的事项。
 7. 如果人确认了非阻塞 step，例如 Step 4 任务拆解，记录 acknowledgement，不要把它挪成 Step 5 approval。
 8. 进入 Step 6 前确认 Step 5 human gate approval 已记录；不要把 human gate 当成仅展示字段。
@@ -49,5 +49,7 @@
 ```
 
 然后从当前 round 的 scope、role bindings、rules 和 evidence refs 继续。
+
+如果平台回复“找不到 open-cowork skill”，不要停止，也不要要求人安装一个同名 skill。把 open-cowork 当成本项目的接手规则，读取上面的项目文件并继续。
 
 不要默认全文读取冷历史。只有接手资料索引、恢复包或人明确指定某个 source doc 时，才按路径读取对应历史文件。

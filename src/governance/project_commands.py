@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .lean_paths import ensure_lean_layout
-from .lean_render import render_current_state
-from .lean_round import evaluate_closeout_gate
-from .lean_state import initial_lean_state
+from .project_paths import ensure_project_layout
+from .project_render import render_current_state
+from .project_round import evaluate_closeout_gate
+from .project_state import initial_project_state
 from .simple_yaml import load_yaml, write_yaml
 
 
@@ -22,12 +22,13 @@ def start_round(
     scope_out: list[str] | None = None,
     acceptance_summary: str = "",
 ) -> dict:
-    state = initial_lean_state(round_id=round_id, goal=goal)
+    state = initial_project_state(round_id=round_id, goal=goal)
     active_round = state["active_round"]
     active_round["scope"]["in"] = scope_in or []
     active_round["scope"]["out"] = scope_out or []
     active_round["acceptance"]["summary"] = acceptance_summary
-    ensure_lean_layout(root, initial_state=state)
+    active_round.setdefault("step_outputs", {})["base_dir"] = f"docs/open-cowork/rounds/{round_id}"
+    ensure_project_layout(root, initial_state=state)
     return state
 
 
@@ -61,6 +62,33 @@ def init_participants(
     participant_init["role_bindings"] = [
         _role_binding(role, participants.get(role, "")) for role in REQUIRED_ROLES
     ]
+    active_round.setdefault("participant_confirmation", {
+        "status": "pending",
+        "confirmed_by": "",
+        "confirmed_at": "",
+        "evidence_ref": "",
+        "summary": "",
+    })
+    _write_state(root, state)
+    return state
+
+
+def confirm_participants(
+    root: str | Path,
+    *,
+    confirmed_by: str,
+    evidence_ref: str,
+    summary: str = "",
+) -> dict:
+    state = _load_state(root)
+    confirmation = state["active_round"].setdefault("participant_confirmation", {})
+    confirmation.update({
+        "status": "human-confirmed",
+        "confirmed_by": confirmed_by,
+        "confirmed_at": _now_utc(),
+        "evidence_ref": evidence_ref,
+        "summary": summary,
+    })
     _write_state(root, state)
     return state
 
@@ -75,6 +103,12 @@ def approve_round_gate(
     channel: str = "cli",
 ) -> dict:
     state = _load_state(root)
+    if gate == "execution":
+        from .project_round import evaluate_execution_prerequisites
+
+        readiness = evaluate_execution_prerequisites(state, root)
+        if not readiness.get("allowed"):
+            raise ValueError(f"execution approval blocked: {readiness.get('reason')}")
     gate_payload = state["active_round"]["gates"][gate]
     gate_payload.update({
         "status": "approved",
@@ -153,8 +187,36 @@ def add_rule(
     active_rules = state["active_round"].setdefault("external_rules", {}).setdefault("active", [])
     active_rules[:] = [item for item in active_rules if item.get("id") != rule_id]
     active_rules.append({"id": rule_id, "failure_impact": failure_impact})
+    confirmation = state["active_round"].setdefault("external_rules", {}).setdefault("confirmation", {})
+    confirmation.update({
+        "status": "selected",
+        "confirmed_by": "agent",
+        "confirmed_at": _now_utc(),
+        "evidence_ref": authorization_ref,
+        "summary": f"External rule selected: {rule_id}",
+    })
     _write_state(root, state)
     return True, entry
+
+
+def confirm_external_rules(
+    root: str | Path,
+    *,
+    actor: str,
+    evidence_ref: str,
+    summary: str,
+) -> dict:
+    state = _load_state(root)
+    confirmation = state["active_round"].setdefault("external_rules", {}).setdefault("confirmation", {})
+    confirmation.update({
+        "status": "confirmed",
+        "confirmed_by": actor,
+        "confirmed_at": _now_utc(),
+        "evidence_ref": evidence_ref,
+        "summary": summary,
+    })
+    _write_state(root, state)
+    return state
 
 
 def update_rule_status(
@@ -241,7 +303,7 @@ def close_round(
 
 
 def _load_state(root: str | Path) -> dict:
-    ensure_lean_layout(root)
+    ensure_project_layout(root)
     return load_yaml(_base(root) / "state.yaml")
 
 

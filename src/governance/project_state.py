@@ -30,10 +30,10 @@ REVIEW_DECISION_BY_STATUS = {
 }
 
 
-def initial_lean_state(*, round_id: str = "R-00000000-001", goal: str = "") -> dict:
+def initial_project_state(*, round_id: str = "R-00000000-001", goal: str = "") -> dict:
     return {
         "protocol": {"name": "open-cowork", "version": PROTOCOL_VERSION},
-        "layout": "lean",
+        "layout": "current-state",
         "default_read_set": [
             ".governance/AGENTS.md",
             ".governance/agent-entry.md",
@@ -74,11 +74,37 @@ def initial_lean_state(*, round_id: str = "R-00000000-001", goal: str = "") -> d
                     "impact_scope": "",
                 },
             },
+            "participant_confirmation": {
+                "status": "pending",
+                "confirmed_by": "",
+                "confirmed_at": "",
+                "evidence_ref": "",
+                "summary": "",
+            },
             "gates": {
                 "execution": _empty_gate(),
                 "closeout": _empty_gate(),
             },
-            "external_rules": {"active": [], "suspended": []},
+            "external_rules": {
+                "active": [],
+                "suspended": [],
+                "confirmation": {
+                    "status": "pending",
+                    "confirmed_by": "",
+                    "confirmed_at": "",
+                    "evidence_ref": "",
+                    "summary": "",
+                },
+            },
+            "step_outputs": {
+                "base_dir": "",
+                "required_before_execution": [
+                    {"step": 1, "name": "intent", "file": "intent.md"},
+                    {"step": 2, "name": "requirements", "file": "requirements.md"},
+                    {"step": 3, "name": "design", "file": "design.md"},
+                    {"step": 4, "name": "tasks", "file": "tasks.md"},
+                ],
+            },
             "evidence_refs": [],
             "verify": {"status": "not-run", "summary": "", "rule_results": []},
             "review": {"status": "not-requested", "decision": "", "reviewer": "", "independent": True, "summary": ""},
@@ -96,20 +122,20 @@ def initial_lean_state(*, round_id: str = "R-00000000-001", goal: str = "") -> d
     }
 
 
-def load_lean_state(root: str | Path) -> dict:
+def load_project_state(root: str | Path) -> dict:
     return load_yaml(Path(root) / ".governance" / "state.yaml")
 
 
-def validate_lean_documents(root: str | Path) -> list[str]:
+def validate_project_documents(root: str | Path) -> list[str]:
     base = Path(root) / ".governance"
-    errors = validate_lean_state(load_yaml(base / "state.yaml"))
+    errors = validate_project_state(load_yaml(base / "state.yaml"))
     errors.extend(_validate_ledger(load_yaml(base / "ledger.yaml")))
     errors.extend(_validate_evidence(load_yaml(base / "evidence.yaml")))
     errors.extend(_validate_rules(load_yaml(base / "rules.yaml")))
     return errors
 
 
-def validate_lean_state(state: dict) -> list[str]:
+def validate_project_state(state: dict) -> list[str]:
     errors: list[str] = []
     protocol = state.get("protocol", {})
     if protocol.get("version") != PROTOCOL_VERSION:

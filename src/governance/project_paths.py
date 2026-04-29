@@ -5,7 +5,7 @@ from pathlib import Path
 from .simple_yaml import write_yaml
 
 
-LEAN_LAYOUT_FILES = (
+PROJECT_LAYOUT_FILES = (
     "AGENTS.md",
     "agent-entry.md",
     "agent-playbook.md",
@@ -16,7 +16,7 @@ LEAN_LAYOUT_FILES = (
     "rules.yaml",
 )
 
-LEAN_LAYOUT_DIRS = ("templates",)
+PROJECT_LAYOUT_DIRS = ("templates",)
 
 DEFAULT_READ_SET = (
     "AGENTS.md",
@@ -25,7 +25,7 @@ DEFAULT_READ_SET = (
     "state.yaml",
 )
 
-LEGACY_HEAVY_DIRS = (
+LEGACY_PROJECT_DIRS = (
     "changes",
     "archive",
     "runtime",
@@ -43,21 +43,30 @@ def default_read_set_paths(root: str | Path) -> list[Path]:
     return [base / name for name in DEFAULT_READ_SET]
 
 
-def ensure_lean_layout(root: str | Path, *, initial_state: dict | None = None) -> None:
-    from .lean_render import render_current_state
-    from .lean_state import initial_lean_state
+def ensure_project_layout(root: str | Path, *, initial_state: dict | None = None) -> None:
+    from .project_render import render_current_state
+    from .project_state import initial_project_state
 
     base = governance_dir(root)
     base.mkdir(parents=True, exist_ok=True)
-    for dirname in LEAN_LAYOUT_DIRS:
+    for dirname in PROJECT_LAYOUT_DIRS:
         (base / dirname).mkdir(parents=True, exist_ok=True)
 
-    _write_text_if_missing(base / "AGENTS.md", "# open-cowork Agent 入口\n\n本项目使用 open-cowork v0.3.11 lean protocol。\n")
-    _write_text_if_missing(base / "agent-entry.md", "# Agent Entry\n\n读取默认读取集后再继续。\n")
-    _write_text_if_missing(base / "agent-playbook.md", "# Agent Playbook\n\n按当前 round 的 gate 推进。\n")
+    _write_text_if_missing(
+        base / "AGENTS.md",
+        "# open-cowork Agent 入口\n\n本项目使用 open-cowork 管理协作事实。收到开发、接手、审查或验证请求时，先读取 `.governance/agent-entry.md`，再修改项目文件。\n",
+    )
+    _write_text_if_missing(
+        base / "agent-entry.md",
+        "# open-cowork Agent Entry\n\nopen-cowork 是项目级协作方式，不是平台 Skill 名称。若当前 Agent 环境提示找不到 `open-cowork` skill，请直接读取本文件和 `.governance/current-state.md`，并在内部运行项目接手入口后继续。\n",
+    )
+    _write_text_if_missing(
+        base / "agent-playbook.md",
+        "# open-cowork Agent Playbook\n\n按当前 round 的范围、协作者确认、外部规则确认、执行批准、验证和独立审查推进。\n",
+    )
     state_path = base / "state.yaml"
     if initial_state is not None or not state_path.exists():
-        state = initial_state or initial_lean_state()
+        state = initial_state or initial_project_state()
         write_yaml(state_path, state)
     else:
         from .simple_yaml import load_yaml

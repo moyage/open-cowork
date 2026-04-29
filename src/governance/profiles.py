@@ -12,7 +12,7 @@ ADOPTION_PROFILES: dict[str, dict] = {
         "profile_version": "ocw.adoption-profile.v1",
         "profile_id": "core",
         "display_name": "Lightweight",
-        "human_label": "轻量协作",
+        "human_label": "基础协作",
         "description": "低风险单人或单 Agent 工作的最小治理。",
         "selection_guidance": "Agent may choose this for low-risk solo work; humans only need to confirm that lightweight governance is acceptable.",
         "enabled_controls": [

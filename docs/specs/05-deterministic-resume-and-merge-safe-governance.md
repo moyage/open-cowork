@@ -115,7 +115,7 @@ v0.3.6 的合并原则是：权威事实优先，投影可重建。
 
 默认写入：
 
-- `.governance/local/current-state.md`
+- `.governance/current-state.md`
 - `.governance/local/PROJECT_ACTIVATION.yaml`
 - `.governance/local/runtime/status/**`
 
