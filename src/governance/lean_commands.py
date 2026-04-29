@@ -203,6 +203,8 @@ def close_round(
     evidence_ref: str = "",
 ) -> tuple[bool, dict]:
     state = _load_state(root)
+    if summary:
+        state["active_round"]["closeout"]["summary"] = summary
     decision = evaluate_closeout_gate(state)
     if not decision.get("allowed"):
         return False, decision

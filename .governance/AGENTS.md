@@ -10,7 +10,7 @@
 4. `.governance/state.yaml`：v0.3.11 lean compact 权威状态。
 5. `.governance/evidence.yaml`、`.governance/ledger.yaml`、`.governance/rules.yaml`：证据引用、接续记录和规则。
 
-只读取当前 active working set。不要默认全文扫描冷历史、历史计划或旧 heavy layout；历史文档只在明确需要追溯 source docs 时按路径读取。
+只读取当前 active working set。不要默认全文扫描冷历史、历史计划、旧 heavy layout、session JSONL 或大日志；历史文档只在明确需要追溯 source docs 时按路径读取。大型输出必须写入文件并在对话中只引用 evidence ref、路径和短摘要。
 
 ## 操作规则
 

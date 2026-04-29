@@ -22,6 +22,13 @@ This file is the project-scoped source of truth for Agent handoff. It can be reg
 
 If a file is missing during migration, report the missing fact explicitly and use the migration / verify flow before execution.
 
+## Context discipline
+
+- Do not full-scan cold history, archives, session JSONL, or large logs unless `state.yaml`, `current-state.md`, or a recovery handoff points to a specific path.
+- Write large command output, reviews, and recovery data to files; cite evidence refs and short summaries in chat.
+- Use targeted reads with line ranges, filters, or summaries. Keep `current-state.md` under 200 lines and `state.yaml` under 400 lines.
+- After compact failure, resume from the generated handoff and last successful evidence instead of rereading the failed transcript.
+
 ## Activation rule
 
 1. Treat open-cowork as project-scoped, not Agent-scoped.

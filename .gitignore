@@ -18,12 +18,24 @@ venv/
 .worktrees/
 .baseline_exports/
 
+# Local Agent/runtime state from dogfood or target-project operation
+.agent-state/
+docs/superpowers/
+tests/
+
 # Runtime governance outputs (generated)
+.governance/current-state.md
+.governance/evidence.yaml
+.governance/ledger.yaml
+.governance/reviews/
+.governance/rules.yaml
+.governance/state.yaml
 .governance/index/
 .governance/changes/
 .governance/archive/
 .governance/runtime/
 .governance/team/
+.governance/cold/
 
 # Keep templates committed
 !.governance/templates/

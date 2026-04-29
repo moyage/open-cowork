@@ -26,7 +26,7 @@ open-cowork 默认面向 AI 时代的使用路径：
 
 1. 识别目标项目和人的当前意图。
 2. 检查 open-cowork 是否已经安装或可从本地仓库使用。
-3. 如果目标项目还没有 `.governance/`，初始化 v0.3.11 lean protocol。
+3. 初始化或升级 v0.3.11 lean protocol；若目标项目已有旧 heavy layout，由安装入口自动迁移并验证。
 4. 生成或读取当前项目的 bounded read set。
 5. 让人确认个人域参与者和 9 步 owner / assistant / reviewer / human gate 矩阵。
 6. 捕获并确认本轮真实意图：需求、优化、Bug、范围、非目标、风险和验收标准。
@@ -38,6 +38,8 @@ open-cowork 默认面向 AI 时代的使用路径：
 v0.3.11 起，新项目默认不创建旧 heavy 布局。Agent 应围绕 `.governance/state.yaml`、`.governance/current-state.md`、`.governance/evidence.yaml`、`.governance/ledger.yaml` 和 `.governance/rules.yaml` 维护项目事实。大型输出写入默认读取集之外，只登记有界 evidence ref。
 
 如果有需求基线、dogfood 报告或审计报告，Agent 应把来源绑定到本轮状态或 ledger，而不是把归档历史全文读进上下文。
+
+Agent 在长任务中必须按 compact-resilient discipline 工作：只读 bounded read set；Hermes/OOSO/review/test 的完整输出写入文件；聊天中只保留 evidence ref、路径和短摘要；对大日志、session JSONL、cold history 使用定点读取或恢复 handoff。compact 或 stream 中断后，从恢复包和最后成功 evidence 继续，不重新打捞完整失败会话。
 
 ## 接手与并行需求
 
@@ -55,7 +57,7 @@ Step 8 review 应由独立 reviewer 完成，并记录真实 reviewer runtime ev
 
 ## 旧版本项目处理
 
-旧版本项目如果存在 heavy layout，Agent 应按“检测 -> dry-run -> 人确认 -> 迁移 -> verify -> 可选清理 / 卸载”的顺序处理。旧历史移动到 cold history 后只作为追溯材料，不进入默认读取集。清理和卸载都必须有显式确认与 receipt，不能把 dry-run 文案说成已经物理删除。
+旧版本项目如果存在 heavy layout，Agent 应通过安装、初始化、setup 或 onboard 入口自动检测、迁移并验证，不要求人额外理解或执行迁移命令。旧历史移动到 cold history 后只作为追溯材料，不进入默认读取集。清理 cold history 和卸载治理文件属于破坏性动作，仍必须先 dry-run、再显式确认并写入 receipt，不能把 dry-run 文案说成已经物理删除。
 
 ## 不应该怎么做
 
@@ -66,3 +68,4 @@ Step 8 review 应由独立 reviewer 完成，并记录真实 reviewer runtime ev
 - 不要把 open-cowork 当成替代用户现有 Agent 或 IDE 的新 runtime。
 - 不要默认全文扫描冷历史；先按接手摘要给出的建议读取顺序读取。
 - 不要把接手资料索引当成新的权威事实源；它只是降低上下文成本的索引。
+- 不要把 Hermes/OOSO 横幅、完整 diff、完整测试日志或完整 session 恢复内容直接灌进上下文。

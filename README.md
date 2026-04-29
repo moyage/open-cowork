@@ -131,20 +131,19 @@ open-cowork 的 README 只说明当前框架和流程，不承担版本发布说
 | 规则与策略 | `.governance/rules.yaml` | Agent + Reviewer |
 | 收束与接续记录 | `.governance/ledger.yaml` | Agent + 审计 |
 
-旧版本项目可能仍有重目录布局。v0.3.11 对这类项目的处理方式是：先检测，再 dry-run，再经人确认迁移到 cold history，最后按需清理或卸载。旧重目录不再是新项目的默认操作模型。
+旧版本项目可能仍有重目录布局。v0.3.11 对这类项目的默认处理方式是：Agent 在安装、初始化或 setup/onboard 时自动检测旧布局，生成 lean state，把旧重目录迁移到 cold history，并运行验证。人不需要额外理解或执行迁移命令。只有清理 cold history 或卸载治理文件这类破坏性动作，才需要显式确认和 receipt。
 
 人和团队通常只需要读 `current-state.md`、当前状态报告、review 摘要和 closeout 摘要；Agent 才需要消费 YAML 状态、证据引用和 rules。
 
-## 旧版本如何迁移、清理和卸载
+## 旧版本如何升级、清理和卸载
 
-Agent 负责处理旧版本项目，人不需要记命令。推荐顺序是：
+Agent 负责处理旧版本项目，人不需要记命令。默认顺序是：
 
-1. 识别旧 heavy 布局和潜在风险。
-2. 先做 dry-run，向人说明会移动什么、不会删除什么。
-3. 经过人确认后，把旧历史移动到 cold history，并写入迁移 receipt。
-4. 运行 verify，确认 lean 文件、receipt 和 legacy 状态一致。
-5. 如需清理，再次 dry-run 并经人确认后执行 cleanup。
-6. 如需卸载，默认拒绝破坏性删除；只有显式确认并记录卸载前 audit 时才移除治理文件。
+1. 安装、初始化、setup 或 onboard 入口自动识别旧 heavy 布局和协议版本。
+2. 自动创建或升级 lean 文件，把旧历史迁移到 cold history，并写入 migration receipt。
+3. 自动运行 verify，确认 lean 文件、receipt 和 legacy 状态一致；失败时停止后续 setup/onboard。
+4. 如需清理 cold history，再做 dry-run 并经人确认后执行 cleanup。
+5. 如需卸载，默认拒绝破坏性删除；只有显式确认并记录卸载前 audit 时才移除治理文件。
 
 ## 人类最小操作面
 

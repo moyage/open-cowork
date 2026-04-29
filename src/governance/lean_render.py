@@ -3,6 +3,7 @@ from __future__ import annotations
 
 def render_current_state(state: dict) -> str:
     active_round = state.get("active_round", {}) if isinstance(state, dict) else {}
+    context_budget = state.get("context_budget", {}) if isinstance(state, dict) else {}
     lines = [
         "# open-cowork current state",
         "",
@@ -14,6 +15,13 @@ def render_current_state(state: dict) -> str:
         f"- participant_initialization: {active_round.get('participant_initialization', {}).get('status', '')}",
         f"- verify: {active_round.get('verify', {}).get('status', '')}",
         f"- review: {active_round.get('review', {}).get('status', '')} / {active_round.get('review', {}).get('decision', '')}",
+        "",
+        "## Context Budget",
+        f"- current_state_target_lines: {context_budget.get('current_state_target_lines', 200)}",
+        f"- state_target_lines: {context_budget.get('state_target_lines', 400)}",
+        "- default_read_set: bounded",
+        "- large_outputs: write-to-file-and-reference",
+        "- cold_history: pointer-only",
         "",
         "## Decisions Needed",
     ]

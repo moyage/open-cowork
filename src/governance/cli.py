@@ -1699,10 +1699,22 @@ def cmd_init(args):
         ensure_governance_index(args.root)
         print(f"Initialized open-cowork governance in {args.root}/.governance (legacy layout)")
         return 0
-    from governance.lean_paths import ensure_lean_layout
+    from governance.lean_migration import install_or_upgrade_lean
 
-    ensure_lean_layout(args.root)
+    payload = install_or_upgrade_lean(args.root)
     print(f"Initialized open-cowork v0.3.11 lean governance in {args.root}/.governance")
+    if "migrated-legacy-heavy-layout" in payload["actions"]:
+        print("- legacy layout detected and migrated automatically")
+    if "upgraded-lean-protocol-version" in payload["actions"]:
+        print("- existing lean state upgraded automatically")
+    if payload.get("receipt"):
+        print(f"- migration_receipt: {payload['receipt']}")
+    if not payload["verification"]["ok"]:
+        print("- verification: failed")
+        for error in payload["verification"]["errors"]:
+            print(f"  - {error}")
+        return 1
+    print("- verification: passed")
     return 0
 
 
@@ -1751,7 +1763,11 @@ def cmd_onboard(args):
     print(f"- target: {target}")
     print(f"- mode: {mode}")
     print("")
-    cmd_init(argparse.Namespace(root=str(target), legacy_layout=False))
+    init_exit = cmd_init(argparse.Namespace(root=str(target), legacy_layout=False))
+    if init_exit != 0:
+        print("")
+        print("Onboarding stopped: open-cowork initialization or upgrade verification failed.")
+        return init_exit
     print("")
     cmd_status(argparse.Namespace(root=str(target)))
     if not args.no_diagnose:
@@ -1923,6 +1939,7 @@ def _should_render_lean_status(args) -> bool:
 
 
 def _print_lean_status(root: str | Path) -> None:
+    from governance.activation import LEAN_CONTEXT_DISCIPLINE
     from governance.lean_round import evaluate_closeout_gate, evaluate_execution_gate
     from governance.lean_state import load_lean_state, validate_lean_state
 
@@ -1947,6 +1964,12 @@ def _print_lean_status(root: str | Path) -> None:
     print("## Gates")
     print(f"- execution: {execution.get('reason')} allowed={str(execution.get('allowed')).lower()}")
     print(f"- closeout: {closeout.get('reason')} allowed={str(closeout.get('allowed')).lower()}")
+    print("## Context Budget")
+    print("- default_read_set: bounded")
+    print("- large_outputs: write-to-file-and-reference")
+    print("- cold_history: pointer-only")
+    for item in LEAN_CONTEXT_DISCIPLINE:
+        print(f"- {item}")
     print("")
 
 
@@ -2974,7 +2997,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "init":
-        cmd_init(args)
+        return cmd_init(args)
     elif args.command == "version":
         return cmd_version(args)
     elif args.command in {"onboard", "setup"}:
